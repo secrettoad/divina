@@ -86,9 +86,9 @@ import_s3 = boto3.client(
     aws_session_token=import_credentials['SessionToken'],
 )
 
-source_objects = source_s3.list_objects(Bucket='lambdaschool-coysu')['Contents']
+source_objects = source_s3.list_objects(Bucket='coysu-divina-prototype')['Contents']
 try:
-    import_s3.create_bucket(Bucket='lambdaschool-coysu2',
+    import_s3.create_bucket(Bucket='coysu-divina-prototype2',
                                  CreateBucketConfiguration={
                                      'LocationConstraint': 'us-west-2'
                                  })
@@ -98,12 +98,12 @@ except ClientError as e:
 
 for file in source_objects:
     object_response = source_s3.get_object(
-        Bucket='lambdaschool-coysu',
+        Bucket='coysu-divina-prototype',
         Key=file['Key']
     )
     import_s3.put_object(
         ACL='public-read',
         Body=io.BytesIO(object_response['Body'].read()),
-        Bucket='lambdaschool-coysu2',
+        Bucket='coysu-divina-prototype2',
         Key=file['Key']
     )

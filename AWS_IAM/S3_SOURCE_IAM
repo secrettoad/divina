@@ -4,7 +4,7 @@
         {
             "Effect": "Allow",
             "Action": "s3:PutObject",
-            "Resource": "arn:aws:s3:::lambdaschool-coysu2/*",
+            "Resource": "arn:aws:s3:::coysu-divina-prototype2/*",
             "Condition": {
                 "StringEquals": {
                     "s3:x-amz-acl": "bucket-owner-full-control"
@@ -14,14 +14,14 @@
         {
             "Effect": "Allow",
             "Action": "s3:ListBucket",
-            "Resource": "arn:aws:s3:::lambdaschool-coysu"
+            "Resource": "arn:aws:s3:::coysu-divina-prototype"
         },
         {
             "Effect": "Allow",
             "Action": "s3:GetObject",
             "Resource": [
-                "arn:aws:s3:::lambdaschool-coysu",
-                "arn:aws:s3:::lambdaschool-coysu/*"
+                "arn:aws:s3:::coysu-divina-prototype",
+                "arn:aws:s3:::coysu-divina-prototype/*"
             ]
         }
     ]
