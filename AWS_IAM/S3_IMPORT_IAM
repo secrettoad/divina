@@ -1,0 +1,33 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket",
+                "s3:GetObject"
+            ],
+            "Resource": [
+                "arn:aws:s3:::lambdaschool-coysu",
+                "arn:aws:s3:::lambdaschool-coysu/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket",
+                "s3:PutObject",
+                "s3:PutObjectAcl"
+            ],
+            "Resource": [
+                "arn:aws:s3:::lambdaschool-coysu2",
+                "arn:aws:s3:::lambdaschool-coysu2/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": "s3:CreateBucket",
+            "Resource": "arn:aws:s3:::lambdaschool-coysu2"
+        }
+    ]
+}
