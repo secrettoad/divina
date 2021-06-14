@@ -4,7 +4,7 @@
     {
       "Effect": "Allow",
       "Principal": {
-        "AWS": ["arn:aws:iam::$ACCOUNT_NUMBER:user/rootish"]
+        "AWS": ["arn:aws:iam::${ACCOUNT_NUMBER}:user/rootish"]
       },
       "Action": "sts:AssumeRole"
     }
