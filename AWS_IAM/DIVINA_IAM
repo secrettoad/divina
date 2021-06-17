@@ -5,17 +5,6 @@
             "Effect": "Allow",
             "Action": [
                 "s3:ListBucket",
-                "s3:GetObject"
-            ],
-            "Resource": [
-                "arn:aws:s3:::coysu-divina-prototype",
-                "arn:aws:s3:::coysu-divina-prototype/*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:ListBucket",
                 "s3:PutObject",
                 "s3:PutObjectAcl"
             ],
@@ -28,6 +17,41 @@
             "Effect": "Allow",
             "Action": "s3:CreateBucket",
             "Resource": "arn:aws:s3:::coysu-divina-prototype-${VISION_ID}"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateRole",
+                "iam:CreatePolicy",
+                "iam:AttachRolePolicy",
+                "iam:CreateInstanceProfile",
+                "iam:AddRoleToInstanceProfile",
+                "iam:PassRole",
+                "iam:ListInstanceProfiles",
+                "iam:ListRoles"
+                ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "elasticmapreduce:RunJobFlow",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateServiceLinkedRole",
+                "iam:PutRolePolicy"
+            ],
+            "Resource": "arn:aws:iam::*:role/aws-service-role/elasticmapreduce.amazonaws.com*/AWSServiceRoleForEMRCleanup*",
+            "Condition": {
+                "StringLike": {
+                    "iam:AWSServiceName": [
+                        "elasticmapreduce.amazonaws.com",
+                        "elasticmapreduce.amazonaws.com.cn"
+                    ]
+                }
+            }
         }
     ]
 }
