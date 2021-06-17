@@ -10,7 +10,7 @@ import subprocess
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
 ####TODO abstract bucket names
-####TODO Make sure that spark cluster terminates at exit
+####TODO setup EC2 SSH keypair when creating cluster
 
 
 def create_source_s3_role(boto3_session, iam_path='AWS_IAM'):
@@ -66,14 +66,23 @@ def vision_setup(source_session, source_bucket, worker_profile, executor_role, v
             Key=file['Key']
         )
         vision_s3.put_object(
-            ACL='public-read',
             Body=io.BytesIO(object_response['Body'].read()),
             Bucket='coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
-            Key=file['Key']
+            Key='data/{}'.format(file['Key'])
         )
 
-    emr_cluster = setup_emr_cluster(vision_session=vision_session, worker_profile=worker_profile, executor_role=executor_role)
+    spark_scripts_directory = os.path.join(os.path.abspath('.'), 'spark_scripts')
 
+    for file in os.listdir(spark_scripts_directory):
+        path = os.path.join(spark_scripts_directory, file)
+        vision_s3.upload_file(
+            Filename=path,
+            Bucket='coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+            Key='spark_scripts/{}'.format(file)
+        )
+
+    emr_cluster = setup_emr_cluster(vision_session=vision_session, model_file='spark_model.py',
+                                    worker_profile=worker_profile, executor_role=executor_role)
 
 
 def create_vision_iam_role(boto3_session, iam_path='AWS_IAM'):
@@ -111,7 +120,8 @@ def create_vision_iam_role(boto3_session, iam_path='AWS_IAM'):
 def create_emr_roles(boto3_session):
     iam_client = boto3_session.client('iam')
 
-    if not all(x in [r['RoleName'] for r in iam_client.list_roles()['Roles']] for x in ['EMR_EC2_DefaultRole', 'EMR_DefaultRole']):
+    if not all(x in [r['RoleName'] for r in iam_client.list_roles()['Roles']] for x in
+               ['EMR_EC2_DefaultRole', 'EMR_DefaultRole']):
         subprocess.run(['aws', 'emr', 'create-default-roles'])
 
     return iam_client.list_roles()
@@ -122,25 +132,57 @@ def delete_emr_cluster(emr_cluster, boto3_session):
     emr_client.terminate_job_flows(JobFlowIds=[emr_cluster['JobFlowId']])
 
 
-def setup_emr_cluster(vision_session, worker_profile='EMR_EC2_DefaultRole', executor_role='EMR_DefaultRole'):
+def setup_emr_cluster(vision_session, model_file, worker_profile='EMR_EC2_DefaultRole',
+                      executor_role='EMR_DefaultRole'):
     emr_client = vision_session.client('emr')
     cluster = emr_client.run_job_flow(
         Name="divina-cluster-{}".format(os.environ['VISION_ID']),
         ReleaseLabel='emr-5.12.0',
         Instances={
-            'MasterInstanceType': 'm4.large',
-            'SlaveInstanceType': 'm4.large',
+            'MasterInstanceType': 'c4.large',
+            'SlaveInstanceType': 'c4.large',
             'InstanceCount': 3,
             'KeepJobFlowAliveWhenNoSteps': False,
             'TerminationProtected': False
         },
+        LogUri='s3://coysu-divina-prototype-{}/emr_logs'.format(os.environ['VISION_ID']),
+        Applications=[
+            {
+                'Name': 'Spark'
+            }
+        ],
+        Steps=[
+            {
+                'Name': 'Setup Debugging',
+                'ActionOnFailure': 'TERMINATE_CLUSTER',
+                'HadoopJarStep': {
+                    'Jar': 'command-runner.jar',
+                    'Args': ['state-pusher-script']
+                }
+            },
+            {
+                'Name': 'setup - copy files',
+                'ActionOnFailure': 'CANCEL_AND_WAIT',
+                'HadoopJarStep': {
+                    'Jar': 'command-runner.jar',
+                    'Args': ['aws', 's3', 'sync',
+                             's3://coysu-divina-prototype-{}/spark_scripts'.format(os.environ['VISION_ID']), '/home/hadoop/']
+                }
+            },
+            {
+                'Name': 'Run Spark',
+                'ActionOnFailure': 'CANCEL_AND_WAIT',
+                'HadoopJarStep': {
+                    'Jar': 'command-runner.jar',
+                    'Args': ['spark-submit', '/home/hadoop/{}'.format(model_file)]
+                }
+            }
+        ],
         VisibleToAllUsers=True,
         JobFlowRole=worker_profile,
         ServiceRole=executor_role
     )
     return cluster
-
-    ###TODO START HERE ^^ there is something invalid about the instance profile. It is not formatting or networking. Maybe needs different permissions?
 
 
 @backoff.on_exception(backoff.expo,
@@ -153,7 +195,8 @@ def assume_role(sts_client, role_arn, session_name):
     return assumed_import_role
 
 
-def create_vision(source_role=None, vision_role=None, worker_profile='EMR_EC2_DefaultRole', executor_role='EMR_DefaultRole',  region='us-east-2'):
+def create_vision(source_role=None, vision_role=None, worker_profile='EMR_EC2_DefaultRole',
+                  executor_role='EMR_DefaultRole', region='us-east-2'):
     os.environ['VISION_ID'] = str(round(datetime.datetime.now().timestamp()))
 
     source_session = boto3.session.Session(aws_access_key_id=os.environ['SOURCE_AWS_PUBLIC_KEY'],
@@ -162,7 +205,6 @@ def create_vision(source_role=None, vision_role=None, worker_profile='EMR_EC2_De
 
     vision_session = boto3.session.Session(aws_access_key_id=os.environ['AWS_PUBLIC_KEY'],
                                            aws_secret_access_key=os.environ['AWS_SECRET_KEY'], region_name=region)
-
 
     if not vision_role:
         vision_role = create_vision_iam_role(boto3_session=vision_session)
