@@ -48,13 +48,15 @@ def vision_setup(source_session, source_bucket, worker_profile, executor_role, v
     vision_s3 = vision_session.client('s3')
 
     try:
-        vision_s3.create_bucket(Bucket='coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+        vision_s3.create_bucket(Bucket='coysu-divina-prototype-visions',
                                 CreateBucketConfiguration={
                                     'LocationConstraint': region
                                 })
     except ClientError as e:
         if e.response['Error']['Code'] == 'BucketAlreadyOwnedByYou':
             print(e)
+        else:
+            raise e
     try:
         source_objects = source_s3.list_objects(Bucket=source_bucket)['Contents']
     except KeyError as e:
@@ -67,8 +69,8 @@ def vision_setup(source_session, source_bucket, worker_profile, executor_role, v
         )
         vision_s3.put_object(
             Body=io.BytesIO(object_response['Body'].read()),
-            Bucket='coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
-            Key='data/{}'.format(file['Key'])
+            Bucket='coysu-divina-prototype-visions',
+            Key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'], file['Key'])
         )
 
     spark_scripts_directory = os.path.join(os.path.abspath('.'), 'spark_scripts')
@@ -77,8 +79,8 @@ def vision_setup(source_session, source_bucket, worker_profile, executor_role, v
         path = os.path.join(spark_scripts_directory, file)
         vision_s3.upload_file(
             Filename=path,
-            Bucket='coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
-            Key='spark_scripts/{}'.format(file)
+            Bucket='coysu-divina-prototype-visions',
+            Key='coysu-divina-prototype-{}/spark_scripts/{}'.format(os.environ['VISION_ID'], file)
         )
 
     emr_cluster = setup_emr_cluster(vision_session=vision_session, model_file='spark_model.py',
@@ -139,11 +141,62 @@ def setup_emr_cluster(vision_session, model_file, worker_profile='EMR_EC2_Defaul
         Name="divina-cluster-{}".format(os.environ['VISION_ID']),
         ReleaseLabel='emr-5.12.0',
         Instances={
-            'MasterInstanceType': 'c4.large',
-            'SlaveInstanceType': 'c4.large',
-            'InstanceCount': 3,
             'KeepJobFlowAliveWhenNoSteps': False,
-            'TerminationProtected': False
+            'TerminationProtected': False,
+            'InstanceGroups': [
+                {
+                    'InstanceRole': 'TASK',
+                    'InstanceType': 'c4.xlarge',
+                    'InstanceCount': 3,
+                    'Configurations': [{
+                        "Classification": "spark-env",
+                        "Configurations": [
+                            {
+                                "Classification": "export",
+                                "Properties": {
+                                    "PYSPARK_PYTHON": "/usr/bin/python3",
+                                    "VISION_ID": os.environ['VISION_ID']
+                                }
+                            }
+                        ]
+                    }]
+                },
+                {
+                    'InstanceRole': 'MASTER',
+                    'InstanceType': 'c4.xlarge',
+                    'InstanceCount': 1,
+                    'Configurations': [{
+                        "Classification": "spark-env",
+                        "Configurations": [
+                            {
+                                "Classification": "export",
+                                "Properties": {
+                                    "PYSPARK_PYTHON": "/usr/bin/python3",
+                                    "VISION_ID": os.environ['VISION_ID']
+                                }
+                            }
+                        ]
+                    }]
+                },
+                {
+                    'InstanceRole': 'CORE',
+                    'InstanceType': 'c4.xlarge',
+                    'InstanceCount': 1,
+                    'Configurations': [{
+                        "Classification": "spark-env",
+                        "Configurations": [
+                            {
+                                "Classification": "export",
+                                "Properties": {
+                                    "PYSPARK_PYTHON": "/usr/bin/python3",
+                                    "VISION_ID": os.environ['VISION_ID']
+                                }
+                            }
+                        ]
+                    }]
+                }
+            ]
+
         },
         LogUri='s3://coysu-divina-prototype-{}/emr_logs'.format(os.environ['VISION_ID']),
         Applications=[
@@ -151,6 +204,7 @@ def setup_emr_cluster(vision_session, model_file, worker_profile='EMR_EC2_Defaul
                 'Name': 'Spark'
             }
         ],
+
         Steps=[
             {
                 'Name': 'Setup Debugging',
@@ -166,7 +220,9 @@ def setup_emr_cluster(vision_session, model_file, worker_profile='EMR_EC2_Defaul
                 'HadoopJarStep': {
                     'Jar': 'command-runner.jar',
                     'Args': ['aws', 's3', 'sync',
-                             's3://coysu-divina-prototype-{}/spark_scripts'.format(os.environ['VISION_ID']), '/home/hadoop/']
+                             's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/spark_scripts'.format(
+                                 os.environ['VISION_ID']),
+                             '/home/hadoop/']
                 }
             },
             {
@@ -178,6 +234,17 @@ def setup_emr_cluster(vision_session, model_file, worker_profile='EMR_EC2_Defaul
                 }
             }
         ],
+        Configurations=[{
+                        "Classification": "spark-env",
+                        "Configurations": [
+                            {
+                                "Classification": "export",
+                                "Properties": {
+                                    "PYSPARK_PYTHON": "/usr/bin/python3"
+                                }
+                            }
+                        ]
+                    }],
         VisibleToAllUsers=True,
         JobFlowRole=worker_profile,
         ServiceRole=executor_role

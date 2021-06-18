@@ -9,14 +9,14 @@
                 "s3:PutObjectAcl"
             ],
             "Resource": [
-                "arn:aws:s3:::coysu-divina-prototype-${VISION_ID}",
-                "arn:aws:s3:::coysu-divina-prototype-${VISION_ID}/*"
+                "arn:aws:s3:::coysu-divina-prototype-visions/coysu-divina-prototype-${VISION_ID}",
+                "arn:aws:s3:::coysu-divina-prototype-visions/coysu-divina-prototype-${VISION_ID}/*"
             ]
         },
         {
             "Effect": "Allow",
             "Action": "s3:CreateBucket",
-            "Resource": "arn:aws:s3:::coysu-divina-prototype-${VISION_ID}"
+            "Resource": "arn:aws:s3:::coysu-divina-prototype-visions"
         },
         {
             "Effect": "Allow",
