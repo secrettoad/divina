@@ -6,7 +6,9 @@
             "Action": [
                 "s3:ListBucket",
                 "s3:PutObject",
-                "s3:PutObjectAcl"
+                "s3:PutObjectAcl",
+                "s3:GetObject",
+                "s3:ListBucket"
             ],
             "Resource": [
                 "arn:aws:s3:::coysu-divina-prototype-visions/coysu-divina-prototype-${VISION_ID}",
@@ -35,6 +37,20 @@
         {
             "Effect": "Allow",
             "Action": "elasticmapreduce:RunJobFlow",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "ec2:DescribeInstanceTypes",
+            "Resource": "*"
+        },
+                {
+            "Effect": "Allow",
+            "Action": [
+                 "pricing:DescribeServices",
+                 "pricing:GetAttributeValues",
+                 "pricing:GetProducts"
+                 ],
             "Resource": "*"
         },
         {

@@ -28,7 +28,7 @@ def get_spark_context(app_name):
         'com.amazonaws.auth.profile.ProfileCredentialsProvider'
     )
 
-    return pyspark.SQLContext(sparkContext=sc)
+    return pyspark.SparkContext()
 
 
 sc = get_spark_context('test_vision')
@@ -44,6 +44,8 @@ object_response = s3.get_object(
     Bucket='coysu-divina-prototype-visions',
     Key='coysu-divina-prototype-{}/data/AirPassengers.csv'.format(os.environ['VISION_ID'])
 )
+
+
 
 sys.stderr.write('csv loaded from s3!!!!!')
 

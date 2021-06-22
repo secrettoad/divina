@@ -6,6 +6,8 @@ import io
 from botocore.exceptions import ClientError
 import backoff
 import subprocess
+from pkg_resources import resource_filename
+import math
 
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
@@ -72,6 +74,10 @@ def vision_setup(source_session, source_bucket, worker_profile, executor_role, v
             Bucket='coysu-divina-prototype-visions',
             Key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'], file['Key'])
         )
+        create_ec2_partitioning_instance(vision_session,
+                                         key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'],
+                                                                                        file['Key']),
+                                         bucket='coysu-divina-prototype-visions')
 
     spark_scripts_directory = os.path.join(os.path.abspath('.'), 'spark_scripts')
 
@@ -235,21 +241,91 @@ def setup_emr_cluster(vision_session, model_file, worker_profile='EMR_EC2_Defaul
             }
         ],
         Configurations=[{
-                        "Classification": "spark-env",
-                        "Configurations": [
-                            {
-                                "Classification": "export",
-                                "Properties": {
-                                    "PYSPARK_PYTHON": "/usr/bin/python3"
-                                }
-                            }
-                        ]
-                    }],
+            "Classification": "spark-env",
+            "Configurations": [
+                {
+                    "Classification": "export",
+                    "Properties": {
+                        "PYSPARK_PYTHON": "/usr/bin/python3"
+                    }
+                }
+            ]
+        }],
         VisibleToAllUsers=True,
         JobFlowRole=worker_profile,
         ServiceRole=executor_role
     )
     return cluster
+
+
+def ec2_pricing(boto3_session, filter_params=None):
+    pricing = boto3_session.client('pricing', region_name='us-east-1')
+    products_params = {'ServiceCode': 'AmazonEC2',
+                       'Filters': [
+                           {'Type': 'TERM_MATCH', 'Field': 'operatingSystem', 'Value': 'Linux'},
+                           {'Type': 'TERM_MATCH', 'Field': 'location',
+                            'Value': '{}'.format(get_region_name(boto3_session.region_name))}
+                       ]}
+    if filter_params:
+        products_params['Filters'] = products_params['Filters'] + filter_params
+    while True:
+        response = pricing.get_products(**products_params)
+        yield from [i for i in response['PriceList']]
+        if 'NextToken' not in response:
+            break
+        products_params['NextToken'] = response['NextToken']
+    return response
+
+
+def unnest_ec2_price(product):
+    od = product['terms']['OnDemand']
+    id1 = list(od)[0]
+    id2 = list(od[id1]['priceDimensions'])[0]
+    return {od[id1]['priceDimensions'][id2]['unit'] + '_USD': od[id1]['priceDimensions'][id2]['pricePerUnit']['USD']}
+
+
+def get_region_name(region_code):
+    default_region = 'EU (Ireland)'
+    endpoint_file = resource_filename('botocore', 'data/endpoints.json')
+    try:
+        with open(endpoint_file, 'r') as f:
+            data = json.load(f)
+        return data['partitions'][0]['regions'][region_code]['description']
+    except IOError:
+        return default_region
+
+
+def create_ec2_partitioning_instance(vision_session, key, bucket):
+    size = get_s3_object_size(vision_session, key, bucket)
+    required_gb = math.ceil(size * 2 / 1000000)
+    instance_info = [json.loads(p) for p in ec2_pricing(vision_session) if
+                     'memory' in json.loads(p)['product']['attributes'] and 'OnDemand' in json.loads(p)['terms']]
+    available_instance_types = [dict(i, **unnest_ec2_price(i)) for i in instance_info if
+                                i['product']['attributes']['memory'].split(' ')[0].isdigit()]
+    eligible_instance_types = [i for i in available_instance_types if
+                               float(i['product']['attributes']['memory'].split(' ')[0]) >= required_gb and 'Hrs_USD' in i]
+    partitioning_instance_type = eligible_instance_types[min(range(len(eligible_instance_types)), key=lambda index:
+    eligible_instance_types[index]['Hrs_USD'])]
+
+
+    ###TODO START HERE FILTER OUT $0 DEDICATED INSTANCE TYPES
+
+
+
+
+    ec2 = vision_session.client('ec2')
+    ec2.create_instances(ImageId='<ami-image-id>', MinCount=1, MaxCount=5,
+                         InstanceType=partitioning_instance_type['product']['attributes']['instanceType'], CpuOptions={
+            'CoreCount': 123,
+            'ThreadsPerCore': 123
+        })
+
+
+def get_s3_object_size(vision_session, key, bucket):
+    s3 = vision_session.client('s3')
+    response = s3.head_object(Bucket=bucket, Key=key)
+    size = response['ContentLength']
+    return size
 
 
 @backoff.on_exception(backoff.expo,
