@@ -10,7 +10,7 @@ sys.stdout.write('RUNNING PYTHON SCRIPT')
 def partition_data():
     df = pd.read_csv('s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data/{}'.format(
         environment['VISION_ID'], environment['DATA_FILE']))
-    partition_size = 2000000
+    partition_size = 2000000000
     if int(environment['SIZE']) <= partition_size:
         groupby = [('mono', df)]
     elif 'PARTITION_DIMENSIONS' in environment:

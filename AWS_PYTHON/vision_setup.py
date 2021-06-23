@@ -18,9 +18,9 @@ from botocore.config import Config
 ####TODO setup EC2 SSH keypair when creating cluster
 
 
-def create_source_s3_role(boto3_session, iam_path='AWS_IAM'):
+def create_source_s3_role(boto3_session, source_bucket, iam_path='AWS_IAM'):
     with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), iam_path, 'S3_SOURCE_IAM')) as f:
-        policy2_json = os.path.expandvars(json.dumps(json.load(f)))
+        policy2_json = os.path.expandvars(json.dumps(json.load(f))).replace('${SOURCE_BUCKET}', source_bucket)
     with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), iam_path, 'S3_SOURCE_ROLE_TRUST_POLICY')) as f:
         s3_source_role_trust_policy = os.path.expandvars(json.dumps(json.load(f)))
 
@@ -303,7 +303,7 @@ def get_region_name(region_code):
 
 def create_ec2_partitioning_instance(vision_session, key, bucket, ec2_keyfile, data_file, partition_dimensions):
     size = get_s3_object_size(vision_session, key, bucket)
-    required_gb = math.ceil(size * 2 / 1000000)
+    required_gb = math.ceil(size * 2 / 1000000000)
     instance_info = [json.loads(p) for p in ec2_pricing(vision_session) if
                      'memory' in json.loads(p)['product']['attributes'] and 'OnDemand' in json.loads(p)['terms']]
     available_instance_types = [dict(i, **unnest_ec2_price(i)) for i in instance_info if
@@ -426,8 +426,22 @@ def create_bucket(s3_client, bucket, createBucketConfiguration):
 @backoff.on_exception(backoff.expo,
                       ClientError)
 def list_objects(s3_client, bucket):
-    objects = s3_client.list_objects(Bucket=bucket)['Contents']
-    return objects
+    objects = s3_client.list_objects(Bucket=bucket)
+    if not 'Contents' in objects:
+        raise Exception('No objects in source s3 bucket. Upload data to bucket: {} and then retry.'.format(bucket))
+    return objects['Contents']
+
+
+@backoff.on_exception(backoff.expo,
+                      ClientError)
+def get_bucket_policy(s3_client, bucket):
+    return s3_client.get_bucket_policy(Bucket=bucket)
+
+
+@backoff.on_exception(backoff.expo,
+                      ClientError)
+def put_bucket_policy(s3_client, bucket, policy):
+    return s3_client.put_bucket_policy(Bucket=bucket, Policy=policy)
 
 
 def create_vision(source_bucket, source_role=None, vision_role=None, worker_profile='EMR_EC2_DefaultRole',
@@ -467,7 +481,7 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
     if not source_role:
         # creates role in source account that has s3 permissions
 
-        source_s3_role = create_source_s3_role(boto3_session=source_session)
+        source_s3_role = create_source_s3_role(boto3_session=source_session, source_bucket=source_bucket)
 
         source_sts_client = source_session.client('sts', aws_access_key_id=os.environ['SOURCE_AWS_PUBLIC_KEY'],
                                                   aws_secret_access_key=os.environ['SOURCE_AWS_SECRET_KEY'])
@@ -492,7 +506,38 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
             aws_session_token=source_credentials['SessionToken'], region_name=region
         )
 
-    ###TODO add logic for provided worker and exectutor profiles
+        source_s3 = source_session.client('s3')
+
+        try:
+            bucket_policy = json.loads(get_bucket_policy(source_s3, bucket=source_bucket)['Policy'])
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchBucketPolicy':
+                bucket_policy = {'Statement': []}
+            else:
+                raise e
+
+        user_policy = {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::{}:role/{}".format(os.environ['ACCOUNT_NUMBER'],
+                                                   vision_role['Role']['RoleName'])
+            },
+            "Action": [
+                "s3:GetBucketLocation",
+                "s3:ListBucket",
+                "s3:GetObject",
+            ],
+            "Resource": [
+                "arn:aws:s3:::{}".format(source_bucket),
+                "arn:aws:s3:::{}/*".format(source_bucket)
+            ]
+        }
+
+        bucket_policy['Statement'].append(user_policy)
+
+        put_bucket_policy(source_s3, bucket=source_bucket, policy=json.dumps(bucket_policy))
+
+        ###TODO add logic for provided worker and exectutor profiles
     if not worker_profile and executor_role:
         create_emr_roles(vision_session)
 
