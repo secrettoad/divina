@@ -48,9 +48,8 @@ def create_source_s3_role(boto3_session, source_bucket, iam_path='AWS_IAM'):
     return role
 
 
-def vision_setup(source_session, source_bucket, worker_profile, executor_role, vision_session, region, ec2_keyfile,
+def vision_setup(source_bucket, worker_profile, executor_role, vision_session, region, ec2_keyfile,
                  partition_dimensions):
-    source_s3 = source_session.client('s3')
     vision_s3 = vision_session.client('s3')
 
     try:
@@ -61,7 +60,7 @@ def vision_setup(source_session, source_bucket, worker_profile, executor_role, v
     except Exception as e:
         raise e
     try:
-        source_objects = list_objects(source_s3, bucket=source_bucket)
+        source_objects = list_objects(vision_s3, bucket=source_bucket)
     except KeyError as e:
         raise e
 
@@ -75,21 +74,79 @@ def vision_setup(source_session, source_bucket, worker_profile, executor_role, v
             Key='coysu-divina-prototype-{}/remote_scripts/{}'.format(os.environ['VISION_ID'], file)
         )
 
+    file_sizes = []
     for file in source_objects:
-        object_response = source_s3.get_object(
-            Bucket=source_bucket,
-            Key=file['Key']
+        copy_source = {
+            'Bucket': source_bucket,
+            'Key': file['Key']
+        }
+        vision_s3.copy_object(CopySource=copy_source, Bucket='coysu-divina-prototype-visions', Key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'], file['Key']))
+        size = get_s3_object_size(vision_session, key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'], file['Key']), bucket='coysu-divina-prototype-visions')
+        file_sizes.append(size)
+
+    ec2_client = vision_session.client('ec2')
+
+    if ec2_keyfile:
+        with open(os.path.join(os.path.expanduser('~'), '.ssh', ec2_keyfile + '.pub')) as f:
+            key = ec2_client.import_key_pair(
+                KeyName='vision_{}_ec2_key'.format(os.environ['VISION_ID']),
+                PublicKeyMaterial=f.read()
+            )
+            paramiko_key = paramiko.RSAKey.from_private_key_file(
+                os.path.join(os.path.expanduser('~'), '.ssh', ec2_keyfile), password=os.environ['KEY_PASS'])
+    else:
+        key = ec2_client.create_key_pair(
+            KeyName='vision_{}_ec2_key'.format(os.environ['VISION_ID'])
         )
-        vision_s3.put_object(
-            Body=io.BytesIO(object_response['Body'].read()),
-            Bucket='coysu-divina-prototype-visions',
-            Key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'], file['Key'])
-        )
-        create_ec2_partitioning_instance(vision_session,
-                                         key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'],
-                                                                                        file['Key']),
-                                         bucket='coysu-divina-prototype-visions', ec2_keyfile=ec2_keyfile,
-                                         data_file=file['Key'], partition_dimensions=partition_dimensions)
+        paramiko_key = paramiko.RSAKey.from_private_key(key)
+
+    environment = {'VISION_ID': str(os.environ['VISION_ID']), 'SOURCE_KEYS': [k['Key'] for k in source_objects], 'SOURCE_BUCKET': source_bucket}
+    if partition_dimensions:
+        environment.update({'PARTITION_DIMENSIONS': partition_dimensions})
+    instance = create_ec2_partitioning_instance(vision_session=vision_session, file_size=max(file_sizes), key=key, environment=environment)
+
+    waiter = ec2_client.get_waiter('instance_running')
+    waiter.wait(InstanceIds=[i['InstanceId'] for i in instance['Instances']])
+
+    try:
+        response = ec2_client.describe_instances(InstanceIds=[i['InstanceId'] for i in instance['Instances']])
+        instance = response['Reservations'][0]['Instances'][0]
+    except Exception as e:
+        raise e
+
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    try:
+            # Here 'ubuntu' is user name and 'instance_ip' is public IP of EC2
+        connect_ssh(client, hostname=instance['PublicIpAddress'], username="ec2-user", pkey=paramiko_key)
+        commands = ['sudo cp /var/lib/cloud/instance/user-data.txt /home/ec2-user/user-data.json',
+                    'sudo yum install unzip -y', 'sudo yum install python3 -y', 'sudo yum install gcc -y',
+                    'sudo curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"',
+                    'sudo unzip awscli-bundle.zip',
+                    'sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/bin/aws',
+                    'sudo aws s3 sync s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/remote_scripts /home/ec2-user/remote_scripts'.format(
+                        os.environ['VISION_ID']), 'sudo chown -R ec2-user /home/ec2-user',
+                    'python3 -m pip install wheel',
+                    'python3 -m pip install -r /home/ec2-user/remote_scripts/requirements.txt',
+                    'python3 /home/ec2-user/remote_scripts/partition_data.py']
+        for cmd in commands:
+            stdin, stdout, stderr = client.exec_command(cmd)
+            for line in stdout:
+                sys.stdout.write(line)
+            for line in stderr:
+                sys.stderr.write(line)
+            # close the client connection once the job is done
+        client.close()
+
+    except Exception as e:
+        raise e
+
+        # TODO test that all is well with AWS-generated keys
+        # TODO start here get the environment variables into /etc/environment and then restart the shell. just make two client connections.
+        # TODO make sure the ec2 instance terminates on completion
+
+        # ec2.stop_instances(InstanceIds=[instance['InstanceId']])
 
     emr_cluster = setup_emr_cluster(vision_session=vision_session, model_file='spark_model.py',
                                     worker_profile=worker_profile, executor_role=executor_role)
@@ -261,13 +318,12 @@ def setup_emr_cluster(vision_session, model_file, worker_profile='EMR_EC2_Defaul
     return cluster
 
 
-def ec2_pricing(boto3_session, filter_params=None):
-    pricing = boto3_session.client('pricing', region_name='us-east-1')
+def ec2_pricing(pricing_client, region_name, filter_params=None):
     products_params = {'ServiceCode': 'AmazonEC2',
                        'Filters': [
                            {'Type': 'TERM_MATCH', 'Field': 'operatingSystem', 'Value': 'Linux'},
                            {'Type': 'TERM_MATCH', 'Field': 'location',
-                            'Value': '{}'.format(get_region_name(boto3_session.region_name))},
+                            'Value': '{}'.format(get_region_name(region_name))},
                            {'Type': 'TERM_MATCH', 'Field': 'capacitystatus', 'Value': 'Used'},
                            {'Type': 'TERM_MATCH', 'Field': 'preInstalledSw', 'Value': 'NA'},
                            {'Type': 'TERM_MATCH', 'Field': 'tenancy', 'Value': 'shared'}
@@ -275,7 +331,7 @@ def ec2_pricing(boto3_session, filter_params=None):
     if filter_params:
         products_params['Filters'] = products_params['Filters'] + filter_params
     while True:
-        response = pricing.get_products(**products_params)
+        response = pricing_client.get_products(**products_params)
         yield from [i for i in response['PriceList']]
         if 'NextToken' not in response:
             break
@@ -301,10 +357,11 @@ def get_region_name(region_code):
         return default_region
 
 
-def create_ec2_partitioning_instance(vision_session, key, bucket, ec2_keyfile, data_file, partition_dimensions):
-    size = get_s3_object_size(vision_session, key, bucket)
-    required_gb = math.ceil(size * 2 / 1000000000)
-    instance_info = [json.loads(p) for p in ec2_pricing(vision_session) if
+def create_ec2_partitioning_instance(vision_session, file_size, key, environment):
+    ec2_client = vision_session.client('ec2')
+    pricing_client = vision_session.client('pricing', region_name='us-east-1')
+    required_gb = math.ceil(file_size * 2 / 1000000000)
+    instance_info = [json.loads(p) for p in ec2_pricing(pricing_client, vision_session.region_name) if
                      'memory' in json.loads(p)['product']['attributes'] and 'OnDemand' in json.loads(p)['terms']]
     available_instance_types = [dict(i, **unnest_ec2_price(i)) for i in instance_info if
                                 i['product']['attributes']['memory'].split(' ')[0].isdigit()]
@@ -315,75 +372,14 @@ def create_ec2_partitioning_instance(vision_session, key, bucket, ec2_keyfile, d
     partitioning_instance_type = eligible_instance_types[min(range(len(eligible_instance_types)), key=lambda index:
     eligible_instance_types[index]['Hrs_USD'])]
 
-    ec2 = vision_session.client('ec2')
-
-    if ec2_keyfile:
-        with open(os.path.join(os.path.expanduser('~'), '.ssh', ec2_keyfile + '.pub')) as f:
-            key = ec2.import_key_pair(
-                KeyName='vision_{}_ec2_key'.format(os.environ['VISION_ID']),
-                PublicKeyMaterial=f.read()
-            )
-            paramiko_key = paramiko.RSAKey.from_private_key_file(
-                os.path.join(os.path.expanduser('~'), '.ssh', ec2_keyfile), password=os.environ['KEY_PASS'])
-    else:
-        key = ec2.create_key_pair(
-            KeyName='vision_{}_ec2_key'.format(os.environ['VISION_ID'])
-        )
-        paramiko_key = paramiko.RSAKey.from_private_key(key)
-
-    environment = {'VISION_ID': str(os.environ['VISION_ID']), 'DATA_FILE': data_file,
-                   'SIZE': str(size)}
-    if partition_dimensions:
-        environment.update({'PARTITION_DIMENSIONS': partition_dimensions})
-
-    instance = ec2.run_instances(ImageId='ami-0b223f209b6d4a220', MinCount=1, MaxCount=1,
+    instance = ec2_client.run_instances(ImageId='ami-0b223f209b6d4a220', MinCount=1, MaxCount=1,
                                  IamInstanceProfile={'Name': 'EMR_EC2_DefaultRole'},
                                  InstanceType=partitioning_instance_type['product']['attributes']['instanceType'],
                                  KeyName=key['KeyName'],
                                  UserData=json.dumps(environment)
                                  )
 
-    waiter = ec2.get_waiter('instance_running')
-    waiter.wait(InstanceIds=[i['InstanceId'] for i in instance['Instances']])
-
-    try:
-        response = ec2.describe_instances(InstanceIds=[i['InstanceId'] for i in instance['Instances']])
-        instance = response['Reservations'][0]['Instances'][0]
-    except Exception as e:
-        raise e
-
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-    try:
-        # Here 'ubuntu' is user name and 'instance_ip' is public IP of EC2
-        connect_ssh(client, hostname=instance['PublicIpAddress'], username="ec2-user", pkey=paramiko_key)
-        commands = ['sudo cp /var/lib/cloud/instance/user-data.txt /home/ec2-user/user-data.json',
-                    'sudo yum install unzip -y', 'sudo yum install python3 -y', 'sudo yum install gcc -y',
-                    'sudo curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"',
-                    'sudo unzip awscli-bundle.zip', 'sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/bin/aws',
-                    'sudo aws s3 sync s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/remote_scripts /home/ec2-user/remote_scripts'.format(
-                        os.environ['VISION_ID']), 'sudo chown -R ec2-user /home/ec2-user',
-                    'python3 -m pip install wheel',
-                    'python3 -m pip install -r /home/ec2-user/remote_scripts/requirements.txt',
-                    'python3 /home/ec2-user/remote_scripts/partition_data.py']
-        for cmd in commands:
-            stdin, stdout, stderr = client.exec_command(cmd)
-            for line in stdout:
-                sys.stdout.write(line)
-            for line in stderr:
-                sys.stderr.write(line)
-        # close the client connection once the job is done
-        client.close()
-
-    except Exception as e:
-        raise e
-
-    # TODO test that all is well with AWS-generated keys
-    # TODO start here get the environment variables into /etc/environment and then restart the shell. just make two client connections.
-    # TODO make sure the ec2 instance terminates on completion
-
-    # ec2.stop_instances(InstanceIds=[instance['InstanceId']])
+    return instance
 
 
 def get_s3_object_size(vision_session, key, bucket):
@@ -541,7 +537,7 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
     if not worker_profile and executor_role:
         create_emr_roles(vision_session)
 
-    vision_setup(source_session=source_session, vision_session=vision_session, source_bucket=source_bucket,
+    vision_setup(vision_session=vision_session, source_bucket=source_bucket,
                  worker_profile=worker_profile, executor_role=executor_role, region=region, ec2_keyfile=ec2_keyfile,
                  partition_dimensions=partition_dimensions)
 
