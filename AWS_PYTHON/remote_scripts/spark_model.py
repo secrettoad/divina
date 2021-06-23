@@ -45,8 +45,6 @@ object_response = s3.get_object(
     Key='coysu-divina-prototype-{}/data/AirPassengers.csv'.format(os.environ['VISION_ID'])
 )
 
-
-
 sys.stderr.write('csv loaded from s3!!!!!')
 
 

@@ -41,10 +41,18 @@
         },
         {
             "Effect": "Allow",
-            "Action": "ec2:DescribeInstanceTypes",
+            "Action": [
+                 "ec2:DescribeInstanceTypes",
+                 "ec2:RunInstances",
+                 "ec2:ImportKeyPair",
+                 "ec2:CreateKeyPair",
+                 "ec2:ReportInstanceStatus",
+                 "ec2:DescribeInstances",
+                 "ec2:StopInstances"
+                 ],
             "Resource": "*"
         },
-                {
+        {
             "Effect": "Allow",
             "Action": [
                  "pricing:DescribeServices",
