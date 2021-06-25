@@ -552,7 +552,7 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
     ###current scope is that all supplied files are either a singal endogenous schema OR an exogenous signal that can be joined to the endogenous schema
     vision_setup(vision_session=vision_session, source_bucket=source_bucket,
                  worker_profile=worker_profile, executor_role=executor_role, region=region, ec2_keyfile=ec2_keyfile,
-                 partition_dimensions=partition_dimensions, time_index='date', exogenous_map={'EXOGENOUS_FILES': [{'sales_train_evaluation.csv.zip': ''}, {'sales_train_validation.csv.zip': ''}, {'sell_prices.csv.zip': ''}]})
+                 partition_dimensions=partition_dimensions, time_index='date', exogenous_map={'EXOGENOUS_FILES': [{'sales_train_evaluation.csv.zip/sales_train_evaluation.csv': ''}, {'sales_train_validation.csv.zip/sales_train_validation.csv': ''}, {'sell_prices.csv.zip/sell_prices.csv': ''}]})
 
 
 create_vision(ec2_keyfile='divina-dev', source_bucket='coysu-divina-prototype-large', partition_dimensions=[])
