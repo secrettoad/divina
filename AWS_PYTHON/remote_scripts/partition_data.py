@@ -57,12 +57,17 @@ def save_data_to_s3(name, df):
 
 def decompress_file(key):
     data = s3_fs.open(os.path.join('s3://', environment['SOURCE_BUCKET'], key)).read()
+    files = []
     if key.split('.')[-1] == '.zip':
         zip_file = ZipFile(BytesIO(data))
-        files = {os.path.join(key.split('.')[:-1], name): zip_file.read(name) for name in zip_file.namelist()}
+        for name in zip_file.namelist():
+            with open('/home/ec2-user/data/{}'.format(os.path.join(key.split('.')[:-1], name)), 'wb+') as f:
+                f.write(data)
+            files.append('/home/ec2-user/data/{}'.format(os.path.join(key.split('.')[:-1], name)))
     else:
-        b = data
-        files = {key: b}
+        with open('/home/ec2-user/data/{}'.format(key), 'wb+') as f:
+            f.write(data)
+        files = ['/home/ec2-user/data/{}'.format(key)]
     return files
 
 
@@ -75,29 +80,16 @@ def parse_files(files):
                 _file = '.'.join(_file.split('.')[:-1])
             extension = _file.split('.')[-1]
             if extension == 'csv':
-                failed_encodings = []
-                ###current scope is that all files supplied are encoded as below
-                encodings = ['utf_8', 'ascii', 'latin_1']
-                for encoding in encodings:
-                    try:
-                        df = pd.read_csv(StringIO(files[file].decode(encoding, errors='replace')), encoding=encoding)
-                        break
-                    except Exception:
-                        failed_encodings += [encoding]
-                        sys.stdout.write('{} is not encoded via {}. Trying next encoding...\n'.format(file, encoding))
-                if set(failed_encodings) == set(encodings):
-                    message = 'Could not decode {}. Please encode the file in utf-8, ascii or latin-1'.format(file)
-                    raise Exception(message)
+                df = pd.read_csv(file)
             elif extension == 'npz':
-                npz = np.load(BytesIO(files[file]), allow_pickle=True, encoding=encoding)
+                npz = np.load(BytesIO(file), allow_pickle=True)
                 df = pd.DataFrame.from_records([{item: npz[item] for item in npz.files}])
             else:
                 raise FileTypeNotSupported(extension)
-            if not any(re.match(map_file.replace('*', '/^\w+$/'), file) for map_file in [[k for k in e][0] for e in environment['EXOGENOUS_MAP']['EXOGENOUS_FILES']]):
-                try:
-                    df[environment['TIME_INDEX']] = pd.to_datetime(df[environment['TIME_INDEX']])
-                except KeyError:
-                    raise Exception('Time index: {} not found in {}'.format(environment['TIME_INDEX'], file))
+            try:
+                df[environment['TIME_INDEX']] = pd.to_datetime(df[environment['TIME_INDEX']])
+            except KeyError:
+                raise Exception('Time index: {} not found in {}'.format(environment['TIME_INDEX'], file))
             dfs[file] = df
         except Exception as e:
             if type(e) == FileTypeNotSupported:
@@ -110,6 +102,8 @@ def parse_files(files):
 
 with open('/home/ec2-user/user-data.json') as f:
     environment = json.load(f)
+if not os.path.isdir('/home/ec2-user/data'):
+    os.mkdir('/home/ec2-user/data')
 
 for key in environment['SOURCE_KEYS']:
     try:
