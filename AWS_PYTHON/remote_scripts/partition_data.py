@@ -35,6 +35,10 @@ def partition_data(files):
     for file in files:
         partition_size = 50000000
         memory_usage = file['df'].memory_usage(deep=True).sum()
+        if file['source_path'] in [list(k.keys())[0] for k in environment['EXOGENOUS_MAP']['EXOGENOUS_FILES']]:
+            data_type = 'exog'
+        else:
+            data_type = 'endo'
         if int(memory_usage) <= partition_size:
             groupby = [('mono', file['df'])]
         elif 'PARTITION_DIMENSIONS' in environment:
@@ -45,12 +49,8 @@ def partition_data(files):
         for name, group in groupby:
             file['df'].to_parquet(
                 's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/partitions/{}/partition-{}.parquet'.format(
-                    environment['VISION_ID'], file['source_path'].replace('/', '-'), name), index=False)
-
-        ####TODO make this return a list of groups and then from the function above call save_data_to_s3. reference to key is out of scope in
-        ####TODO save_data_to_s3
-
-        sys.stdout.write('SAVED PARQUET -- {} -- {}'.format(environment['VISION_ID'], name))
+                    environment['VISION_ID'], data_type, file['source_path'].replace('/', '-').strip('.') + str(name)), index=False)
+            sys.stdout.write('SAVED PARQUET - {} - {} - {}\n'.format(environment['VISION_ID'], file['source_path'], name))
 
 
 def decompress_file(key):
@@ -107,12 +107,15 @@ def rm(f):
 
 
 with open('/home/ec2-user/user-data.json') as f:
-    environment = json.load(f)
+    environment = json.load(f)['ENVIRONMENT']
+data_directories = ['data', 'data/endo', 'data/exog']
 if not os.path.isdir('/home/ec2-user/data'):
-    os.mkdir('/home/ec2-user/data')
+    for d in data_directories:
+        os.mkdir(os.path.join('/home/ec2-user/', d))
 else:
     shutil.rmtree('/home/ec2-user/data')
-    os.mkdir('/home/ec2-user/data')
+    for d in data_directories:
+        os.mkdir(os.path.join('/home/ec2-user/', d))
 
 for key in environment['SOURCE_KEYS']:
     try:
@@ -124,4 +127,5 @@ for key in environment['SOURCE_KEYS']:
         traceback.print_exc()
     finally:
         shutil.rmtree('/home/ec2-user/data')
-        os.mkdir('/home/ec2-user/data')
+        for d in data_directories:
+            os.mkdir(os.path.join('/home/ec2-user/', d))
