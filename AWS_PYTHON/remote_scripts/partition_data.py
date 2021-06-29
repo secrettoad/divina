@@ -11,7 +11,7 @@ import shutil
 
 s3_fs = s3fs.S3FileSystem()
 
-sys.stdout.write('RUNNING PYTHON SCRIPT')
+sys.stdout.write('RUNNING PYTHON SCRIPT\n')
 
 
 class FileTypeNotSupported(Exception):
@@ -35,14 +35,14 @@ def partition_data(files):
     for file in files:
         partition_size = 50000000
         memory_usage = file['df'].memory_usage(deep=True).sum()
-        if file['source_path'] in [list(k.keys())[0] for k in environment['EXOGENOUS_MAP']['EXOGENOUS_FILES']]:
+        if file['source_path'] in [list(k.keys())[0] for k in data_definition['exogenous_files']]:
             data_type = 'exog'
         else:
             data_type = 'endo'
         if int(memory_usage) <= partition_size:
             groupby = [('mono', file['df'])]
         elif 'PARTITION_DIMENSIONS' in environment:
-            groupby = file['df'].groupby(environment['PARTITION_DIMENSIONS'])
+            groupby = file['df'].groupby(data_definition['partition_dimensions'])
         else:
             num_chunks = round((int(memory_usage) / partition_size)) + 1
             groupby = zip(range(num_chunks), np.array_split(file['df'], num_chunks))
@@ -86,12 +86,12 @@ def parse_files(files):
                 df = pd.DataFrame.from_records([{item: npz[item] for item in npz.files}])
             else:
                 raise FileTypeNotSupported(extension)
-            if not file['source_path'] in [list(k.keys())[0] for k in environment['EXOGENOUS_MAP']['EXOGENOUS_FILES']]:
+            if not file['source_path'] in [list(k.keys())[0] for k in data_definition['exogenous_files']] and 'time_index' in data_definition:
                 try:
-                    df[environment['TIME_INDEX']] = pd.to_datetime(df[environment['TIME_INDEX']])
+                    df[data_definition['time_index']] = pd.to_datetime(df[data_definition['time_index']])
                 except KeyError:
                     raise Exception(
-                        'Time index: {} not found in {}'.format(environment['TIME_INDEX'], file['local_path']))
+                        'Time index: {} not found in {}'.format(data_definition['time_index'], file['local_path']))
             file['df'] = df
         except Exception as e:
                 traceback.print_exc()
@@ -108,6 +108,8 @@ def rm(f):
 
 with open('/home/ec2-user/user-data.json') as f:
     environment = json.load(f)['ENVIRONMENT']
+with open('/home/ec2-user/data_definition.json') as f:
+    data_definition = json.load(f)
 data_directories = ['data', 'data/endo', 'data/exog']
 if not os.path.isdir('/home/ec2-user/data'):
     for d in data_directories:

@@ -19,8 +19,15 @@ from botocore.config import Config
 
 
 def vision_setup(source_bucket, worker_profile, executor_role, vision_session, region, ec2_keyfile,
-                 partition_dimensions, time_index, exogenous_map, target, keep_spark_alive):
+                 data_definition=None, keep_spark_alive=False):
     vision_s3 = vision_session.client('s3')
+
+    if not os.path.exists('./tmp'):
+        os.mkdir('./tmp')
+
+    if data_definition:
+        with open(os.path.join('.', 'tmp/data_definition.json'), 'w+') as f:
+            json.dump(data_definition, f)
 
     try:
         create_bucket(vision_s3, bucket='coysu-divina-prototype-visions',
@@ -37,15 +44,20 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
     upload_directories = {}
     upload_directories.update({'remote_scripts': os.path.join(os.path.abspath('.'), 'remote_scripts')})
     upload_directories.update({'spark_scripts': os.path.join(os.path.abspath('.'), 'spark_scripts')})
+    upload_directories.update({'/': os.path.join(os.path.abspath('.'), 'tmp')})
 
     for d in upload_directories:
-        for file in os.listdir(d):
+        if not d == '/':
+            key = 'coysu-divina-prototype-{}/{}'.format(os.environ['VISION_ID'], d)
+        else:
+            key = 'coysu-divina-prototype-{}'.format(os.environ['VISION_ID'])
+        for file in os.listdir(upload_directories[d]):
             path = os.path.join(upload_directories[d], file)
             with open(path) as f:
                 upload_file(s3_client=vision_s3,
-                        bucket='coysu-divina-prototype-visions',
-                        key='coysu-divina-prototype-{}/{}/{}'.format(os.environ['VISION_ID'], d, file),
-                        body=f.read())
+                            bucket='coysu-divina-prototype-visions',
+                            key=os.path.join(key, file),
+                            body=f.read())
 
     file_sizes = []
     for file in source_objects:
@@ -76,10 +88,9 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
         )
         paramiko_key = paramiko.RSAKey.from_private_key(key)
 
-    environment = {'ENVIRONMENT':{'VISION_ID': str(os.environ['VISION_ID']), 'SOURCE_KEYS': [k['Key'] for k in source_objects],
-                   'SOURCE_BUCKET': source_bucket, 'TIME_INDEX': time_index, 'EXOGENOUS_MAP': exogenous_map}}
-    if partition_dimensions:
-        environment.update({'PARTITION_DIMENSIONS': partition_dimensions})
+    environment = {
+        'ENVIRONMENT': {'VISION_ID': str(os.environ['VISION_ID']), 'SOURCE_KEYS': [k['Key'] for k in source_objects],
+                        'SOURCE_BUCKET': source_bucket}}
     instance = create_ec2_partitioning_instance(vision_session=vision_session, file_size=max(file_sizes), key=key,
                                                 environment=environment)
 
@@ -104,7 +115,10 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
                     'sudo unzip awscli-bundle.zip',
                     'sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/bin/aws',
                     'sudo aws s3 sync s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/remote_scripts /home/ec2-user/remote_scripts'.format(
-                        os.environ['VISION_ID']), 'sudo chown -R ec2-user /home/ec2-user',
+                        os.environ['VISION_ID']),
+                    'sudo aws s3 cp s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json /home/ec2-user/data_definition.json'.format(
+                        os.environ['VISION_ID']),
+                    'sudo chown -R ec2-user /home/ec2-user',
                     'python3 -m pip install wheel',
                     'python3 -m pip install -r /home/ec2-user/remote_scripts/requirements.txt',
                     'python3 /home/ec2-user/remote_scripts/partition_data.py']
@@ -114,7 +128,8 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
                 sys.stdout.write(line)
             for line in stderr:
                 sys.stderr.write(line)
-            exit_status = stdout.channel.recv_exit_status()  # Blocking call
+                ###TODO GET THIS TO WORK BELOW
+            exit_status = stdout.channel.recv_exit_status()
             if not exit_status == 0:
                 client.close()
                 ec2_client.stop_instances(InstanceIds=[instance['InstanceId']])
@@ -125,17 +140,15 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
     except Exception as e:
         raise e
 
-        # TODO test that all is well with AWS-generated keys
-        # TODO start here get the environment variables into /etc/environment and then restart the shell. just make two client connections.
-        # TODO make sure the ec2 instance terminates on completion
+        # TODO put exogenous map to json file before s3 sync - put with dataset to make essbase-type dataset object
 
     ec2_client.stop_instances(InstanceIds=[instance['InstanceId']])
 
-    environment = {'TARGET': target, 'TIME_INDEX': time_index, 'EXOGENOUS_MAP': json.dumps(exogenous_map)}
-
     emr_client = vision_session.client('emr')
     emr_cluster = setup_emr_cluster(emr_client=emr_client,
-                                    worker_profile=worker_profile, executor_role=executor_role, environment=environment, keep_spark_alive=keep_spark_alive, ec2_key='vision_{}_ec2_key'.format(os.environ['VISION_ID']))
+                                    worker_profile=worker_profile, executor_role=executor_role,
+                                    keep_spark_alive=keep_spark_alive,
+                                    ec2_key='vision_{}_ec2_key'.format(os.environ['VISION_ID']))
 
     emr_waiter = emr_client.get_waiter('step_complete')
     emr_waiter.wait(
@@ -146,6 +159,7 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
             "MaxAttempts": 10
         }
     )
+
 
 def create_emr_roles(boto3_session):
     iam_client = boto3_session.client('iam')
@@ -163,14 +177,13 @@ def delete_emr_cluster(emr_cluster, boto3_session):
 
 
 def setup_emr_cluster(emr_client, worker_profile='EMR_EC2_DefaultRole',
-                      executor_role='EMR_DefaultRole', environment=None, keep_spark_alive=False, ec2_key=None):
-    if not environment:
-        environment = {}
+                      executor_role='EMR_DefaultRole', keep_spark_alive=False, ec2_key=None):
     if keep_spark_alive:
         on_failure = 'CANCEL_AND_WAIT'
     else:
         on_failure = 'TERMINATE_CLUSTER'
-    environment.update({"PYSPARK_PYTHON": "/usr/bin/python3", "VISION_ID": os.environ['VISION_ID']})
+    environment = {"PYSPARK_PYTHON": "/usr/bin/python3", "VISION_ID": os.environ['VISION_ID']}
+
     cluster = emr_client.run_job_flow(
         Name="divina-cluster-{}".format(os.environ['VISION_ID']),
         ReleaseLabel='emr-6.2.0',
@@ -197,7 +210,8 @@ def setup_emr_cluster(emr_client, worker_profile='EMR_EC2_DefaultRole',
             'Ec2KeyName': ec2_key,
 
         },
-        LogUri='s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/logs/emr_logs'.format(os.environ['VISION_ID']),
+        LogUri='s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/logs/emr_logs'.format(
+            os.environ['VISION_ID']),
         Applications=[
             {
                 'Name': 'Spark'
@@ -205,7 +219,7 @@ def setup_emr_cluster(emr_client, worker_profile='EMR_EC2_DefaultRole',
         ],
         Steps=[
             {
-                'Name': 'Setup Debugging',
+                'Name': 'setup_state_pusher',
                 'ActionOnFailure': on_failure,
                 'HadoopJarStep': {
                     'Jar': 'command-runner.jar',
@@ -213,7 +227,7 @@ def setup_emr_cluster(emr_client, worker_profile='EMR_EC2_DefaultRole',
                 }
             },
             {
-                'Name': 'setup - copy files',
+                'Name': 'setup_s3_sync_scripts',
                 'ActionOnFailure': on_failure,
                 'HadoopJarStep': {
                     'Jar': 'command-runner.jar',
@@ -224,7 +238,18 @@ def setup_emr_cluster(emr_client, worker_profile='EMR_EC2_DefaultRole',
                 }
             },
             {
-                'Name': 'Run Spark',
+                'Name': 'setup_s3_sync_data',
+                'ActionOnFailure': on_failure,
+                'HadoopJarStep': {
+                    'Jar': 'command-runner.jar',
+                    'Args': ['aws', 's3', 'cp',
+                             's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json'.format(
+                                 os.environ['VISION_ID']),
+                             '/home/hadoop/data_definition.json']
+                }
+            },
+            {
+                'Name': 'vision_script',
                 'ActionOnFailure': on_failure,
                 'HadoopJarStep': {
                     'Jar': 'command-runner.jar',
@@ -433,7 +458,8 @@ def create_role(iam_client, policy_document, trust_policy_document, role_name, p
 
 
 def create_vision(source_bucket, source_role=None, vision_role=None, worker_profile='EMR_EC2_DefaultRole',
-                  executor_role='EMR_DefaultRole', region='us-east-2', ec2_keyfile=None, partition_dimensions=None, keep_spark_alive=False):
+                  executor_role='EMR_DefaultRole', region='us-east-2', ec2_keyfile=None, data_definition=None,
+                  keep_spark_alive=False):
     os.environ['VISION_ID'] = str(round(datetime.datetime.now().timestamp()))
 
     source_session = boto3.session.Session(aws_access_key_id=os.environ['SOURCE_AWS_PUBLIC_KEY'],
@@ -536,7 +562,8 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
 
         try:
             bucket_policy = json.loads(get_bucket_policy(source_s3, bucket=source_bucket)['Policy'])
-            bucket_policy['Statement'].append(user_policy)
+            if not user_policy in bucket_policy['Statement']:
+                bucket_policy['Statement'].append(user_policy)
         except ClientError as e:
             if e.response['Error']['Code'] == 'NoSuchBucketPolicy':
                 bucket_policy = {'Statement': [user_policy]}
@@ -552,10 +579,8 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
     ###current scope is that all supplied files are either a singal endogenous schema OR an exogenous signal that can be joined to the endogenous schema
     vision_setup(vision_session=vision_session, source_bucket=source_bucket,
                  worker_profile=worker_profile, executor_role=executor_role, region=region, ec2_keyfile=ec2_keyfile,
-                 partition_dimensions=partition_dimensions, time_index='date', exogenous_map={
-            'EXOGENOUS_FILES': [{'sales_train_evaluation.csv.zip/sales_train_evaluation.csv': ''},
-                                {'sales_train_validation.csv.zip/sales_train_validation.csv': ''},
-                                {'sell_prices.csv.zip/sell_prices.csv': ''}]}, target='sales', keep_spark_alive=keep_spark_alive)
+                 keep_spark_alive=keep_spark_alive)
 
 
-create_vision(ec2_keyfile='divina-dev', source_bucket='coysu-divina-prototype-large', partition_dimensions=[], keep_spark_alive=True)
+create_vision(ec2_keyfile='divina-dev', source_bucket='coysu-divina-prototype-large',
+              keep_spark_alive=True)
