@@ -1,15 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="ec2-user@18.117.159.77:22">
-    <serverData>
-      <paths name="ec2-user@18.117.159.77:22">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/home/ec2-user/remote_scripts" local="$PROJECT_DIR$/AWS_PYTHON/remote_scripts" />
-          </mappings>
-        </serverdata>
-      </paths>
-    </serverData>
+  <component name="PublishConfigData" autoUpload="Always">
     <option name="myAutoUpload" value="ALWAYS" />
   </component>
 </project>

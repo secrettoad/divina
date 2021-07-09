@@ -81,17 +81,8 @@ def parse_files(files):
             extension = file['local_path'].split('.')[-1]
             if extension == 'csv':
                 df = pd.read_csv(file['local_path'])
-            elif extension == 'npz':
-                npz = np.load(file['local_path'], allow_pickle=True)
-                df = pd.DataFrame.from_records([{item: npz[item] for item in npz.files}])
             else:
                 raise FileTypeNotSupported(extension)
-            if not file['source_path'] in [list(k.keys())[0] for k in data_definition['exogenous_files']] and 'time_index' in data_definition:
-                try:
-                    df[data_definition['time_index']] = pd.to_datetime(df[data_definition['time_index']])
-                except KeyError:
-                    raise Exception(
-                        'Time index: {} not found in {}'.format(data_definition['time_index'], file['local_path']))
             file['df'] = df
         except Exception as e:
                 traceback.print_exc()
@@ -127,6 +118,7 @@ for key in environment['SOURCE_KEYS']:
     except Exception as e:
         sys.stdout.write('Could not partition file: {}\n'.format(key))
         traceback.print_exc()
+        raise e
     finally:
         shutil.rmtree('/home/ec2-user/data')
         for d in data_directories:

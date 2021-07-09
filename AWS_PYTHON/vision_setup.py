@@ -2,7 +2,6 @@ import boto3
 import json
 import os
 import datetime
-import io
 from botocore.exceptions import ClientError
 import backoff
 import subprocess
@@ -10,16 +9,14 @@ from pkg_resources import resource_filename
 import math
 import paramiko
 import sys
-from botocore.config import Config
 
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
 ####TODO abstract bucket names
-####TODO setup EC2 SSH keypair when creating cluster
 
 
 def vision_setup(source_bucket, worker_profile, executor_role, vision_session, region, ec2_keyfile,
-                 data_definition=None, keep_spark_alive=False):
+                 data_definition=None, keep_instances_alive=False):
     vision_s3 = vision_session.client('s3')
 
     if not os.path.exists('./tmp'):
@@ -140,15 +137,14 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
     except Exception as e:
         raise e
 
-        # TODO put exogenous map to json file before s3 sync - put with dataset to make essbase-type dataset object
-
-    ec2_client.stop_instances(InstanceIds=[instance['InstanceId']])
+    if not keep_instances_alive:
+        ec2_client.stop_instances(InstanceIds=[instance['InstanceId']])
 
     emr_client = vision_session.client('emr')
-    emr_cluster = setup_emr_cluster(emr_client=emr_client,
-                                    worker_profile=worker_profile, executor_role=executor_role,
-                                    keep_spark_alive=keep_spark_alive,
-                                    ec2_key='vision_{}_ec2_key'.format(os.environ['VISION_ID']))
+    emr_cluster = run_vision_and_validation(emr_client=emr_client,
+                                worker_profile=worker_profile, executor_role=executor_role,
+                                keep_instances_alive=keep_instances_alive,
+                                ec2_key='vision_{}_ec2_key'.format(os.environ['VISION_ID']))
 
     emr_waiter = emr_client.get_waiter('step_complete')
     emr_waiter.wait(
@@ -159,6 +155,9 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
             "MaxAttempts": 10
         }
     )
+
+    delete_emr_cluster(emr_cluster, vision_session)
+
 
 
 def create_emr_roles(boto3_session):
@@ -176,9 +175,9 @@ def delete_emr_cluster(emr_cluster, boto3_session):
     emr_client.terminate_job_flows(JobFlowIds=[emr_cluster['JobFlowId']])
 
 
-def setup_emr_cluster(emr_client, worker_profile='EMR_EC2_DefaultRole',
-                      executor_role='EMR_DefaultRole', keep_spark_alive=False, ec2_key=None):
-    if keep_spark_alive:
+def run_vision_and_validation(emr_client, worker_profile='EMR_EC2_DefaultRole',
+                      executor_role='EMR_DefaultRole', keep_instances_alive=False, ec2_key=None):
+    if keep_instances_alive:
         on_failure = 'CANCEL_AND_WAIT'
     else:
         on_failure = 'TERMINATE_CLUSTER'
@@ -188,7 +187,7 @@ def setup_emr_cluster(emr_client, worker_profile='EMR_EC2_DefaultRole',
         Name="divina-cluster-{}".format(os.environ['VISION_ID']),
         ReleaseLabel='emr-6.2.0',
         Instances={
-            'KeepJobFlowAliveWhenNoSteps': keep_spark_alive,
+            'KeepJobFlowAliveWhenNoSteps': keep_instances_alive,
             'TerminationProtected': False,
             'InstanceGroups': [
                 {
@@ -255,6 +254,14 @@ def setup_emr_cluster(emr_client, worker_profile='EMR_EC2_DefaultRole',
                     'Jar': 'command-runner.jar',
                     'Args': ['spark-submit', '/home/hadoop/spark_scripts/predict.py']
                 }
+            },
+            {
+                'Name': 'validation_script',
+                'ActionOnFailure': on_failure,
+                'HadoopJarStep': {
+                    'Jar': 'command-runner.jar',
+                    'Args': ['spark-submit', '/home/hadoop/spark_scripts/validate.py']
+                }
             }
         ],
         Configurations=[{
@@ -315,6 +322,7 @@ def get_region_name(region_code):
 def create_ec2_partitioning_instance(vision_session, file_size, key, environment):
     ec2_client = vision_session.client('ec2')
     pricing_client = vision_session.client('pricing', region_name='us-east-1')
+    ###TODO stream during partition_data.py to prevent the need for file storage
     required_gb = math.ceil(file_size * 2 / 1000000000)
     instance_info = [json.loads(p) for p in ec2_pricing(pricing_client, vision_session.region_name) if
                      'memory' in json.loads(p)['product']['attributes'] and 'OnDemand' in json.loads(p)['terms']]
@@ -459,7 +467,7 @@ def create_role(iam_client, policy_document, trust_policy_document, role_name, p
 
 def create_vision(source_bucket, source_role=None, vision_role=None, worker_profile='EMR_EC2_DefaultRole',
                   executor_role='EMR_DefaultRole', region='us-east-2', ec2_keyfile=None, data_definition=None,
-                  keep_spark_alive=False):
+                  keep_instances_alive=False):
     os.environ['VISION_ID'] = str(round(datetime.datetime.now().timestamp()))
 
     source_session = boto3.session.Session(aws_access_key_id=os.environ['SOURCE_AWS_PUBLIC_KEY'],
@@ -579,8 +587,8 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
     ###current scope is that all supplied files are either a singal endogenous schema OR an exogenous signal that can be joined to the endogenous schema
     vision_setup(vision_session=vision_session, source_bucket=source_bucket,
                  worker_profile=worker_profile, executor_role=executor_role, region=region, ec2_keyfile=ec2_keyfile,
-                 keep_spark_alive=keep_spark_alive)
+                 keep_instances_alive=keep_instances_alive)
 
 
 create_vision(ec2_keyfile='divina-dev', source_bucket='coysu-divina-prototype-large',
-              keep_spark_alive=True)
+              keep_instances_alive=True)

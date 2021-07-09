@@ -9,6 +9,9 @@ from pyspark.ml.regression import LinearRegression
 from pyspark.ml.feature import VectorAssembler, OneHotEncoder, StringIndexer
 from pyspark.sql.types import StringType, DecimalType
 from pyspark.ml import Pipeline
+import pyspark.sql.functions as F
+from pyspark.sql import Window
+from dateutil import parser
 import sys
 import json
 
@@ -43,32 +46,68 @@ df = sqlc.read.format("parquet").load(
 
 df = df.drop(*data_definition['drop_features'])
 
-sys.stdout.write('Spark dataframe loaded')
+if not 'time_validation_splits' in data_definition:
+    split = df.select('*',
+                      F.percent_rank().over(Window.partitionBy().orderBy(data_definition['time_index'])).alias(
+                          'pct_rank_time')).where('pct_rank_time > 0.7').agg(
+        {data_definition['time_index']: 'min'}).collect()[0][0]
+    data_definition['time_validation_splits'] = [split]
+if not 'time_horizons' in data_definition:
+    data_definition['time_horizons'] = [1]
+
+for h in data_definition['time_horizons']:
+    if 'signal_dimension' in data_definition:
+        df = df.withColumn('{}_h_{}'.format(data_definition['target'], h), F.lag('col1name', -1 * h, default=None).over(Window.partitionBy(data_definition['signal_dimensions']).orderBy(data_definition['time_index'])))
+    else:
+        df = df.withColumn('{}_h_{}'.format(data_definition['target'], h), F.lag('col1name', -1 * h, default=None).over(Window.orderBy(data_definition['time_index'])))
+
+###CURRENT SCOPE IS THAT A TIME INDEX IS REQUIRED TO BE DESIGNATED AND BE OF A PARSABLE DATETIME FORMAT
+
+df = df.withColumn(data_definition['time_index'], F.to_datetime(data_definition['time_index']))
+
+sys.stdout.write('Spark dataframe loaded\n')
 
 non_features = [data_definition['target']]
-if 'time_index' in data_definition:
-    non_features = non_features + [data_definition['time_index']]
+non_features = non_features + [data_definition['time_index'], data_definition['target']] + [
+    '{}_h_{}'.format(
+        data_definition['target'], h) for
+    h in
+    data_definition['time_horizons']]
 
 discrete_features = [c for c in df.schema if not c in non_features and (
-            c.dataType is StringType or c.name in data_definition['categorical_features'])]
+        c.dataType is StringType or c.name in data_definition['categorical_features'])]
 string_indexers = [StringIndexer(inputCol=c.name, outputCol="{}_index".format(c.name)) for c in discrete_features]
 one_hot_encoders = [
     OneHotEncoder(dropLast=False, inputCol="{}_index".format(c.name), outputCol="{}_ohe_vec".format(c.name)) for c in
     discrete_features]
 vector_assembler = VectorAssembler(
     inputCols=['{}_ohe_vec'.format(c.name) for c in discrete_features] + [c.name for c in df.schema if
-                                                                          not c.name in non_features and c.name not in [
+                                                                          not c.name in non_features + [
                                                                               c.name for c in discrete_features]],
     outputCol='features')
-linear_regression = LinearRegression(featuresCol='features', labelCol=data_definition['target'])
-model = Pipeline(stages=string_indexers + one_hot_encoders + [vector_assembler, linear_regression])
 
-fit_model = model.fit(df)
+preprocessing_pipeline = Pipeline(stages=string_indexers + one_hot_encoders + [vector_assembler])
+df = preprocessing_pipeline.fit(df).transform(df)
+###TODO drop all nulls in target here. or raise error if there are any
 
-sys.stdout.write('Pipeline fit')
+for s in data_definition['time_validation_splits']:
+    df_train = df.filter(df[data_definition['time_index']] < s)
+    df_test = df
 
-df_pred = fit_model.transform(df)
+    for h in data_definition['time_horizons']:
+        df_train = df_train.na.fill(
+            df.select(F.mean(df['{}_h_{}'.format(data_definition['target'], h)])).collect()[0][0],
+            subset=['{}_h_{}'.format(data_definition['target'], h)])
+        linear_regression = LinearRegression(featuresCol='features',
+                                             labelCol='{}_h_{}'.format(data_definition['target'], h))
+        fit_model = linear_regression.fit(df_train)
+        sys.stdout.write('Pipeline fit for horizon {}\n'.format(h))
 
-sys.stdout.write('Predictions made')
+        df_test = fit_model.transform(df_test)
+        df_test = df_test.withColumnRenamed("prediction", '{}_h_{}_pred'.format(data_definition['target'], h))
 
-df_pred.write.option("maxRecordsPerFile", 20000).parquet("s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/predictions".format(os.environ['VISION_ID']))
+        sys.stdout.write('Predictions made for horizon {}\n'.format(h))
+
+    df_test.write.option("maxRecordsPerFile", 20000).parquet(
+        "s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/split-{}/predictions".format(s, os.environ[
+            'VISION_ID']))
