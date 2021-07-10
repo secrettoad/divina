@@ -129,7 +129,8 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
             exit_status = stdout.channel.recv_exit_status()
             if not exit_status == 0:
                 client.close()
-                ec2_client.stop_instances(InstanceIds=[instance['InstanceId']])
+                if not keep_instances_alive:
+                    ec2_client.stop_instances(InstanceIds=[instance['InstanceId']])
                 quit()
             # close the client connection once the job is done
         client.close()
@@ -157,7 +158,6 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
     )
 
     delete_emr_cluster(emr_cluster, vision_session)
-
 
 
 def create_emr_roles(boto3_session):
@@ -322,7 +322,6 @@ def get_region_name(region_code):
 def create_ec2_partitioning_instance(vision_session, file_size, key, environment):
     ec2_client = vision_session.client('ec2')
     pricing_client = vision_session.client('pricing', region_name='us-east-1')
-    ###TODO stream during partition_data.py to prevent the need for file storage
     required_gb = math.ceil(file_size * 2 / 1000000000)
     instance_info = [json.loads(p) for p in ec2_pricing(pricing_client, vision_session.region_name) if
                      'memory' in json.loads(p)['product']['attributes'] and 'OnDemand' in json.loads(p)['terms']]
@@ -334,6 +333,8 @@ def create_ec2_partitioning_instance(vision_session, file_size, key, environment
                                                                                        'instanceType'][:2] == 'm5']
     partitioning_instance_type = eligible_instance_types[min(range(len(eligible_instance_types)), key=lambda index:
     eligible_instance_types[index]['Hrs_USD'])]
+
+    ###TODO dynamically size EBS with BlockDeviceMappings=[{"DeviceName": "/dev/xvda", "Ebs": {"VolumeSize": 50}}] and then mount to filesystem and write data
 
     instance = ec2_client.run_instances(ImageId='ami-0b223f209b6d4a220', MinCount=1, MaxCount=1,
                                         IamInstanceProfile={'Name': 'EMR_EC2_DefaultRole'},
@@ -584,11 +585,11 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
     if not worker_profile and executor_role:
         create_emr_roles(vision_session)
 
-    ###current scope is that all supplied files are either a singal endogenous schema OR an exogenous signal that can be joined to the endogenous schema
+    ###current scope is that all supplied files are either a single endogenous schema OR an exogenous signal that can be joined to the endogenous schema
     vision_setup(vision_session=vision_session, source_bucket=source_bucket,
                  worker_profile=worker_profile, executor_role=executor_role, region=region, ec2_keyfile=ec2_keyfile,
                  keep_instances_alive=keep_instances_alive)
 
 
-create_vision(ec2_keyfile='divina-dev', source_bucket='coysu-divina-prototype-large',
+create_vision(ec2_keyfile='divina-dev', source_bucket='coysu-divina-prototype-small',
               keep_instances_alive=True)

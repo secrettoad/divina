@@ -55,26 +55,33 @@ if not 'time_validation_splits' in data_definition:
 if not 'time_horizons' in data_definition:
     data_definition['time_horizons'] = [1]
 
+with open('/home/hadoop/data_definition.json', 'w+') as f:
+    json.dump(data_definition, f)
+
+os.system(
+        "sudo aws s3 cp {} {}".format('/home/hadoop/data_definition.json', 's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json'.format(
+                                 os.environ['VISION_ID'])))
+
+
 for h in data_definition['time_horizons']:
     if 'signal_dimension' in data_definition:
-        df = df.withColumn('{}_h_{}'.format(data_definition['target'], h), F.lag('col1name', -1 * h, default=None).over(Window.partitionBy(data_definition['signal_dimensions']).orderBy(data_definition['time_index'])))
+        df = df.withColumn('{}_h_{}'.format(data_definition['target'], h), F.lag(data_definition['target'], -1 * h, default=None).over(Window.partitionBy(data_definition['signal_dimensions']).orderBy(data_definition['time_index'])))
     else:
-        df = df.withColumn('{}_h_{}'.format(data_definition['target'], h), F.lag('col1name', -1 * h, default=None).over(Window.orderBy(data_definition['time_index'])))
+        df = df.withColumn('{}_h_{}'.format(data_definition['target'], h), F.lag(data_definition['target'], -1 * h, default=None).over(Window.orderBy(data_definition['time_index'])))
 
 ###CURRENT SCOPE IS THAT A TIME INDEX IS REQUIRED TO BE DESIGNATED AND BE OF A PARSABLE DATETIME FORMAT
 
-df = df.withColumn(data_definition['time_index'], F.to_datetime(data_definition['time_index']))
+df = df.withColumn(data_definition['time_index'], F.to_timestamp(data_definition['time_index']))
 
 sys.stdout.write('Spark dataframe loaded\n')
 
-non_features = [data_definition['target']]
-non_features = non_features + [data_definition['time_index'], data_definition['target']] + [
+non_features = [data_definition['target'], data_definition['time_index']] + [
     '{}_h_{}'.format(
         data_definition['target'], h) for
     h in
     data_definition['time_horizons']]
 
-discrete_features = [c for c in df.schema if not c in non_features and (
+discrete_features = [c for c in df.schema if not c.name in non_features and (
         c.dataType is StringType or c.name in data_definition['categorical_features'])]
 string_indexers = [StringIndexer(inputCol=c.name, outputCol="{}_index".format(c.name)) for c in discrete_features]
 one_hot_encoders = [
@@ -108,6 +115,8 @@ for s in data_definition['time_validation_splits']:
 
         sys.stdout.write('Predictions made for horizon {}\n'.format(h))
 
-    df_test.write.option("maxRecordsPerFile", 20000).parquet(
-        "s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/split-{}/predictions".format(s, os.environ[
-            'VISION_ID']))
+    df_test.write.mode('overwrite').option("maxRecordsPerFile", 20000).parquet(
+        "s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/predictions/split-{}".format(os.environ[
+            'VISION_ID'], s))
+
+
