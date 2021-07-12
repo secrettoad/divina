@@ -33,24 +33,27 @@ class FileTypeNotSupported(Exception):
 
 def partition_data(files):
     for file in files:
-        partition_size = 50000000
+        partition_size = 5000000000
         memory_usage = file['df'].memory_usage(deep=True).sum()
+        path = 's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/partitions/{}'.format(
+                    environment['VISION_ID'], data_type)
         if file['source_path'] in [list(k.keys())[0] for k in data_definition['exogenous_files']]:
             data_type = 'exog'
         else:
             data_type = 'endo'
         if int(memory_usage) <= partition_size:
-            groupby = [('mono', file['df'])]
+            partition_cols = None
+            path += '/{}'.format(file['source_path'])
         elif 'PARTITION_DIMENSIONS' in environment:
-            groupby = file['df'].groupby(data_definition['partition_dimensions'])
+            partition_cols = data_definition['partition_dimensions']
         else:
-            num_chunks = round((int(memory_usage) / partition_size)) + 1
-            groupby = zip(range(num_chunks), np.array_split(file['df'], num_chunks))
-        for name, group in groupby:
-            file['df'].to_parquet(
-                's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/partitions/{}/partition-{}.parquet'.format(
-                    environment['VISION_ID'], data_type, file['source_path'].replace('/', '-').strip('.') + str(name)), index=False)
-            sys.stdout.write('SAVED PARQUET - {} - {} - {}\n'.format(environment['VISION_ID'], file['source_path'], name))
+            partition_rows = partition_size/memory_usage * len(file['df'])
+            file['df']['partition'] = np.arange(len(file['df'])) // partition_rows
+            partition_cols = ['partition']
+        file['df'].to_parquet(
+            's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/partitions/{}'.format(
+                    environment['VISION_ID'], data_type), index=False, partition_cols=partition_cols)
+        sys.stdout.write('SAVED PARQUET - {} - {}\n'.format(environment['VISION_ID'], file['source_path']))
 
 
 def decompress_file(key):

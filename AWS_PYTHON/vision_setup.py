@@ -9,13 +9,14 @@ from pkg_resources import resource_filename
 import math
 import paramiko
 import sys
+import time
 
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
 ####TODO abstract bucket names
 
 
-def vision_setup(source_bucket, worker_profile, executor_role, vision_session, region, ec2_keyfile,
+def vision_setup(source_bucket, worker_profile, driver_role, vision_session, region, ec2_keyfile,
                  data_definition=None, keep_instances_alive=False):
     vision_s3 = vision_session.client('s3')
 
@@ -23,9 +24,11 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
         os.mkdir('./tmp')
 
     if data_definition:
+        sys.stdout.write('Writing data definition...\n')
         with open(os.path.join('.', 'tmp/data_definition.json'), 'w+') as f:
             json.dump(data_definition, f)
 
+    sys.stdout.write('Creating Divina cloud storage...\n')
     try:
         create_bucket(vision_s3, bucket='coysu-divina-prototype-visions',
                       createBucketConfiguration={
@@ -38,6 +41,7 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
     except KeyError as e:
         raise e
 
+    sys.stdout.write('Uploading artifacts to cloud...\n')
     upload_directories = {}
     upload_directories.update({'remote_scripts': os.path.join(os.path.abspath('.'), 'remote_scripts')})
     upload_directories.update({'spark_scripts': os.path.join(os.path.abspath('.'), 'spark_scripts')})
@@ -57,6 +61,7 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
                             body=f.read())
 
     file_sizes = []
+    sys.stdout.write('Importing data...\n')
     for file in source_objects:
         copy_source = {
             'Bucket': source_bucket,
@@ -69,6 +74,7 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
                                   bucket='coysu-divina-prototype-visions')
         file_sizes.append(size)
 
+    sys.stdout.write('Building dataset...\n')
     ec2_client = vision_session.client('ec2')
 
     if ec2_keyfile:
@@ -141,9 +147,10 @@ def vision_setup(source_bucket, worker_profile, executor_role, vision_session, r
     if not keep_instances_alive:
         ec2_client.stop_instances(InstanceIds=[instance['InstanceId']])
 
+    sys.stdout.write('Creating forecasts...\n')
     emr_client = vision_session.client('emr')
     emr_cluster = run_vision_and_validation(emr_client=emr_client,
-                                worker_profile=worker_profile, executor_role=executor_role,
+                                worker_profile=worker_profile, driver_role=driver_role,
                                 keep_instances_alive=keep_instances_alive,
                                 ec2_key='vision_{}_ec2_key'.format(os.environ['VISION_ID']))
 
@@ -176,7 +183,7 @@ def delete_emr_cluster(emr_cluster, boto3_session):
 
 
 def run_vision_and_validation(emr_client, worker_profile='EMR_EC2_DefaultRole',
-                      executor_role='EMR_DefaultRole', keep_instances_alive=False, ec2_key=None):
+                      driver_role='EMR_DefaultRole', keep_instances_alive=False, ec2_key=None):
     if keep_instances_alive:
         on_failure = 'CANCEL_AND_WAIT'
     else:
@@ -275,7 +282,7 @@ def run_vision_and_validation(emr_client, worker_profile='EMR_EC2_DefaultRole',
         }],
         VisibleToAllUsers=True,
         JobFlowRole=worker_profile,
-        ServiceRole=executor_role
+        ServiceRole=driver_role
     )
     return cluster
 
@@ -322,26 +329,28 @@ def get_region_name(region_code):
 def create_ec2_partitioning_instance(vision_session, file_size, key, environment):
     ec2_client = vision_session.client('ec2')
     pricing_client = vision_session.client('pricing', region_name='us-east-1')
-    required_gb = math.ceil(file_size * 2 / 1000000000)
+    required_ram = math.ceil(file_size * 10 / 1000000000)
+    required_disk = math.ceil(file_size / 1000000000) + 3
     instance_info = [json.loads(p) for p in ec2_pricing(pricing_client, vision_session.region_name) if
                      'memory' in json.loads(p)['product']['attributes'] and 'OnDemand' in json.loads(p)['terms']]
     available_instance_types = [dict(i, **unnest_ec2_price(i)) for i in instance_info if
                                 i['product']['attributes']['memory'].split(' ')[0].isdigit()]
     eligible_instance_types = [i for i in available_instance_types if
                                float(i['product']['attributes']['memory'].split(' ')[
-                                         0]) >= required_gb and 'Hrs_USD' in i and i['product']['attributes'][
+                                         0]) >= required_ram and 'Hrs_USD' in i and i['product']['attributes'][
                                                                                        'instanceType'][:2] == 'm5']
     partitioning_instance_type = eligible_instance_types[min(range(len(eligible_instance_types)), key=lambda index:
     eligible_instance_types[index]['Hrs_USD'])]
 
-    ###TODO dynamically size EBS with BlockDeviceMappings=[{"DeviceName": "/dev/xvda", "Ebs": {"VolumeSize": 50}}] and then mount to filesystem and write data
+    ###TODO dynamically size EBS with  and then mount to filesystem and write data
 
     instance = ec2_client.run_instances(ImageId='ami-0b223f209b6d4a220', MinCount=1, MaxCount=1,
                                         IamInstanceProfile={'Name': 'EMR_EC2_DefaultRole'},
                                         InstanceType=partitioning_instance_type['product']['attributes'][
                                             'instanceType'],
                                         KeyName=key['KeyName'],
-                                        UserData=json.dumps(environment)
+                                        UserData=json.dumps(environment),
+                                        BlockDeviceMappings=[{"DeviceName": "/dev/xvda", "Ebs": {"VolumeSize": required_disk}}]
                                         )
 
     return instance
@@ -382,7 +391,7 @@ def create_bucket(s3_client, bucket, createBucketConfiguration):
         if e.response['Error']['Code'] != 'BucketAlreadyOwnedByYou':
             raise e
         else:
-            sys.stdout.write('Divina visions s3 bucket already exists...\n')
+            sys.stdout.write('Cloud storage already exists...\n')
 
 
 @backoff.on_exception(backoff.expo,
@@ -390,7 +399,7 @@ def create_bucket(s3_client, bucket, createBucketConfiguration):
 def list_objects(s3_client, bucket):
     objects = s3_client.list_objects(Bucket=bucket)
     if not 'Contents' in objects:
-        raise Exception('No objects in source s3 bucket. Upload data to bucket: {} and then retry.'.format(bucket))
+        raise Exception('No data to import. Upload data to bucket: {} and then retry.'.format(bucket))
     return objects['Contents']
 
 
@@ -422,7 +431,7 @@ def create_role(iam_client, policy_document, trust_policy_document, role_name, p
         role = iam_client.get_role(RoleName=role_name)
     except ClientError as e:
         if e.response['Error']['Code'] == 'NoSuchEntity':
-            sys.stdout.write('Divina role: {} not found. Creating now.'.format(role_name))
+            sys.stdout.write('Divina role: {} not found. Creating now.\n'.format(role_name))
             role = iam_client.create_role(
                 Path='/',
                 RoleName=role_name,
@@ -452,7 +461,7 @@ def create_role(iam_client, policy_document, trust_policy_document, role_name, p
 
     except ClientError as e:
         if e.response['Error']['Code'] == 'NoSuchEntity':
-            sys.stdout.write('Divina policy: {} not found. Creating now.'.format(policy_name))
+            sys.stdout.write('Divina policy: {} not found. Creating now.\n'.format(policy_name))
             iam_client.create_policy(
                 PolicyName=policy_name,
                 PolicyDocument=policy_document
@@ -467,10 +476,11 @@ def create_role(iam_client, policy_document, trust_policy_document, role_name, p
 
 
 def create_vision(source_bucket, source_role=None, vision_role=None, worker_profile='EMR_EC2_DefaultRole',
-                  executor_role='EMR_DefaultRole', region='us-east-2', ec2_keyfile=None, data_definition=None,
+                  driver_role='EMR_DefaultRole', region='us-east-2', ec2_keyfile=None, data_definition=None,
                   keep_instances_alive=False):
     os.environ['VISION_ID'] = str(round(datetime.datetime.now().timestamp()))
 
+    sys.stdout.write('Authenticating to the cloud...\n')
     source_session = boto3.session.Session(aws_access_key_id=os.environ['SOURCE_AWS_PUBLIC_KEY'],
                                            aws_secret_access_key=os.environ['SOURCE_AWS_SECRET_KEY'],
                                            region_name=region)
@@ -479,6 +489,7 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
                                            aws_secret_access_key=os.environ['AWS_SECRET_KEY'], region_name=region)
 
     if not vision_role:
+        sys.stdout.write('Creating Divina cloud role...\n')
         vision_iam = vision_session.client('iam')
 
         with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), os.environ['IAM_PATH'], 'DIVINA_IAM')) as f:
@@ -512,7 +523,7 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
 
     if not source_role:
         # creates role in source account that has s3 permissions
-
+        sys.stdout.write('Connecting import cloud role...\n')
         source_iam = source_session.client('iam')
 
         with open(
@@ -569,6 +580,7 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
             ]
         }
 
+        sys.stdout.write('Granting Divina access to imported data...\n')
         try:
             bucket_policy = json.loads(get_bucket_policy(source_s3, bucket=source_bucket)['Policy'])
             if not user_policy in bucket_policy['Statement']:
@@ -582,14 +594,22 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
         put_bucket_policy(source_s3, bucket=source_bucket, policy=json.dumps(bucket_policy))
 
         ###TODO add logic for provided worker and exectutor profiles
-    if not worker_profile and executor_role:
+    if not worker_profile and driver_role:
+        sys.stdout.write('Creating spark driver and executor cloud roles...\n')
         create_emr_roles(vision_session)
 
     ###current scope is that all supplied files are either a single endogenous schema OR an exogenous signal that can be joined to the endogenous schema
     vision_setup(vision_session=vision_session, source_bucket=source_bucket,
-                 worker_profile=worker_profile, executor_role=executor_role, region=region, ec2_keyfile=ec2_keyfile,
+                 worker_profile=worker_profile, driver_role=driver_role, region=region, ec2_keyfile=ec2_keyfile,
                  keep_instances_alive=keep_instances_alive)
 
-
-create_vision(ec2_keyfile='divina-dev', source_bucket='coysu-divina-prototype-small',
+num_retries = 2
+n = 0
+while n < num_retries:
+    try:
+        n += 1
+        create_vision(ec2_keyfile='divina-dev', source_bucket='coysu-divina-prototype-large',
               keep_instances_alive=True)
+    except:
+        time.sleep(10**n)
+
