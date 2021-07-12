@@ -36,7 +36,11 @@
         },
         {
             "Effect": "Allow",
-            "Action": "elasticmapreduce:RunJobFlow",
+            "Action": [
+                "elasticmapreduce:RunJobFlow",
+                "elasticmapreduce:DescribeStep",
+                "elasticmapreduce:ListSteps"
+                ],
             "Resource": "*"
         },
         {

@@ -49,7 +49,7 @@ df = df.drop(*data_definition['drop_features'])
 if not 'time_validation_splits' in data_definition:
     split = df.select('*',
                       F.percent_rank().over(Window.partitionBy().orderBy(data_definition['time_index'])).alias(
-                          'pct_rank_time')).where('pct_rank_time > 0.7').agg(
+                          'pct_rank_time')).where('pct_rank_time > 0.5').agg(
         {data_definition['time_index']: 'min'}).collect()[0][0]
     data_definition['time_validation_splits'] = [split]
 if not 'time_horizons' in data_definition:
@@ -68,8 +68,6 @@ for h in data_definition['time_horizons']:
         df = df.withColumn('{}_h_{}'.format(data_definition['target'], h), F.lag(data_definition['target'], -1 * h, default=None).over(Window.partitionBy(data_definition['signal_dimensions']).orderBy(data_definition['time_index'])))
     else:
         df = df.withColumn('{}_h_{}'.format(data_definition['target'], h), F.lag(data_definition['target'], -1 * h, default=None).over(Window.orderBy(data_definition['time_index'])))
-
-###CURRENT SCOPE IS THAT A TIME INDEX IS REQUIRED TO BE DESIGNATED AND BE OF A PARSABLE DATETIME FORMAT
 
 df = df.withColumn(data_definition['time_index'], F.to_timestamp(data_definition['time_index']))
 

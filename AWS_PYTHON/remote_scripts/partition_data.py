@@ -35,24 +35,26 @@ def partition_data(files):
     for file in files:
         partition_size = 5000000000
         memory_usage = file['df'].memory_usage(deep=True).sum()
-        path = 's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/partitions/{}'.format(
-                    environment['VISION_ID'], data_type)
         if file['source_path'] in [list(k.keys())[0] for k in data_definition['exogenous_files']]:
             data_type = 'exog'
         else:
             data_type = 'endo'
+        root_path = 's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/partitions/{}'.format(
+                    environment['VISION_ID'], data_type)
         if int(memory_usage) <= partition_size:
-            partition_cols = None
-            path += '/{}'.format(file['source_path'])
-        elif 'PARTITION_DIMENSIONS' in environment:
-            partition_cols = data_definition['partition_dimensions']
+            path = root_path + '/{}.parquet'.format(file['source_path'])
+            file['df'].to_parquet(path, index=False)
+            sys.stdout.write('SAVED PARQUET - {} - {}\n'.format(environment['VISION_ID'], file['source_path']))
+        elif 'signal_dimensions' in data_definition:
+            partition_cols = data_definition['signal_dimensions']
+            file['df'].to_parquet(
+                root_path, index=False, partition_cols=partition_cols)
         else:
             partition_rows = partition_size/memory_usage * len(file['df'])
             file['df']['partition'] = np.arange(len(file['df'])) // partition_rows
             partition_cols = ['partition']
-        file['df'].to_parquet(
-            's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/partitions/{}'.format(
-                    environment['VISION_ID'], data_type), index=False, partition_cols=partition_cols)
+            file['df'].to_parquet(
+                root_path, index=False, partition_cols=partition_cols)
         sys.stdout.write('SAVED PARQUET - {} - {}\n'.format(environment['VISION_ID'], file['source_path']))
 
 

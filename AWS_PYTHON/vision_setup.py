@@ -13,12 +13,10 @@ import time
 
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
-####TODO abstract bucket names
-
 
 def vision_setup(source_bucket, worker_profile, driver_role, vision_session, region, ec2_keyfile,
-                 data_definition=None, keep_instances_alive=False):
-    vision_s3 = vision_session.client('s3')
+                 data_definition=None, keep_instances_alive=False, verbosity=0):
+    vision_s3_client = vision_session.client('s3')
 
     if not os.path.exists('./tmp'):
         os.mkdir('./tmp')
@@ -30,14 +28,14 @@ def vision_setup(source_bucket, worker_profile, driver_role, vision_session, reg
 
     sys.stdout.write('Creating Divina cloud storage...\n')
     try:
-        create_bucket(vision_s3, bucket='coysu-divina-prototype-visions',
+        create_bucket(vision_s3_client, bucket='coysu-divina-prototype-visions',
                       createBucketConfiguration={
                           'LocationConstraint': region
                       })
     except Exception as e:
         raise e
     try:
-        source_objects = list_objects(vision_s3, bucket=source_bucket)
+        source_objects = list_objects(vision_s3_client, bucket=source_bucket)
     except KeyError as e:
         raise e
 
@@ -55,7 +53,7 @@ def vision_setup(source_bucket, worker_profile, driver_role, vision_session, reg
         for file in os.listdir(upload_directories[d]):
             path = os.path.join(upload_directories[d], file)
             with open(path) as f:
-                upload_file(s3_client=vision_s3,
+                upload_file(s3_client=vision_s3_client,
                             bucket='coysu-divina-prototype-visions',
                             key=os.path.join(key, file),
                             body=f.read())
@@ -63,13 +61,14 @@ def vision_setup(source_bucket, worker_profile, driver_role, vision_session, reg
     file_sizes = []
     sys.stdout.write('Importing data...\n')
     for file in source_objects:
-        copy_source = {
+        copy_object(copy_source={
             'Bucket': source_bucket,
             'Key': file['Key']
-        }
-        vision_s3.copy_object(CopySource=copy_source, Bucket='coysu-divina-prototype-visions',
-                              Key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'], file['Key']))
-        size = get_s3_object_size(vision_s3,
+        }, bucket='coysu-divina-prototype-visions',
+            key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'], file['Key']),
+            s3_client=vision_s3_client)
+
+        size = get_s3_object_size(vision_s3_client,
                                   key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'], file['Key']),
                                   bucket='coysu-divina-prototype-visions')
         file_sizes.append(size)
@@ -79,9 +78,9 @@ def vision_setup(source_bucket, worker_profile, driver_role, vision_session, reg
 
     if ec2_keyfile:
         with open(os.path.join(os.path.expanduser('~'), '.ssh', ec2_keyfile + '.pub')) as f:
-            key = ec2_client.import_key_pair(
-                KeyName='vision_{}_ec2_key'.format(os.environ['VISION_ID']),
-                PublicKeyMaterial=f.read()
+            key = import_key_pair(
+                key_name='vision_{}_ec2_key'.format(os.environ['VISION_ID']),
+                public_key_material=f.read(), ec2_client=ec2_client
             )
             paramiko_key = paramiko.RSAKey.from_private_key_file(
                 os.path.join(os.path.expanduser('~'), '.ssh', ec2_keyfile), password=os.environ['KEY_PASS'])
@@ -94,22 +93,19 @@ def vision_setup(source_bucket, worker_profile, driver_role, vision_session, reg
     environment = {
         'ENVIRONMENT': {'VISION_ID': str(os.environ['VISION_ID']), 'SOURCE_KEYS': [k['Key'] for k in source_objects],
                         'SOURCE_BUCKET': source_bucket}}
-    instance = create_ec2_partitioning_instance(vision_session=vision_session, file_size=max(file_sizes), key=key,
+    instance = create_ec2_partitioning_instance(boto3_session=vision_session, file_size=max(file_sizes), key=key,
                                                 environment=environment)
 
-    waiter = ec2_client.get_waiter('instance_running')
-    waiter.wait(InstanceIds=[i['InstanceId'] for i in instance['Instances']])
-
     try:
-        response = ec2_client.describe_instances(InstanceIds=[i['InstanceId'] for i in instance['Instances']])
+        waiter = get_ec2_waiter('instance_running', ec2_client=ec2_client)
+        waiter.wait(InstanceIds=[i['InstanceId'] for i in instance['Instances']])
+        response = describe_instances(instance_ids=[i['InstanceId'] for i in instance['Instances']],
+                                      ec2_client=ec2_client)
         instance = response['Reservations'][0]['Instances'][0]
-    except Exception as e:
-        raise e
 
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    try:
         # Here 'ubuntu' is user name and 'instance_ip' is public IP of EC2
         connect_ssh(client, hostname=instance['PublicIpAddress'], username="ec2-user", pkey=paramiko_key)
         commands = ['sudo cp /var/lib/cloud/instance/user-data.txt /home/ec2-user/user-data.json',
@@ -127,44 +123,49 @@ def vision_setup(source_bucket, worker_profile, driver_role, vision_session, reg
                     'python3 /home/ec2-user/remote_scripts/partition_data.py']
         for cmd in commands:
             stdin, stdout, stderr = client.exec_command(cmd)
-            for line in stdout:
-                sys.stdout.write(line)
-            for line in stderr:
-                sys.stderr.write(line)
-                ###TODO GET THIS TO WORK BELOW
+            if verbosity > 0:
+                for line in stdout:
+                    sys.stdout.write(line)
+            if verbosity > 2:
+                for line in stderr:
+                    sys.stderr.write(line)
             exit_status = stdout.channel.recv_exit_status()
             if not exit_status == 0:
                 client.close()
                 if not keep_instances_alive:
-                    ec2_client.stop_instances(InstanceIds=[instance['InstanceId']])
+                    stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
                 quit()
             # close the client connection once the job is done
         client.close()
 
     except Exception as e:
+        if not keep_instances_alive:
+            stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
         raise e
-
     if not keep_instances_alive:
-        ec2_client.stop_instances(InstanceIds=[instance['InstanceId']])
+        stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
 
     sys.stdout.write('Creating forecasts...\n')
     emr_client = vision_session.client('emr')
     emr_cluster = run_vision_and_validation(emr_client=emr_client,
-                                worker_profile=worker_profile, driver_role=driver_role,
-                                keep_instances_alive=keep_instances_alive,
-                                ec2_key='vision_{}_ec2_key'.format(os.environ['VISION_ID']))
+                                            worker_profile=worker_profile, driver_role=driver_role,
+                                            keep_instances_alive=keep_instances_alive,
+                                            ec2_key='vision_{}_ec2_key'.format(os.environ['VISION_ID']))
 
-    emr_waiter = emr_client.get_waiter('step_complete')
+    steps = list_steps(emr_client, emr_cluster['JobFlowId'])
+    last_step_id = steps['Steps'][0]['Id']
+    emr_waiter = get_emr_waiter(emr_client, 'step_complete')
     emr_waiter.wait(
-        ClusterId='the-cluster-id',
-        StepId='the-step-id',
+        ClusterId=emr_cluster['JobFlowId'],
+        StepId=last_step_id,
         WaiterConfig={
             "Delay": 30,
-            "MaxAttempts": 10
+            "MaxAttempts": 120
         }
     )
 
-    delete_emr_cluster(emr_cluster, vision_session)
+
+    delete_emr_cluster(emr_cluster, emr_client)
 
 
 def create_emr_roles(boto3_session):
@@ -177,113 +178,22 @@ def create_emr_roles(boto3_session):
     return iam_client.list_roles()
 
 
-def delete_emr_cluster(emr_cluster, boto3_session):
-    emr_client = boto3_session.client('emr')
-    emr_client.terminate_job_flows(JobFlowIds=[emr_cluster['JobFlowId']])
-
-
 def run_vision_and_validation(emr_client, worker_profile='EMR_EC2_DefaultRole',
-                      driver_role='EMR_DefaultRole', keep_instances_alive=False, ec2_key=None):
+                              driver_role='EMR_DefaultRole', keep_instances_alive=False, ec2_key=None):
     if keep_instances_alive:
         on_failure = 'CANCEL_AND_WAIT'
     else:
         on_failure = 'TERMINATE_CLUSTER'
-    environment = {"PYSPARK_PYTHON": "/usr/bin/python3", "VISION_ID": os.environ['VISION_ID']}
 
-    cluster = emr_client.run_job_flow(
-        Name="divina-cluster-{}".format(os.environ['VISION_ID']),
-        ReleaseLabel='emr-6.2.0',
-        Instances={
-            'KeepJobFlowAliveWhenNoSteps': keep_instances_alive,
-            'TerminationProtected': False,
-            'InstanceGroups': [
-                {
-                    'InstanceRole': 'TASK',
-                    'InstanceType': 'c4.xlarge',
-                    'InstanceCount': 3
-                },
-                {
-                    'InstanceRole': 'MASTER',
-                    'InstanceType': 'c4.xlarge',
-                    'InstanceCount': 1
-                },
-                {
-                    'InstanceRole': 'CORE',
-                    'InstanceType': 'c4.xlarge',
-                    'InstanceCount': 1
-                }
-            ],
-            'Ec2KeyName': ec2_key,
-
-        },
-        LogUri='s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/logs/emr_logs'.format(
-            os.environ['VISION_ID']),
-        Applications=[
-            {
-                'Name': 'Spark'
-            }
-        ],
-        Steps=[
-            {
-                'Name': 'setup_state_pusher',
-                'ActionOnFailure': on_failure,
-                'HadoopJarStep': {
-                    'Jar': 'command-runner.jar',
-                    'Args': ['state-pusher-script']
-                }
-            },
-            {
-                'Name': 'setup_s3_sync_scripts',
-                'ActionOnFailure': on_failure,
-                'HadoopJarStep': {
-                    'Jar': 'command-runner.jar',
-                    'Args': ['aws', 's3', 'sync',
-                             's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/spark_scripts'.format(
-                                 os.environ['VISION_ID']),
-                             '/home/hadoop/spark_scripts']
-                }
-            },
-            {
-                'Name': 'setup_s3_sync_data',
-                'ActionOnFailure': on_failure,
-                'HadoopJarStep': {
-                    'Jar': 'command-runner.jar',
-                    'Args': ['aws', 's3', 'cp',
-                             's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json'.format(
-                                 os.environ['VISION_ID']),
-                             '/home/hadoop/data_definition.json']
-                }
-            },
-            {
-                'Name': 'vision_script',
-                'ActionOnFailure': on_failure,
-                'HadoopJarStep': {
-                    'Jar': 'command-runner.jar',
-                    'Args': ['spark-submit', '/home/hadoop/spark_scripts/predict.py']
-                }
-            },
-            {
-                'Name': 'validation_script',
-                'ActionOnFailure': on_failure,
-                'HadoopJarStep': {
-                    'Jar': 'command-runner.jar',
-                    'Args': ['spark-submit', '/home/hadoop/spark_scripts/validate.py']
-                }
-            }
-        ],
-        Configurations=[{
-            "Classification": "spark-env",
-            "Configurations": [
-                {
-                    "Classification": "export",
-                    "Properties": environment
-                }
-            ]
-        }],
-        VisibleToAllUsers=True,
-        JobFlowRole=worker_profile,
-        ServiceRole=driver_role
-    )
+    with open(os.path.join('.', 'tmp/emr_config.json'), 'r') as f:
+        emr_config = json.loads(os.path.expandvars(json.dumps(json.load(f)).replace('${WORKER_PROFILE}',worker_profile).replace(
+                                                                                         '${DRIVER_ROLE}',
+                                                                                         driver_role).replace(
+                                                                                         '${EMR_ON_FAILURE}',
+                                                                                         on_failure).replace(
+                                                                                         '${EC2_KEYNAME}', ec2_key)))
+    emr_config['emr_config']['Instances']['KeepJobFlowAliveWhenNoSteps'] = keep_instances_alive
+    cluster = emr_client.run_job_flow(**emr_config['emr_config'])
     return cluster
 
 
@@ -300,7 +210,7 @@ def ec2_pricing(pricing_client, region_name, filter_params=None):
     if filter_params:
         products_params['Filters'] = products_params['Filters'] + filter_params
     while True:
-        response = pricing_client.get_products(**products_params)
+        response = get_products(pricing_client, products_params)
         yield from [i for i in response['PriceList']]
         if 'NextToken' not in response:
             break
@@ -326,23 +236,21 @@ def get_region_name(region_code):
         return default_region
 
 
-def create_ec2_partitioning_instance(vision_session, file_size, key, environment):
-    ec2_client = vision_session.client('ec2')
-    pricing_client = vision_session.client('pricing', region_name='us-east-1')
+def create_ec2_partitioning_instance(boto3_session, file_size, key, environment):
+    ec2_client = boto3_session.client('ec2')
+    pricing_client = boto3_session.client('pricing', region_name='us-east-1')
     required_ram = math.ceil(file_size * 10 / 1000000000)
     required_disk = math.ceil(file_size / 1000000000) + 3
-    instance_info = [json.loads(p) for p in ec2_pricing(pricing_client, vision_session.region_name) if
+    instance_info = [json.loads(p) for p in ec2_pricing(pricing_client, boto3_session.region_name) if
                      'memory' in json.loads(p)['product']['attributes'] and 'OnDemand' in json.loads(p)['terms']]
     available_instance_types = [dict(i, **unnest_ec2_price(i)) for i in instance_info if
                                 i['product']['attributes']['memory'].split(' ')[0].isdigit()]
     eligible_instance_types = [i for i in available_instance_types if
                                float(i['product']['attributes']['memory'].split(' ')[
                                          0]) >= required_ram and 'Hrs_USD' in i and i['product']['attributes'][
-                                                                                       'instanceType'][:2] == 'm5']
+                                                                                        'instanceType'][:2] == 'm5']
     partitioning_instance_type = eligible_instance_types[min(range(len(eligible_instance_types)), key=lambda index:
     eligible_instance_types[index]['Hrs_USD'])]
-
-    ###TODO dynamically size EBS with  and then mount to filesystem and write data
 
     instance = ec2_client.run_instances(ImageId='ami-0b223f209b6d4a220', MinCount=1, MaxCount=1,
                                         IamInstanceProfile={'Name': 'EMR_EC2_DefaultRole'},
@@ -350,10 +258,70 @@ def create_ec2_partitioning_instance(vision_session, file_size, key, environment
                                             'instanceType'],
                                         KeyName=key['KeyName'],
                                         UserData=json.dumps(environment),
-                                        BlockDeviceMappings=[{"DeviceName": "/dev/xvda", "Ebs": {"VolumeSize": required_disk}}]
+                                        BlockDeviceMappings=[
+                                            {"DeviceName": "/dev/xvda", "Ebs": {"VolumeSize": required_disk}}]
                                         )
 
     return instance
+
+
+
+@backoff.on_exception(backoff.expo,
+                      ClientError, max_time=30)
+def list_steps(emr_client, cluster_id):
+    return emr_client.list_steps(ClusterId=cluster_id)
+
+
+@backoff.on_exception(backoff.expo,
+                      ClientError, max_time=30)
+def get_ec2_waiter(step, ec2_client):
+    return ec2_client.get_waiter(step)
+
+
+@backoff.on_exception(backoff.expo,
+                      ClientError, max_time=30)
+def copy_object(copy_source, bucket, key, s3_client):
+    return s3_client.copy_object(CopySource=copy_source, Bucket=bucket,
+                                 Key=key)
+
+
+@backoff.on_exception(backoff.expo,
+                      ClientError, max_time=30)
+def describe_instances(instance_ids, ec2_client):
+    return ec2_client.describe_instances(InstanceIds=instance_ids)
+
+
+@backoff.on_exception(backoff.expo,
+                      ClientError, max_time=30)
+def import_key_pair(
+        key_name,
+        public_key_material, ec2_client
+):
+    return ec2_client.import_key_pair(KeyName=key_name, PublicKeyMaterial=public_key_material)
+
+
+@backoff.on_exception(backoff.expo,
+                      ClientError, max_time=30)
+def stop_instances(instance_ids, ec2_client):
+    ec2_client.stop_instances(InstanceIds=instance_ids)
+
+
+@backoff.on_exception(backoff.expo,
+                      ClientError, max_time=30)
+def get_emr_waiter(emr_client, step):
+    waiter = emr_client.get_waiter(step)
+    return waiter
+
+@backoff.on_exception(backoff.expo,
+                      ClientError, max_time=30)
+def delete_emr_cluster(emr_cluster, emr_client):
+    emr_client.terminate_job_flows(JobFlowIds=[emr_cluster['JobFlowId']])
+
+
+@backoff.on_exception(backoff.expo,
+                      ClientError, max_time=30)
+def get_products(pricing_client, products_params):
+    return pricing_client.get_products(**products_params)
 
 
 @backoff.on_exception(backoff.expo,
@@ -477,7 +445,7 @@ def create_role(iam_client, policy_document, trust_policy_document, role_name, p
 
 def create_vision(source_bucket, source_role=None, vision_role=None, worker_profile='EMR_EC2_DefaultRole',
                   driver_role='EMR_DefaultRole', region='us-east-2', ec2_keyfile=None, data_definition=None,
-                  keep_instances_alive=False):
+                  keep_instances_alive=False, verbosity=0):
     os.environ['VISION_ID'] = str(round(datetime.datetime.now().timestamp()))
 
     sys.stdout.write('Authenticating to the cloud...\n')
@@ -601,15 +569,8 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
     ###current scope is that all supplied files are either a single endogenous schema OR an exogenous signal that can be joined to the endogenous schema
     vision_setup(vision_session=vision_session, source_bucket=source_bucket,
                  worker_profile=worker_profile, driver_role=driver_role, region=region, ec2_keyfile=ec2_keyfile,
-                 keep_instances_alive=keep_instances_alive)
+                 data_definition=data_definition, keep_instances_alive=keep_instances_alive, verbosity=verbosity)
 
-num_retries = 2
-n = 0
-while n < num_retries:
-    try:
-        n += 1
-        create_vision(ec2_keyfile='divina-dev', source_bucket='coysu-divina-prototype-large',
-              keep_instances_alive=True)
-    except:
-        time.sleep(10**n)
 
+create_vision(ec2_keyfile='divina-dev', source_bucket='coysu-divina-prototype-small',
+              keep_instances_alive=True, verbosity=3)
