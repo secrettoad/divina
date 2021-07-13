@@ -52,7 +52,11 @@
                  "ec2:CreateKeyPair",
                  "ec2:ReportInstanceStatus",
                  "ec2:DescribeInstances",
-                 "ec2:StopInstances"
+                 "ec2:StopInstances",
+                 "ec2:DescribeSecurityGroups",
+                 "ec2:DescribeVpcs",
+                 "ec2:CreateSecurityGroup",
+                 "ec2:AuthorizeSecurityGroupIngress"
                  ],
             "Resource": "*"
         },

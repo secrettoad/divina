@@ -10,6 +10,7 @@ import math
 import paramiko
 import sys
 import time
+import socket
 
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
@@ -93,8 +94,77 @@ def vision_setup(source_bucket, worker_profile, driver_role, vision_session, reg
     environment = {
         'ENVIRONMENT': {'VISION_ID': str(os.environ['VISION_ID']), 'SOURCE_KEYS': [k['Key'] for k in source_objects],
                         'SOURCE_BUCKET': source_bucket}}
-    instance = create_ec2_partitioning_instance(boto3_session=vision_session, file_size=max(file_sizes), key=key,
-                                                environment=environment)
+
+    security_groups = describe_security_groups(
+        filters=[
+            dict(Name='group-name', Values=['divina-ssh'])
+        ], ec2_client=ec2_client
+    )
+    ip_permissions = [
+        {'IpRanges': [
+            {
+                'CidrIp': '0.0.0.0/0',
+                'Description': 'divina-ip'
+            },
+        ],
+
+            'IpProtocol': 'tcp',
+            'FromPort': 22,
+            'ToPort': 22,
+        },
+
+    ]
+    if len(security_groups['SecurityGroups']) > 0:
+        security_group = security_groups['SecurityGroups'][0]
+        if not ip_permissions[0]['IpRanges'][0]['CidrIp'] in [ipr['CidrIp'] for s in security_group['IpPermissions'] for ipr in s['IpRanges']
+                                                 if all(
+                    [s[k] == ip_permissions[0][k] for k in ['FromPort', 'ToPort', 'IpProtocol']])]:
+            authorize_security_group_ingress(
+                group_id=security_group['GroupId'],
+                ip_permissions=ip_permissions, ec2_client=ec2_client
+
+            )
+
+    else:
+        vpc_id = ec2_client.describe_vpcs()['Vpcs'][0]['VpcId']
+
+        security_group = create_security_group(
+            Description='Security group for allowing SSH access to partitioning VM for Coysu Divina',
+            GroupName='divina-ssh',
+            VpcId=vpc_id, ec2_client=ec2_client
+        )
+        authorize_security_group_ingress(
+            group_id=security_group['GroupId'],
+            ip_permissions=ip_permissions, ec2_client=ec2_client
+
+        )
+
+    pricing_client = vision_session.client('pricing', region_name='us-east-1')
+    required_ram = math.ceil(max(file_sizes) * 10 / 1000000000)
+    required_disk = math.ceil(max(file_sizes) / 1000000000) + 3
+    instance_info = [json.loads(p) for p in ec2_pricing(pricing_client, vision_session.region_name) if
+                         'memory' in json.loads(p)['product']['attributes'] and 'OnDemand' in json.loads(p)['terms']]
+    available_instance_types = [dict(i, **unnest_ec2_price(i)) for i in instance_info if
+                                    i['product']['attributes']['memory'].split(' ')[0].isdigit()]
+    eligible_instance_types = [i for i in available_instance_types if
+                                   float(i['product']['attributes']['memory'].split(' ')[
+                                             0]) >= required_ram and 'Hrs_USD' in i and i['product']['attributes'][
+                                                                                            'instanceType'][:2] == 'm5']
+    partitioning_instance_type = eligible_instance_types[min(range(len(eligible_instance_types)), key=lambda index:
+    eligible_instance_types[index]['Hrs_USD'])]
+
+    instance = ec2_client.run_instances(ImageId='ami-0b223f209b6d4a220', MinCount=1, MaxCount=1,
+                                            IamInstanceProfile={'Name': 'EMR_EC2_DefaultRole'},
+                                            InstanceType=partitioning_instance_type['product']['attributes'][
+                                                'instanceType'],
+                                            KeyName=key['KeyName'],
+                                            UserData=json.dumps(environment),
+                                            BlockDeviceMappings=[
+                                                {"DeviceName": "/dev/xvda", "Ebs": {"VolumeSize": required_disk}}],
+                                            SecurityGroupIds=[
+                                                security_group['GroupId']
+                                            ]
+                                            )
 
     try:
         waiter = get_ec2_waiter('instance_running', ec2_client=ec2_client)
@@ -165,9 +235,6 @@ def vision_setup(source_bucket, worker_profile, driver_role, vision_session, reg
     )
 
 
-    delete_emr_cluster(emr_cluster, emr_client)
-
-
 def create_emr_roles(boto3_session):
     iam_client = boto3_session.client('iam')
 
@@ -186,12 +253,13 @@ def run_vision_and_validation(emr_client, worker_profile='EMR_EC2_DefaultRole',
         on_failure = 'TERMINATE_CLUSTER'
 
     with open(os.path.join('.', 'tmp/emr_config.json'), 'r') as f:
-        emr_config = json.loads(os.path.expandvars(json.dumps(json.load(f)).replace('${WORKER_PROFILE}',worker_profile).replace(
-                                                                                         '${DRIVER_ROLE}',
-                                                                                         driver_role).replace(
-                                                                                         '${EMR_ON_FAILURE}',
-                                                                                         on_failure).replace(
-                                                                                         '${EC2_KEYNAME}', ec2_key)))
+        emr_config = json.loads(
+            os.path.expandvars(json.dumps(json.load(f)).replace('${WORKER_PROFILE}', worker_profile).replace(
+                '${DRIVER_ROLE}',
+                driver_role).replace(
+                '${EMR_ON_FAILURE}',
+                on_failure).replace(
+                '${EC2_KEYNAME}', ec2_key)))
     emr_config['emr_config']['Instances']['KeepJobFlowAliveWhenNoSteps'] = keep_instances_alive
     cluster = emr_client.run_job_flow(**emr_config['emr_config'])
     return cluster
@@ -236,34 +304,31 @@ def get_region_name(region_code):
         return default_region
 
 
-def create_ec2_partitioning_instance(boto3_session, file_size, key, environment):
-    ec2_client = boto3_session.client('ec2')
-    pricing_client = boto3_session.client('pricing', region_name='us-east-1')
-    required_ram = math.ceil(file_size * 10 / 1000000000)
-    required_disk = math.ceil(file_size / 1000000000) + 3
-    instance_info = [json.loads(p) for p in ec2_pricing(pricing_client, boto3_session.region_name) if
-                     'memory' in json.loads(p)['product']['attributes'] and 'OnDemand' in json.loads(p)['terms']]
-    available_instance_types = [dict(i, **unnest_ec2_price(i)) for i in instance_info if
-                                i['product']['attributes']['memory'].split(' ')[0].isdigit()]
-    eligible_instance_types = [i for i in available_instance_types if
-                               float(i['product']['attributes']['memory'].split(' ')[
-                                         0]) >= required_ram and 'Hrs_USD' in i and i['product']['attributes'][
-                                                                                        'instanceType'][:2] == 'm5']
-    partitioning_instance_type = eligible_instance_types[min(range(len(eligible_instance_types)), key=lambda index:
-    eligible_instance_types[index]['Hrs_USD'])]
+@backoff.on_exception(backoff.expo,
+                      ClientError, max_time=30)
+def create_security_group(description, group_name, vpc_id, ec2_client):
+    return ec2_client.create_security_group(
+            Description=description,
+            GroupName=group_name,
+            VpcId=vpc_id, ec2_client=ec2_client
+        )
 
-    instance = ec2_client.run_instances(ImageId='ami-0b223f209b6d4a220', MinCount=1, MaxCount=1,
-                                        IamInstanceProfile={'Name': 'EMR_EC2_DefaultRole'},
-                                        InstanceType=partitioning_instance_type['product']['attributes'][
-                                            'instanceType'],
-                                        KeyName=key['KeyName'],
-                                        UserData=json.dumps(environment),
-                                        BlockDeviceMappings=[
-                                            {"DeviceName": "/dev/xvda", "Ebs": {"VolumeSize": required_disk}}]
-                                        )
 
-    return instance
+@backoff.on_exception(backoff.expo,
+                      ClientError, max_time=30)
+def authorize_security_group_ingress(group_id, ip_permissions, ec2_client):
+    ec2_client.authorize_security_group_ingress(
+        GroupId=group_id,
+        IpPermissions=ip_permissions
 
+    )
+
+@backoff.on_exception(backoff.expo,
+                      ClientError, max_time=30)
+def describe_security_groups(filters, ec2_client):
+    return ec2_client.describe_security_groups(
+        Filters=filters
+    )
 
 
 @backoff.on_exception(backoff.expo,
@@ -311,6 +376,7 @@ def stop_instances(instance_ids, ec2_client):
 def get_emr_waiter(emr_client, step):
     waiter = emr_client.get_waiter(step)
     return waiter
+
 
 @backoff.on_exception(backoff.expo,
                       ClientError, max_time=30)

@@ -44,7 +44,6 @@ def partition_data(files):
         if int(memory_usage) <= partition_size:
             path = root_path + '/{}.parquet'.format(file['source_path'])
             file['df'].to_parquet(path, index=False)
-            sys.stdout.write('SAVED PARQUET - {} - {}\n'.format(environment['VISION_ID'], file['source_path']))
         elif 'signal_dimensions' in data_definition:
             partition_cols = data_definition['signal_dimensions']
             file['df'].to_parquet(
