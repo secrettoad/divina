@@ -2,14 +2,13 @@ import os
 
 scripts_path = os.path.abspath('.')
 os.system("sudo python3 -m pip install Cython")
-os.system(
-    "sudo python3 -m pip install -r {}".format(os.path.join('/home/hadoop/spark_scripts', 'requirements.txt')))
 import pyspark
 import pyspark.sql.functions as F
 import json
 
 with open('/home/hadoop/data_definition.json') as f:
     data_definition = json.load(f)
+
 
 def get_spark_context():
     # configure
@@ -30,9 +29,7 @@ def get_spark_context():
 
     ###TODO TODO REPLACE FOR LOOPS WITH PROPER PARALLELIZATION
 
-
 def get_metrics(data_definition, df):
-    metrics = {}
     metrics = {'time_horizons': {}}
     for h in data_definition['time_horizons']:
         metrics['time_horizons'][h] = {}

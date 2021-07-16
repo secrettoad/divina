@@ -3,4 +3,3 @@ boto3
 s3fs
 pandas
 pyarrow
-requests
