@@ -67,12 +67,6 @@ def source_s3():
 
 
 @pytest.fixture()
-def source_ec2():
-    with moto.mock_ec2():
-        yield boto3.client("ec2")
-
-
-@pytest.fixture()
 def vision_sts():
     with moto.mock_sts():
         yield boto3.client("sts")

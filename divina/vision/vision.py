@@ -9,8 +9,7 @@ from pkg_resources import resource_filename
 import math
 import paramiko
 import sys
-import time
-import socket
+import io
 
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
@@ -22,15 +21,22 @@ def vision_setup(source_bucket, worker_profile, driver_role, vision_session, sou
 
     if data_definition:
         sys.stdout.write('Writing data definition...\n')
-        with open(os.path.join('.', 'config/data_definition.json'), 'w+') as f:
+        with open(os.path.join('..', 'config/data_definition.json'), 'w+') as f:
             json.dump(data_definition, f)
     vision_s3_client = vision_session.client('s3')
     source_s3_client = source_session.client('s3')
-    file_sizes = import_data(vision_s3_client=vision_s3_client, source_s3_client=source_s3_client, source_bucket=source_bucket, vision_role_name=vision_role_name, vision_region=vision_session.region_name)
+    ###TODO below works if you debug through. figure out why no
+    import_data(vision_s3_client=vision_s3_client, source_s3_client=source_s3_client, source_bucket=source_bucket, vision_role_name=vision_role_name, vision_region=vision_session.region_name)
     sys.stdout.write('Uploading artifacts to cloud...\n')
-    upload_scripts(vision_s3_client)
+    upload_scripts(vision_s3_client, 'coysu-divina-prototype-visions')
     sys.stdout.write('Building dataset...\n')
-    build_dataset(boto_session=vision_session, ec2_keyfile=ec2_keyfile, data_bucket='coysu-divina-prototype-visions', keep_instances_alive=keep_instances_alive, file_sizes=file_sizes, verbosity=verbosity)
+    vision_ec2_client = vision_session.client('ec2')
+    vision_pricing_client = vision_session.client('pricing', region_name='us-east-1')
+    instance, paramiko_key = build_dataset_infrastructure(s3_client=vision_s3_client, ec2_client=vision_ec2_client, pricing_client=vision_pricing_client, ec2_keyfile=ec2_keyfile, data_bucket='coysu-divina-prototype-visions', keep_instances_alive=keep_instances_alive, verbosity=verbosity)
+    if not build_dataset_ssh(instance=instance, verbosity=verbosity, paramiko_key=paramiko_key):
+        if not keep_instances_alive:
+            stop_instances(instance_ids=[instance['InstanceId']], ec2_client=vision_ec2_client)
+        quit()
     sys.stdout.write('Creating forecasts...\n')
     emr_client = vision_session.client('emr')
     emr_cluster = run_vision_and_validation(emr_client=emr_client,
@@ -51,8 +57,12 @@ def vision_setup(source_bucket, worker_profile, driver_role, vision_session, sou
     )
 
 
-def build_dataset(boto_session, ec2_keyfile, data_bucket, keep_instances_alive, file_sizes, verbosity):
-    ec2_client = boto_session.client('ec2')
+def build_dataset_infrastructure(s3_client, ec2_client, pricing_client, data_bucket, ec2_keyfile=None, keep_instances_alive=False):
+    file_sizes = []
+    keys = []
+    for o in list_objects(s3_client=s3_client, bucket=data_bucket, prefix='coysu-divina-prototype-{}'.format(os.environ['VISION_ID'])):
+        file_sizes.append(get_s3_object_size(s3_client=s3_client, key=o['Key'], bucket=data_bucket))
+        keys.append(o['Key'])
 
     if ec2_keyfile:
         with open(os.path.join(os.path.expanduser('~'), '.ssh', ec2_keyfile + '.pub')) as f:
@@ -66,10 +76,10 @@ def build_dataset(boto_session, ec2_keyfile, data_bucket, keep_instances_alive, 
         key = ec2_client.create_key_pair(
             KeyName='vision_{}_ec2_key'.format(os.environ['VISION_ID'])
         )
-        paramiko_key = paramiko.RSAKey.from_private_key(key)
+        paramiko_key = paramiko.RSAKey.from_private_key(io.StringIO(key['KeyMaterial']))
 
     environment = {
-        'ENVIRONMENT': {'VISION_ID': str(os.environ['VISION_ID']), 'SOURCE_KEYS': [k['Key'] for k in source_objects],
+        'ENVIRONMENT': {'VISION_ID': str(os.environ['VISION_ID']), 'SOURCE_KEYS': keys,
                         'SOURCE_BUCKET': data_bucket}}
 
     security_groups = describe_security_groups(
@@ -107,9 +117,9 @@ def build_dataset(boto_session, ec2_keyfile, data_bucket, keep_instances_alive, 
         vpc_id = ec2_client.describe_vpcs()['Vpcs'][0]['VpcId']
 
         security_group = create_security_group(
-            Description='Security group for allowing SSH access to partitioning VM for Coysu Divina',
-            GroupName='divina-ssh',
-            VpcId=vpc_id, ec2_client=ec2_client
+            description='Security group for allowing SSH access to partitioning VM for Coysu Divina',
+            group_name='divina-ssh',
+            vpc_id=vpc_id, ec2_client=ec2_client
         )
         authorize_security_group_ingress(
             group_id=security_group['GroupId'],
@@ -117,10 +127,9 @@ def build_dataset(boto_session, ec2_keyfile, data_bucket, keep_instances_alive, 
 
         )
 
-    pricing_client = boto_session.client('pricing', region_name='us-east-1')
     required_ram = math.ceil(max(file_sizes) * 10 / 1000000000)
     required_disk = math.ceil(max(file_sizes) / 1000000000) + 3
-    instance_info = [json.loads(p) for p in ec2_pricing(pricing_client, boto_session.region_name) if
+    instance_info = [json.loads(p) for p in ec2_pricing(pricing_client, ec2_client._client_config.region_name) if
                      'memory' in json.loads(p)['product']['attributes'] and 'OnDemand' in json.loads(p)['terms']]
     available_instance_types = [dict(i, **unnest_ec2_price(i)) for i in instance_info if
                                 i['product']['attributes']['memory'].split(' ')[0].isdigit()]
@@ -151,39 +160,6 @@ def build_dataset(boto_session, ec2_keyfile, data_bucket, keep_instances_alive, 
                                       ec2_client=ec2_client)
         instance = response['Reservations'][0]['Instances'][0]
 
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-        connect_ssh(client, hostname=instance['PublicIpAddress'], username="ec2-user", pkey=paramiko_key)
-        commands = ['sudo cp /var/lib/cloud/instance/user-data.txt /home/ec2-user/user-data.json',
-                    'sudo yum install unzip -y', 'sudo yum install python3 -y', 'sudo yum install gcc -y',
-                    'sudo curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"',
-                    'sudo unzip awscli-bundle.zip',
-                    'sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/bin/aws',
-                    'sudo aws s3 sync s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/remote_scripts /home/ec2-user/remote_scripts'.format(
-                        os.environ['VISION_ID']),
-                    'sudo aws s3 cp s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json /home/ec2-user/data_definition.json'.format(
-                        os.environ['VISION_ID']),
-                    'sudo chown -R ec2-user /home/ec2-user',
-                    'python3 -m pip install wheel',
-                    'python3 -m pip install -r /home/ec2-user/remote_scripts/requirements.txt',
-                    'python3 /home/ec2-user/remote_scripts/build_dataset.py']
-        for cmd in commands:
-            stdin, stdout, stderr = client.exec_command(cmd)
-            if verbosity > 0:
-                for line in stdout:
-                    sys.stdout.write(line)
-            if verbosity > 2:
-                for line in stderr:
-                    sys.stderr.write(line)
-            exit_status = stdout.channel.recv_exit_status()
-            if not exit_status == 0:
-                client.close()
-                if not keep_instances_alive:
-                    stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
-                quit()
-        client.close()
-
     except Exception as e:
         if not keep_instances_alive:
             stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
@@ -191,12 +167,48 @@ def build_dataset(boto_session, ec2_keyfile, data_bucket, keep_instances_alive, 
     if not keep_instances_alive:
         stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
 
+    return instance, paramiko_key
 
-def upload_scripts(s3_client):
+
+def build_dataset_ssh(instance, verbosity, paramiko_key):
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    connect_ssh(client, hostname=instance['PublicIpAddress'], username="ec2-user", pkey=paramiko_key)
+    commands = ['sudo cp /var/lib/cloud/instance/user-data.txt /home/ec2-user/user-data.json',
+                'sudo yum install unzip -y', 'sudo yum install python3 -y', 'sudo yum install gcc -y',
+                'sudo curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"',
+                'sudo unzip awscli-bundle.zip',
+                'sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/bin/aws',
+                'sudo aws s3 sync s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/remote_scripts /home/ec2-user/remote_scripts'.format(
+                    os.environ['VISION_ID']),
+                'sudo aws s3 cp s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json /home/ec2-user/data_definition.json'.format(
+                    os.environ['VISION_ID']),
+                'sudo chown -R ec2-user /home/ec2-user',
+                'python3 -m pip install wheel',
+                'python3 -m pip install -r /home/ec2-user/remote_scripts/requirements.txt',
+                'python3 /home/ec2-user/remote_scripts/build_dataset.py']
+    for cmd in commands:
+        stdin, stdout, stderr = client.exec_command(cmd)
+        if verbosity > 0:
+            for line in stdout:
+                sys.stdout.write(line)
+        if verbosity > 2:
+            for line in stderr:
+                sys.stderr.write(line)
+        exit_status = stdout.channel.recv_exit_status()
+        if not exit_status == 0:
+            client.close()
+            return False
+    client.close()
+    return True
+
+
+def upload_scripts(s3_client, bucket):
     upload_dirs = {}
-    upload_dirs.update({'remote_scripts': os.path.join(os.path.abspath('.'), 'divina/remote_scripts')})
-    upload_dirs.update({'spark_scripts': os.path.join(os.path.abspath('.'), 'divina/spark_scripts')})
-    upload_dirs.update({'/': os.path.join(os.path.abspath('.'), 'divina/config')})
+    upload_dirs.update({'remote_scripts': os.path.join(os.path.abspath('..'), 'divina/remote_scripts')})
+    upload_dirs.update({'spark_scripts': os.path.join(os.path.abspath('..'), 'divina/spark_scripts')})
+    upload_dirs.update({'/': os.path.join(os.path.abspath('..'), 'divina/config')})
 
     for d in upload_dirs:
         if not d == '/':
@@ -207,7 +219,7 @@ def upload_scripts(s3_client):
             path = os.path.join(upload_dirs[d], file)
             with open(path) as f:
                 upload_file(s3_client=s3_client,
-                            bucket='coysu-divina-prototype-visions',
+                            bucket=bucket,
                             key=os.path.join(key, file),
                             body=f.read())
 
@@ -223,7 +235,7 @@ def import_data(vision_s3_client, source_s3_client, vision_role_name, vision_reg
         "Action": [
             "s3:GetBucketLocation",
             "s3:ListBucket",
-            "s3:GetObject",
+            "s3:GetObject"
         ],
         "Resource": [
             "arn:aws:s3:::{}".format(source_bucket),
@@ -250,6 +262,7 @@ def import_data(vision_s3_client, source_s3_client, vision_role_name, vision_reg
                       createBucketConfiguration={
                           'LocationConstraint': vision_region
                       })
+
     except Exception as e:
         raise e
     try:
@@ -257,7 +270,6 @@ def import_data(vision_s3_client, source_s3_client, vision_role_name, vision_reg
     except KeyError as e:
         raise e
 
-    file_sizes = []
     sys.stdout.write('Importing data...\n')
     for file in source_objects:
         copy_object(copy_source={
@@ -267,7 +279,7 @@ def import_data(vision_s3_client, source_s3_client, vision_role_name, vision_reg
             key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'], file['Key']),
             s3_client=vision_s3_client)
 
-    return file_sizes
+    return None
 
 
 def create_emr_roles(boto3_session):
@@ -280,14 +292,14 @@ def create_emr_roles(boto3_session):
     return iam_client.list_roles()
 
 
-def run_vision_and_validation(emr_client, worker_profile='EMR_EC2_DefaultRole',
+def run_training(emr_client, worker_profile='EMR_EC2_DefaultRole',
                               driver_role='EMR_DefaultRole', keep_instances_alive=False, ec2_key=None):
     if keep_instances_alive:
         on_failure = 'CANCEL_AND_WAIT'
     else:
         on_failure = 'TERMINATE_CLUSTER'
 
-    with open(os.path.join('.', 'divina/config/emr_config.json'), 'r') as f:
+    with open(os.path.join('..', 'divina/config/emr_config.json'), 'r') as f:
         emr_config = json.loads(
             os.path.expandvars(json.dumps(json.load(f)).replace('${WORKER_PROFILE}', worker_profile).replace(
                 '${DRIVER_ROLE}',
@@ -345,7 +357,7 @@ def create_security_group(description, group_name, vpc_id, ec2_client):
     return ec2_client.create_security_group(
         Description=description,
         GroupName=group_name,
-        VpcId=vpc_id, ec2_client=ec2_client
+        VpcId=vpc_id
     )
 
 
@@ -380,7 +392,7 @@ def get_ec2_waiter(step, ec2_client):
 
 
 @backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
+                      ClientError, max_tries=10)
 def copy_object(copy_source, bucket, key, s3_client):
     return s3_client.copy_object(CopySource=copy_source, Bucket=bucket,
                                  Key=key)
@@ -423,6 +435,8 @@ def delete_emr_cluster(emr_cluster, emr_client):
 @backoff.on_exception(backoff.expo,
                       ClientError, max_time=30)
 def get_products(pricing_client, products_params):
+    with open('pricing_mock.json', 'w+') as f:
+        json.dump(pricing_client.get_products(**products_params), f)
     return pricing_client.get_products(**products_params)
 
 
@@ -465,9 +479,12 @@ def create_bucket(s3_client, bucket, createBucketConfiguration):
 
 
 @backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def list_objects(s3_client, bucket):
-    objects = s3_client.list_objects(Bucket=bucket)
+                      ClientError, max_tries=10)
+def list_objects(s3_client, bucket, prefix=None):
+    if prefix:
+        objects = s3_client.list_objects(Bucket=bucket, Prefix=prefix)
+    else:
+        objects = s3_client.list_objects(Bucket=bucket)
     if not 'Contents' in objects:
         raise Exception('No data to import. Upload data to bucket: {} and then retry.'.format(bucket))
     return objects['Contents']
@@ -638,7 +655,7 @@ def create_vision(source_bucket, source_role=None, vision_role=None, worker_prof
 
     ###current scope is that all supplied files are either a single endogenous schema OR an exogenous signal that can be joined to the endogenous schema
     vision_setup(vision_session=vision_session, source_session=source_session, source_bucket=source_bucket,
-                 worker_profile=worker_profile, driver_role=driver_role, region=region, ec2_keyfile=ec2_keyfile,
+                 worker_profile=worker_profile, driver_role=driver_role, vision_role_name='divina-vision-role', ec2_keyfile=ec2_keyfile,
                  data_definition=data_definition, keep_instances_alive=keep_instances_alive, verbosity=verbosity)
 
 
