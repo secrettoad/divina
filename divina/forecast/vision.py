@@ -17,7 +17,7 @@ import io
 def vision_setup(divina_version, worker_profile, driver_role, vision_session, source_session,
                  ec2_keyfile,
                  vision_role_name,
-                 data_definition=None, keep_instances_alive=False, verbosity=0, vision_role=None, source_role=None):
+                 data_definition=None, keep_instances_alive=False, verbosity=0, vision_role=None, source_role=None, divina_pip_arguments=None):
     vision_iam = vision_session.client('iam')
     source_iam = source_session.client('iam')
     vision_sts = vision_session.client('sts')
@@ -39,23 +39,14 @@ def vision_setup(divina_version, worker_profile, driver_role, vision_session, so
     source_s3_client = source_session.client('s3')
     import_data(vision_s3_client=vision_s3_client, source_s3_client=source_s3_client,
                 vision_role_name=vision_role_name)
-    sys.stdout.write('Uploading artifacts to cloud...\n')
-    os.system('export AWS_ACCESS_KEY_ID={}; export AWS_SECRET_ACCESS_KEY={}; aws s3 sync {} s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/divina'.format(os.environ['AWS_PUBLIC_KEY'], os.environ['AWS_SECRET_KEY'], os.path.dirname(os.path.dirname(__file__)), os.environ['VISION_ID']))
-    os.system(
-        'export AWS_ACCESS_KEY_ID={}; export AWS_SECRET_ACCESS_KEY={}; aws s3 sync {} s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/divina'.format(
-            os.environ['AWS_PUBLIC_KEY'], os.environ['AWS_SECRET_KEY'], os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'setup.cfg'),
-            os.environ['VISION_ID']))
-    os.system(
-        'export AWS_ACCESS_KEY_ID={}; export AWS_SECRET_ACCESS_KEY={}; aws s3 sync {} s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/divina'.format(
-            os.environ['AWS_PUBLIC_KEY'], os.environ['AWS_SECRET_KEY'], os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'setup.py'),
-            os.environ['VISION_ID']))
     sys.stdout.write('Building dataset...\n')
     vision_ec2_client = vision_session.client('ec2')
     vision_pricing_client = vision_session.client('pricing', region_name='us-east-1')
     instance, paramiko_key = create_dataset_ec2(s3_client=vision_s3_client, ec2_client=vision_ec2_client,
                                                 pricing_client=vision_pricing_client, ec2_keyfile=ec2_keyfile,
-                                                keep_instances_alive=keep_instances_alive, divina_version=divina_version)
-    if not build_dataset_ssh(instance=instance, verbosity=verbosity, paramiko_key=paramiko_key):
+                                                keep_instances_alive=keep_instances_alive,
+                                                divina_version=divina_version)
+    if not build_dataset_ssh(instance=instance, verbosity=verbosity, paramiko_key=paramiko_key, divina_pip_arguments=divina_pip_arguments):
         if not keep_instances_alive:
             stop_instances(instance_ids=[instance['InstanceId']], ec2_client=vision_ec2_client)
         quit()
@@ -98,9 +89,9 @@ def get_sessions(vision_iam, source_iam, vision_sts, source_sts, vision_role=Non
                                   'divina-vision-role-policy', 'role for coysu divina')
 
     assumed_vision_role = assume_role(sts_client=vision_sts,
-                                          role_arn="arn:aws:iam::{}:role/{}".format(
-                                              os.environ['ACCOUNT_NUMBER'], vision_role['Role']['RoleName']),
-                                          session_name="AssumeRoleSession2")
+                                      role_arn="arn:aws:iam::{}:role/{}".format(
+                                          os.environ['ACCOUNT_NUMBER'], vision_role['Role']['RoleName']),
+                                      session_name="AssumeRoleSession2")
 
     # From the response that contains the assumed role, get the temporary
     # credentials that can be used to make subsequent API calls
@@ -109,9 +100,9 @@ def get_sessions(vision_iam, source_iam, vision_sts, source_sts, vision_role=Non
     # Use the temporary credentials that AssumeRole returns to make a
     # connection to Amazon S3
     vision_session = boto3.session.Session(
-            aws_access_key_id=vision_credentials['AccessKeyId'],
-            aws_secret_access_key=vision_credentials['SecretAccessKey'],
-            aws_session_token=vision_credentials['SessionToken'], region_name=vision_sts._client_config.region_name,
+        aws_access_key_id=vision_credentials['AccessKeyId'],
+        aws_secret_access_key=vision_credentials['SecretAccessKey'],
+        aws_session_token=vision_credentials['SessionToken'], region_name=vision_sts._client_config.region_name,
     )
 
     if not source_role:
@@ -121,7 +112,8 @@ def get_sessions(vision_iam, source_iam, vision_sts, source_sts, vision_role=Non
         with open(
                 os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config',
                              'import_iam_policy.json')) as f:
-            source_policy = os.path.expandvars(json.dumps(json.load(f))).replace('${IMPORT_BUCKET}', os.environ['IMPORT_BUCKET'])
+            source_policy = os.path.expandvars(json.dumps(json.load(f))).replace('${IMPORT_BUCKET}',
+                                                                                 os.environ['IMPORT_BUCKET'])
         with open(
                 os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config',
                              'import_trust_policy.json')) as f:
@@ -264,7 +256,7 @@ def create_dataset_ec2(divina_version, s3_client, ec2_client, pricing_client, ec
     return instance, paramiko_key
 
 
-def build_dataset_ssh(instance, verbosity, paramiko_key):
+def build_dataset_ssh(instance, verbosity, paramiko_key, divina_pip_arguments):
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -273,9 +265,9 @@ def build_dataset_ssh(instance, verbosity, paramiko_key):
                 'sudo yum install unzip -y', 'sudo yum install python3 -y', 'sudo yum install gcc -y',
                 'sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"',
                 'sudo unzip awscliv2.zip',
-                'sudo sudo ./aws/install -i /usr/local/aws-cli -b /usr/local/bin',
-                'aws codeartifact login --tool pip --domain coysu --repository divina',
-                'pip install divina=={} --extra-index-url https://www.pypi.org/simple'.format(pkg_resources.get_distribution('divina').version),
+                'sudo ./aws/install -i /usr/local/aws-cli -b /usr/local/bin',
+                'python3 -m pip install divina=={} {}'.format(
+                    get_distribution('divina').version, "" if divina_pip_arguments is None else divina_pip_arguments),
                 'aws s3 cp s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json /home/ec2-user/data_definition.json'.format(
                     os.environ['VISION_ID']),
                 'sudo chown -R ec2-user /home/ec2-user',
@@ -386,7 +378,7 @@ def create_modelling_emr(emr_client, worker_profile='EMR_EC2_DefaultRole',
         on_failure = 'CANCEL_AND_WAIT'
     else:
         on_failure = 'TERMINATE_CLUSTER'
-    with open(os.path.join('..', 'divina/config/emr_config.json'), 'r') as f:
+    with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config/emr_config.json'), 'r') as f:
         if ec2_key:
             emr_config = json.loads(
                 os.path.expandvars(json.dumps(json.load(f)).replace('${WORKER_PROFILE}', worker_profile).replace(
@@ -698,27 +690,27 @@ def create_role(iam_client, policy_document, trust_policy_document, role_name, p
     return role
 
 
-def create_vision(import_bucket, divina_version, source_role=None, vision_role=None, worker_profile='EMR_EC2_DefaultRole',
+def create_vision(import_bucket, divina_version, source_role=None, vision_role=None,
+                  worker_profile='EMR_EC2_DefaultRole',
                   driver_role='EMR_DefaultRole', region='us-east-2', ec2_keyfile=None, data_definition=None,
-                  keep_instances_alive=False, verbosity=0):
+                  keep_instances_alive=False, verbosity=0, divina_pip_arguments=None):
     os.environ['VISION_ID'] = str(round(datetime.datetime.now().timestamp()))
     os.environ['DIVINA_BUCKET'] = 'coysu-divina-prototype-visions'
     os.environ['IMPORT_BUCKET'] = import_bucket
 
     sys.stdout.write('Authenticating to the cloud...\n')
-    source_session = boto3.session.Session(aws_access_key_id=os.environ['SOURCE_AWS_PUBLIC_KEY'],
-                                           aws_secret_access_key=os.environ['SOURCE_AWS_SECRET_KEY'],
+    source_session = boto3.session.Session(aws_access_key_id=os.environ['SOURCE_AWS_ACCESS_KEY_ID'],
+                                           aws_secret_access_key=os.environ['SOURCE_AWS_SECRET_ACCESS_KEY'],
                                            region_name=region)
 
-    vision_session = boto3.session.Session(aws_access_key_id=os.environ['AWS_PUBLIC_KEY'],
-                                           aws_secret_access_key=os.environ['AWS_SECRET_KEY'], region_name=region)
+    vision_session = boto3.session.Session(aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+                                           aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+                                           region_name=region)
 
     ###current scope is that all supplied files are either a single endogenous schema OR an exogenous signal that can be joined to the endogenous schema
     vision_setup(vision_session=vision_session, source_session=source_session,
                  vision_role=vision_role, source_role=source_role, worker_profile=worker_profile,
                  driver_role=driver_role, vision_role_name='divina-vision-role',
                  ec2_keyfile=ec2_keyfile,
-                 data_definition=data_definition, keep_instances_alive=keep_instances_alive, verbosity=verbosity, divina_version=divina_version)
-
-
-create_vision(import_bucket='coysu-divina-prototype-small', ec2_keyfile='divina-dev', verbosity=3)
+                 data_definition=data_definition, keep_instances_alive=keep_instances_alive, verbosity=verbosity,
+                 divina_version=divina_version, divina_pip_arguments=divina_pip_arguments)
