@@ -29,6 +29,7 @@ def get_spark_context():
 
     ###TODO TODO REPLACE FOR LOOPS WITH PROPER PARALLELIZATION
 
+
 def get_metrics(data_definition, df):
     metrics = {'time_horizons': {}}
     for h in data_definition['time_horizons']:
@@ -41,28 +42,27 @@ def get_metrics(data_definition, df):
     return metrics
 
 
-if not 'train_only' in data_definition or not data_definition['train_only']:
-    sc = get_spark_context()
+sc = get_spark_context()
 
-    sqlc = pyspark.sql.SQLContext(sc)
-    metrics = {}
-    for s in data_definition['time_validation_splits']:
+sqlc = pyspark.sql.SQLContext(sc)
+metrics = {}
+for s in data_definition['time_validation_splits']:
 
-        df_pred = sqlc.read.format("parquet").load(
-            "s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/predictions/split-{}/*".format(os.environ['VISION_ID'], s))
+    df_pred = sqlc.read.format("parquet").load(
+        "s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/predictions/split-{}/*".format(os.environ['VISION_ID'], s))
 
-        if 'signal_dimensions' in data_definition:
-            metrics[s] = df_pred.partitionBy(data_definition['signal_dimensions']).rdd.mapPartitions(
-                lambda x: get_metrics(data_definition, x)).toDF(
-                [c.name for c in df_pred.schema])
-        else:
-            metrics[s] = get_metrics(data_definition, df_pred)
+    if 'signal_dimensions' in data_definition:
+        metrics[s] = df_pred.partitionBy(data_definition['signal_dimensions']).rdd.mapPartitions(
+            lambda x: get_metrics(data_definition, x)).toDF(
+            [c.name for c in df_pred.schema])
+    else:
+        metrics[s] = get_metrics(data_definition, df_pred)
 
-        if not os.path.exists('/home/hadoop/metrics'.format(s)):
-            os.mkdir('/home/hadoop/metrics'.format(s))
-        with open('/home/hadoop/metrics/split-{}-metrics.json'.format(s), 'w+') as f:
-            json.dump(metrics, f)
+    if not os.path.exists('/home/hadoop/metrics'.format(s)):
+        os.mkdir('/home/hadoop/metrics'.format(s))
+    with open('/home/hadoop/metrics/split-{}-metrics.json'.format(s), 'w+') as f:
+        json.dump(metrics, f)
 
-        os.system(
-            "sudo aws s3 cp {} {}".format('/home/hadoop/metrics/split-{}-metrics.json'.format(s), 's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/metrics/split-{}-metrics.json'.format(
+    os.system(
+        "sudo aws s3 cp {} {}".format('/home/hadoop/metrics/split-{}-metrics.json'.format(s), 's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/metrics/split-{}-metrics.json'.format(
                                      os.environ['VISION_ID'], s)))

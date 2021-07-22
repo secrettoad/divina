@@ -10,8 +10,9 @@ from pyspark.sql.types import StringType
 import sys
 import json
 from pyspark.ml.pipeline import Pipeline
-from divina.preprocessing.base import CategoricalEncoder
-from divina.models.linear import GLASMA
+from divina.modelling.preprocessing.base import CategoricalEncoder
+from divina.modelling.ensembles.linear import GLASMA
+
 
 with open('/home/hadoop/data_definition.json') as f:
     data_definition = json.load(f)
@@ -85,9 +86,7 @@ vector_assembler = VectorAssembler(
                                                                                       c.name for c in discrete_features]],
             outputCol='features')
 
-df = Pipeline(stages=[categorical_encoder, vector_assembler]).fit(df).transform(df)
-
-sys.stdout.write('Spark dataframe loaded\n')
+sys.stdout.write('Spark model loaded\n')
 
 for s in data_definition['time_validation_splits']:
     df_train = df.filter(df[data_definition['time_index']] < s)
@@ -95,18 +94,13 @@ for s in data_definition['time_validation_splits']:
 
     for h in data_definition['time_horizons']:
 
-        glasma = GLASMA(features_col='features', target_col='{}_h_{}'.format(data_definition['target'], h))
+        glasma = GLASMA(feature_col='features', label_col='{}_h_{}'.format(data_definition['target'], h))
 
-        fit_glasma = glasma.fit(df)
+        fit_pipeline = Pipeline(stages=[categorical_encoder, vector_assembler, glasma]).fit(df)
+
         sys.stdout.write('Pipeline fit for horizon {}\n'.format(h))
 
-        df_test = fit_glasma.transform(df_test).withColumnRenamed("prediction",
-                                                                  '{}_h_{}_pred'.format(data_definition['target'], h))
+        fit_pipeline.write().overwrite().save(
+            "s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/models/s-{}_h-{}".format(os.environ['VISION_ID'], s, h))
 
-        sys.stdout.write('Predictions made for horizon {}\n'.format(h))
-
-    df_test.write.mode('overwrite').option("maxRecordsPerFile", 20000).parquet(
-        "s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/predictions/split-{}".format(os.environ[
-            'VISION_ID'], s))
-
-
+        sys.stdout.write('Pipeline persisted for horizon {}\n'.format(h))

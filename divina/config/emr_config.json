@@ -3,7 +3,7 @@
     "Name": "divina-cluster-${VISION_ID}",
     "ReleaseLabel": "emr-6.2.0",
     "Instances": {
-      "KeepJobFlowAliveWhenNoSteps": false,
+      "KeepJobFlowAliveWhenNoSteps": true,
       "TerminationProtected": false,
       "InstanceGroups": [
         {
@@ -66,28 +66,6 @@
             "cp",
             "s3://coysu-divina-prototype-visions/coysu-divina-prototype-${VISION_ID}/data_definition.json",
             "/home/hadoop/data_definition.json"
-          ]
-        }
-      },
-      {
-        "Name": "vision_script",
-        "ActionOnFailure": "${EMR_ON_FAILURE}",
-        "HadoopJarStep": {
-          "Jar": "command-runner.jar",
-          "Args": [
-            "spark-submit",
-            "/home/hadoop/spark_scripts/predict.py"
-          ]
-        }
-      },
-      {
-        "Name": "validation_script",
-        "ActionOnFailure": "${EMR_ON_FAILURE}",
-        "HadoopJarStep": {
-          "Jar": "command-runner.jar",
-          "Args": [
-            "spark-submit",
-            "/home/hadoop/spark_scripts/validate.py"
           ]
         }
       }

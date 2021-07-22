@@ -39,7 +39,8 @@
             "Action": [
                 "elasticmapreduce:RunJobFlow",
                 "elasticmapreduce:DescribeStep",
-                "elasticmapreduce:ListSteps"
+                "elasticmapreduce:ListSteps",
+                "elasticmapreduce:AddJobFlowSteps"
                 ],
             "Resource": "*"
         },

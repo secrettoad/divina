@@ -1,8 +1,9 @@
+import os
+os.system('pip install -r requirements.txt')
+import sys
 import pandas as pd
 import numpy as np
-import sys
 import json
-import os
 from zipfile import ZipFile
 from io import BytesIO
 import s3fs
@@ -31,7 +32,7 @@ class FileTypeNotSupported(Exception):
         return self.message
 
 
-def partition_data(files):
+def partition_data(data_definition, files):
     for file in files:
         partition_size = 5000000000
         memory_usage = file['df'].memory_usage(deep=True).sum()
@@ -39,8 +40,8 @@ def partition_data(files):
             data_type = 'exog'
         else:
             data_type = 'endo'
-        root_path = 's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/partitions/{}'.format(
-                    environment['VISION_ID'], data_type)
+        root_path = 's3://{}/coysu-divina-prototype-{}/partitions/{}'.format(os.environ['DIVINA_BUCKET'],
+                    os.environ['VISION_ID'], data_type)
         if int(memory_usage) <= partition_size:
             path = root_path + '/{}.parquet'.format(file['source_path'])
             file['df'].to_parquet(path, index=False)
@@ -54,27 +55,27 @@ def partition_data(files):
             partition_cols = ['partition']
             file['df'].to_parquet(
                 root_path, index=False, partition_cols=partition_cols)
-        sys.stdout.write('SAVED PARQUET - {} - {}\n'.format(environment['VISION_ID'], file['source_path']))
+        sys.stdout.write('SAVED PARQUET - {} - {}\n'.format(os.environ['VISION_ID'], file['source_path']))
 
 
-def decompress_file(key):
-    data = s3_fs.open(os.path.join('s3://', environment['SOURCE_BUCKET'], key)).read()
+def decompress_file(tmp_dir, key):
+    data = s3_fs.open(os.path.join('s3://', os.environ['DIVINA_BUCKET'], key)).read()
     files = []
     if key.split('.')[-1] == 'zip':
-        if not os.path.isdir('/home/ec2-user/data/{}'.format(key.replace('.', '-'))):
-            os.mkdir('/home/ec2-user/data/{}'.format(key.replace('.', '-')))
+        if not os.path.isdir('{}/{}'.format(tmp_dir, key.split('/')[-1].replace('.', '-'))):
+            os.mkdir('{}/{}'.format(tmp_dir, key.split('/')[-1].replace('.', '-')))
         zip_file = ZipFile(BytesIO(data))
         for name in zip_file.namelist():
-            local_path = '/home/ec2-user/data/{}'.format(os.path.join(key.replace('.', '-'), name))
+            local_path = '{}/{}'.format(tmp_dir, os.path.join(key.split('/')[-1].replace('.', '-'), name))
             with open(local_path, 'wb+') as f:
                 f.write(zip_file.read(name))
             files.append({'source_path': os.path.join(key, name), 'local_path': local_path,
                           'filename': local_path.split('/')[-1]})
     else:
-        local_path = '/home/ec2-user/data/{}'.format(key)
+        local_path = '{}/{}'.format(tmp_dir, key.split('/')[-1])
         with open(local_path, 'wb+') as f:
             f.write(data)
-        files = [{'source_path': key, 'local_path': '/home/ec2-user/data/{}'.format(key),
+        files = [{'source_path': key, 'local_path': local_path,
                   'filename': local_path.split('/')[-1]}]
     return files
 
@@ -101,29 +102,31 @@ def rm(f):
     raise TypeError('must be either file or directory')
 
 
-with open('/home/ec2-user/user-data.json') as f:
-    environment = json.load(f)['ENVIRONMENT']
-with open('/home/ec2-user/data_definition.json') as f:
-    data_definition = json.load(f)
-data_directories = ['data', 'data/endo', 'data/exog']
-if not os.path.isdir('/home/ec2-user/data'):
+def build_dataset(tmp_dir='/tmp/data'):
+    if os.path.exists('./user-data.json'):
+        with open('./user-data.json') as f:
+            os.environ.update(json.load(f)['ENVIRONMENT'])
+    with open('../config/data_definition.json') as f:
+        data_definition = json.load(f)
+    data_directories = ['endo', 'exog']
+    if not os.path.isdir(tmp_dir):
+        os.mkdir(tmp_dir)
     for d in data_directories:
-        os.mkdir(os.path.join('/home/ec2-user/', d))
-else:
-    shutil.rmtree('/home/ec2-user/data')
-    for d in data_directories:
-        os.mkdir(os.path.join('/home/ec2-user/', d))
+        if not os.path.isdir(os.path.join(tmp_dir, d)):
+            os.mkdir(os.path.join(tmp_dir, d))
 
-for key in environment['SOURCE_KEYS']:
-    try:
-        files = decompress_file(key)
-        files = parse_files(files)
-        partition_data(files)
-    except Exception as e:
-        sys.stdout.write('Could not partition file: {}\n'.format(key))
-        traceback.print_exc()
-        raise e
-    finally:
-        shutil.rmtree('/home/ec2-user/data')
-        for d in data_directories:
-            os.mkdir(os.path.join('/home/ec2-user/', d))
+    for key in s3_fs.ls('s3://{}/coysu-divina-prototype-{}/data'.format(os.environ['DIVINA_BUCKET'], os.environ['VISION_ID'])):
+        try:
+            files = decompress_file(tmp_dir, key)
+            files = parse_files(files)
+            partition_data(data_definition, files)
+        except Exception as e:
+            sys.stdout.write('Could not partition file: {}\n'.format(key))
+            traceback.print_exc()
+            raise e
+        finally:
+            shutil.rmtree('{}'.format(tmp_dir))
+            for d in data_directories:
+                os.mkdir(os.path.join('./', d))
+
+build_dataset('5345934875')

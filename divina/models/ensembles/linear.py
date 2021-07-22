@@ -1,6 +1,6 @@
 from pyspark.ml.regression import LinearRegression
 from pyspark.ml.pipeline import Pipeline, Estimator, Transformer
-from divina.preprocessing.base import MeanFiller
+from divina.modelling.preprocessing.base import MeanFiller
 
 
 class GLASMA(Estimator):
