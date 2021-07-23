@@ -280,7 +280,7 @@ def build_dataset_ssh(instance, verbosity, paramiko_key, divina_pip_arguments):
                 'aws s3 cp s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json /home/ec2-user/data_definition.json'.format(
                     os.environ['VISION_ID']),
                 'sudo chown -R ec2-user /home/ec2-user',
-                'divina build_dataset /home/ec2-user/data']
+                'divina[dataset] build-dataset /home/ec2-user/data']
     for cmd in commands:
         stdin, stdout, stderr = client.exec_command(cmd)
         if verbosity > 0:

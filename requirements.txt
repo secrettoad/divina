@@ -4,4 +4,4 @@ pytest
 click
 backoff
 paramiko
-pygit2
+pandas

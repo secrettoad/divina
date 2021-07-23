@@ -1,6 +1,6 @@
 import sys
 import click
-from ..forecast import vision, build_dataset
+from ..forecast import vision, build_dataset as bd
 import pkg_resources
 
 
@@ -18,6 +18,6 @@ def forecast(import_bucket, divina_version=pkg_resources.get_distribution('divin
 
 @divina.command()
 def build_dataset():
-    build_dataset.build_dataset()
+    bd.build_dataset()
 
 
