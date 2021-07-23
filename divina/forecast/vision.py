@@ -35,8 +35,17 @@ def vision_setup(divina_version, worker_profile, driver_role, vision_session, so
         sys.stdout.write('Writing data definition...\n')
         with open(os.path.join('..', 'config/data_definition.json'), 'w+') as f:
             json.dump(data_definition, f)
+
     vision_s3_client = vision_session.client('s3')
     source_s3_client = source_session.client('s3')
+
+    upload_file(s3_client=vision_s3_client,
+                bucket=os.environ['DIVINA_BUCKET'],
+                key='coysu-divina-prototype-{}/data_definition.json'.format(os.environ['VISION_ID']),
+                body=io.StringIO(json.dumps(data_definition)).read())
+
+    os.system('aws s3 sync {} s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json'.format(os.path.join('..', 'config/data_definition.json'), os.environ['VISION_ID']))
+
     import_data(vision_s3_client=vision_s3_client, source_s3_client=source_s3_client,
                 vision_role_name=vision_role_name)
     sys.stdout.write('Building dataset...\n')
@@ -271,38 +280,21 @@ def build_dataset_ssh(instance, verbosity, paramiko_key, divina_pip_arguments):
                 'aws s3 cp s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json /home/ec2-user/data_definition.json'.format(
                     os.environ['VISION_ID']),
                 'sudo chown -R ec2-user /home/ec2-user',
-                'divina forecast build_dataset /home/ec2-user/data']
+                'divina build_dataset /home/ec2-user/data']
     for cmd in commands:
         stdin, stdout, stderr = client.exec_command(cmd)
         if verbosity > 0:
             for line in stdout:
                 sys.stdout.write(line)
-        if verbosity > 2:
-            for line in stderr:
-                sys.stderr.write(line)
         exit_status = stdout.channel.recv_exit_status()
         if not exit_status == 0:
+            if verbosity > 2:
+                for line in stderr:
+                    sys.stderr.write(line)
             client.close()
             return False
     client.close()
     return True
-
-
-def upload_scripts(s3_client, bucket):
-    upload_dirs = {'divina': os.path.dirname(os.path.dirname(os.path.dirname(__file__)))}
-
-    for d in upload_dirs:
-        if not d == '/':
-            key = '{}/{}'.format('coysu-divina-prototype-{}'.format(os.environ['VISION_ID']), d)
-        else:
-            key = '{}'.format('coysu-divina-prototype-{}'.format(os.environ['VISION_ID']))
-        for file in os.listdir(upload_dirs[d]):
-            path = os.path.join(upload_dirs[d], file)
-            with open(path) as f:
-                upload_file(s3_client=s3_client,
-                            bucket=bucket,
-                            key=os.path.join(key, file),
-                            body=f.read())
 
 
 def import_data(vision_s3_client, source_s3_client, vision_role_name):

@@ -1,7 +1,7 @@
 import os
 import json
 from unittest.mock import patch
-from divina.forecast.vision import import_data, create_dataset_ec2, upload_scripts, create_modelling_emr, get_sessions
+from divina.forecast.vision import import_data, create_dataset_ec2, create_modelling_emr, get_sessions
 import boto3
 import paramiko
 

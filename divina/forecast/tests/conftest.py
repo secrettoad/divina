@@ -108,6 +108,7 @@ def vision_iam():
 def divina_test_version():
     return pkg_resources.get_distribution('divina').version
 
+
 @pytest.fixture()
 def vision_codeartifact():
     return boto3.client('codeartifact')

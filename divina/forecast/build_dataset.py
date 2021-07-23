@@ -128,5 +128,3 @@ def build_dataset(tmp_dir='/tmp/data'):
             shutil.rmtree('{}'.format(tmp_dir))
             for d in data_directories:
                 os.mkdir(os.path.join('./', d))
-
-build_dataset('5345934875')

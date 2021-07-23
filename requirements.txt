@@ -2,3 +2,5 @@ moto
 boto3
 pytest
 click
+backoff
+paramiko
