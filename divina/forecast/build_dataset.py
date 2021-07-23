@@ -8,7 +8,7 @@ from io import BytesIO
 import s3fs
 import traceback
 import shutil
-s3_fs = s3fs.S3FileSystem(region_name='us-east-2')
+s3_fs = s3fs.S3FileSystem(region='us-east-2')
 
 sys.stdout.write('RUNNING PYTHON SCRIPT\n')
 
