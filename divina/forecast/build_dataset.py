@@ -101,7 +101,7 @@ def rm(f):
     raise TypeError('must be either file or directory')
 
 
-def build_dataset(tmp_dir='~/tmp_data'):
+def build_dataset(tmp_dir='tmp_data'):
     sys.stdout.write(tmp_dir)
     if os.path.exists('./user-data.json'):
         with open('./user-data.json') as f:
@@ -128,3 +128,5 @@ def build_dataset(tmp_dir='~/tmp_data'):
             raise e
         finally:
             shutil.rmtree('{}'.format(tmp_dir))
+
+build_dataset()
