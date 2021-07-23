@@ -58,7 +58,7 @@ def partition_data(data_definition, files):
 
 
 def decompress_file(tmp_dir, key):
-    data = s3_fs.open(os.path.join('s3://', os.environ['DIVINA_BUCKET'], key)).read()
+    data = s3_fs.open(os.path.join('s3://', key)).read()
     files = []
     if key.split('.')[-1] == 'zip':
         if not os.path.isdir('{}/{}'.format(tmp_dir, key.split('/')[-1].replace('.', '-'))):
@@ -127,5 +127,3 @@ def build_dataset(tmp_dir='/tmp/data'):
             raise e
         finally:
             shutil.rmtree('{}'.format(tmp_dir))
-            for d in data_directories:
-                os.mkdir(os.path.join('./', d))
