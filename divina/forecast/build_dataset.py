@@ -101,7 +101,7 @@ def rm(f):
     raise TypeError('must be either file or directory')
 
 
-def build_dataset(tmp_dir=os.path.join(os.path.dirname(__file__), '/tmp/data')):
+def build_dataset(tmp_dir='~/tmp/data'):
     sys.stdout.write(tmp_dir)
     if os.path.exists('./user-data.json'):
         with open('./user-data.json') as f:
