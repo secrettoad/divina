@@ -102,6 +102,7 @@ def rm(f):
 
 
 def build_dataset(tmp_dir=os.path.join(os.path.dirname(__file__), '/tmp/data')):
+    sys.stdout.write(tmp_dir)
     if os.path.exists('./user-data.json'):
         with open('./user-data.json') as f:
             os.environ.update(json.load(f)['ENVIRONMENT'])
