@@ -8,6 +8,7 @@ from io import BytesIO
 import s3fs
 import traceback
 import shutil
+
 s3_fs = s3fs.S3FileSystem()
 
 sys.stdout.write('RUNNING PYTHON SCRIPT\n')
@@ -39,7 +40,7 @@ def partition_data(data_definition, files):
         else:
             data_type = 'endo'
         root_path = 's3://{}/coysu-divina-prototype-{}/partitions/{}'.format(os.environ['DIVINA_BUCKET'],
-                    os.environ['VISION_ID'], data_type)
+                                                                             os.environ['VISION_ID'], data_type)
         if int(memory_usage) <= partition_size:
             path = root_path + '/{}.parquet'.format(file['source_path'])
             file['df'].to_parquet(path, index=False)
@@ -48,7 +49,7 @@ def partition_data(data_definition, files):
             file['df'].to_parquet(
                 root_path, index=False, partition_cols=partition_cols)
         else:
-            partition_rows = partition_size/memory_usage * len(file['df'])
+            partition_rows = partition_size / memory_usage * len(file['df'])
             file['df']['partition'] = np.arange(len(file['df'])) // partition_rows
             partition_cols = ['partition']
             file['df'].to_parquet(
@@ -88,8 +89,8 @@ def parse_files(files):
                 raise FileTypeNotSupported(extension)
             file['df'] = df
         except Exception as e:
-                traceback.print_exc()
-                raise e
+            traceback.print_exc()
+            raise e
 
     return files
 
@@ -104,7 +105,8 @@ def build_dataset(tmp_dir='/tmp/data'):
     if os.path.exists('./user-data.json'):
         with open('./user-data.json') as f:
             os.environ.update(json.load(f)['ENVIRONMENT'])
-    with open('../config/data_definition.json') as f:
+    with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config',
+                           'data_definition.json')) as f:
         data_definition = json.load(f)
     data_directories = ['endo', 'exog']
     if not os.path.isdir(tmp_dir):
@@ -113,7 +115,8 @@ def build_dataset(tmp_dir='/tmp/data'):
         if not os.path.isdir(os.path.join(tmp_dir, d)):
             os.mkdir(os.path.join(tmp_dir, d))
 
-    for key in s3_fs.ls('s3://{}/coysu-divina-prototype-{}/data'.format(os.environ['DIVINA_BUCKET'], os.environ['VISION_ID'])):
+    for key in s3_fs.ls(
+            's3://{}/coysu-divina-prototype-{}/data'.format(os.environ['DIVINA_BUCKET'], os.environ['VISION_ID'])):
         try:
             files = decompress_file(tmp_dir, key)
             files = parse_files(files)
