@@ -4,18 +4,19 @@ import sys
 import pathlib
 from pkg_resources import get_distribution
 import boto3
+import pbr.git
 
 
 def main():
     pkg_dir = pathlib.Path(*pathlib.Path(__file__).parent.absolute().parts[:-2])
     auth_token = boto3.client('codeartifact').get_authorization_token(domain='coysu')['authorizationToken']
+    new_version = '{}dev{}'.format(''.join(get_distribution('divina').version.split('dev')[:-1]), str(int(get_distribution('divina').version.split('dev')[-1]) + 1))
     commands = ['rm -rf {}'.format(os.path.join(pkg_dir, 'dist/*')),
                 'aws codeartifact login --tool twine --repository divina --domain coysu',
                 'cd {};python setup.py sdist bdist_wheel'.format(pkg_dir),
                 'twine upload {} --repository=codeartifact'.format(os.path.join(pkg_dir, 'dist/*')),
-                'python3 -m pip uninstall divina -y',
-                'python3 -m pip install divina=={} -i https://aws:{}@coysu-169491045780.d.codeartifact.us-west-2.amazonaws.com/pypi/divina/simple/ --extra-index https://www.pypi.org/simple'.format(
-                    get_distribution('divina').version, auth_token),
+                'python3 -m pip install --upgrade divina=={} -i https://aws:{}@coysu-169491045780.d.codeartifact.us-west-2.amazonaws.com/pypi/divina/simple/ --extra-index https://www.pypi.org/simple'.format(
+                    new_version, auth_token),
                 'rm -rf .eggs']
     my_env = os.environ.copy()
     my_env["PATH"] = "/usr/sbin:/sbin:" + my_env["PATH"]
