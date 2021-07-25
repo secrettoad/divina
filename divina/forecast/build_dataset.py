@@ -125,8 +125,6 @@ def build_dataset(tmp_dir='tmp_data'):
         except Exception as e:
             sys.stdout.write('Could not partition file: {}\n'.format(key))
             traceback.print_exc()
+            shutil.rmtree('{}'.format(tmp_dir))
             raise e
-        #finally:
-            #shutil.rmtree('{}'.format(tmp_dir))
-
-build_dataset()
+    shutil.rmtree('{}'.format(tmp_dir))

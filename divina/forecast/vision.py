@@ -275,12 +275,12 @@ def build_dataset_ssh(instance, verbosity, paramiko_key, divina_pip_arguments):
                 'sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"',
                 'sudo unzip awscliv2.zip',
                 'sudo ./aws/install -i /usr/local/aws-cli -b /usr/local/bin',
-                'python3 -m pip install divina=={} {}'.format(
+                'sudo python3 -m pip install divina[dataset]=={} {}'.format(
                     get_distribution('divina').version, "" if divina_pip_arguments is None else divina_pip_arguments),
                 'aws s3 cp s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json /home/ec2-user/data_definition.json'.format(
                     os.environ['VISION_ID']),
                 'sudo chown -R ec2-user /home/ec2-user',
-                'divina[dataset] build-dataset /home/ec2-user/data']
+                'divina build-dataset']
     for cmd in commands:
         stdin, stdout, stderr = client.exec_command(cmd)
         if verbosity > 0:
@@ -409,6 +409,7 @@ def run_script_emr(emr_client, cluster_id, keep_instances_alive, filename):
         on_failure = 'TERMINATE_CLUSTER'
     steps = emr_client.add_job_flow_steps(
         JobFlowId=cluster_id,
+        ###TODO start here and translate this into using the cli somehow
         Steps=[
             {
                 "Name": "vision_script",
