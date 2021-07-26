@@ -1,6 +1,7 @@
 import click
 from ..forecast import spark_vision, dataset, spark_predict, spark_train, spark_validate
 import pkg_resources
+from pyspark.sql import SparkSession
 import pyspark
 
 
@@ -8,7 +9,9 @@ def get_spark_context_s3a(s3_endpoint):
     # configure
     conf = pyspark.SparkConf()
     # init & return
-    sc = pyspark.SparkContext.getOrCreate(conf=conf)
+    sc = SparkSession.builder.config('spark.jars.packages',
+                                     'aws-java-sdk-1.7.4.jar,hadoop-aws-2.7.6.jar').getOrCreate().sparkContext.getOrCreate(
+        conf=conf)
 
     # s3a config
     sc._jsc.hadoopConfiguration().set('fs.s3a.endpoint',
@@ -67,9 +70,3 @@ def predict(s3_endpoint, data_definition):
 def validate(s3_endpoint, data_definition):
     sc = get_spark_context_s3a(s3_endpoint)
     spark_validate.validate(spark_context=sc, data_definition=data_definition)
-
-
-
-
-
-
