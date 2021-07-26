@@ -5,13 +5,9 @@ import numpy as np
 import json
 from zipfile import ZipFile
 from io import BytesIO
-import s3fs
 import traceback
 import shutil
-
-s3_fs = s3fs.S3FileSystem()
-
-sys.stdout.write('RUNNING PYTHON SCRIPT\n')
+import importlib
 
 
 class FileTypeNotSupported(Exception):
@@ -57,7 +53,7 @@ def partition_data(data_definition, files):
         sys.stdout.write('SAVED PARQUET - {} - {}\n'.format(os.environ['VISION_ID'], file['source_path']))
 
 
-def decompress_file(tmp_dir, key):
+def decompress_file(tmp_dir, key, s3_fs):
     data = s3_fs.open(os.path.join('s3://', key)).read()
     files = []
     if key.split('.')[-1] == 'zip':
@@ -102,6 +98,8 @@ def rm(f):
 
 
 def build_dataset(tmp_dir='tmp_data'):
+    s3fs = importlib.import_module('s3fs')
+    s3_fs = s3fs.S3FileSystem()
     sys.stdout.write(tmp_dir)
     if os.path.exists('./user-data.json'):
         with open('./user-data.json') as f:
