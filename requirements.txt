@@ -1,3 +1,4 @@
+wheel
 Cython
 moto
 boto3

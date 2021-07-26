@@ -1,17 +1,17 @@
 import click
 from ..forecast import spark_vision, dataset, spark_predict, spark_train, spark_validate
 import pkg_resources
-from pyspark.sql import SparkSession
+from pyspark import SparkContext
 import pyspark
-import sys
 
 
-def get_spark_context_s3a(s3_endpoint):
+def get_spark_context_s3(s3_endpoint):
     # configure
     conf = pyspark.SparkConf()
     # init & return
-    sc = SparkSession.builder.config('spark.jars.packages',
-                                     'com.amazonaws:aws-java-sdk:1.7.4,org.apache.hadoop:hadoop-aws:2.7.6').getOrCreate().sparkContext.getOrCreate(
+    conf.set('spark.jars.ivy', '/Users/johnhurdle/Dropbox/PS/_divina/venv/lib/python3.7/site-packages/pyspark')
+    conf.set('spark.jars.packages','com.amazonaws:aws-java-sdk:1.7.4,org.apache.hadoop:hadoop-aws:2.7.6')
+    sc = SparkContext.getOrCreate(
         conf=conf)
 
     # s3a config
@@ -22,7 +22,6 @@ def get_spark_context_s3a(s3_endpoint):
         'com.amazonaws.auth.InstanceProfileCredentialsProvider',
         'com.amazonaws.auth.profile.ProfileCredentialsProvider'
     )
-    sys.stdout.write(sc._jsc.sc().listJars())
 
     return sc
 
