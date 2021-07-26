@@ -15,10 +15,10 @@ def get_spark_context_s3(s3_endpoint):
         conf=conf)
 
     # s3a config
-    sc._jsc.hadoopConfiguration().set('fs.s3a.endpoint',
+    sc._jsc.hadoopConfiguration().set('fs.s3.endpoint',
                                       s3_endpoint)
     sc._jsc.hadoopConfiguration().set(
-        'fs.s3a.aws.credentials.provider',
+        'fs.s3.aws.credentials.provider',
         'com.amazonaws.auth.InstanceProfileCredentialsProvider',
         'com.amazonaws.auth.profile.ProfileCredentialsProvider'
     )
