@@ -53,7 +53,7 @@ def build_dataset():
 @click.argument('vision_id', envvar='VISION_ID')
 @divina.command()
 def train(s3_endpoint, data_definition, vision_id):
-    sc = get_spark_context_s3a(s3_endpoint)
+    sc = get_spark_context_s3(s3_endpoint)
     spark_train.train(spark_context=sc, data_definition=data_definition, vision_id=vision_id)
 
 
@@ -61,7 +61,7 @@ def train(s3_endpoint, data_definition, vision_id):
 @click.argument('data_definition', type=click.File('rb'))
 @divina.command()
 def predict(s3_endpoint, data_definition):
-    sc = get_spark_context_s3a(s3_endpoint)
+    sc = get_spark_context_s3(s3_endpoint)
     spark_predict.predict(spark_context=sc, data_definition=data_definition)
 
 
@@ -69,5 +69,5 @@ def predict(s3_endpoint, data_definition):
 @click.argument('data_definition', type=click.File('rb'))
 @divina.command()
 def validate(s3_endpoint, data_definition):
-    sc = get_spark_context_s3a(s3_endpoint)
+    sc = get_spark_context_s3(s3_endpoint)
     spark_validate.validate(spark_context=sc, data_definition=data_definition)
