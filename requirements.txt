@@ -1,3 +1,4 @@
+Cython
 moto
 boto3
 pytest

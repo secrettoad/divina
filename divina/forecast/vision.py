@@ -1,15 +1,16 @@
 import boto3
-import json
 import os
 import datetime
-from botocore.exceptions import ClientError
-import backoff
 import subprocess
 from pkg_resources import resource_filename, get_distribution
 import math
 import paramiko
-import sys
 import io
+import sys
+import json
+from ..aws import aws_backoff
+from .import_data import import_data
+import backoff
 
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
@@ -39,7 +40,7 @@ def vision_setup(divina_version, worker_profile, driver_role, vision_session, so
     vision_s3_client = vision_session.client('s3')
     source_s3_client = source_session.client('s3')
 
-    upload_file(s3_client=vision_s3_client,
+    aws_backoff.upload_file(s3_client=vision_s3_client,
                 bucket=os.environ['DIVINA_BUCKET'],
                 key='coysu-divina-prototype-{}/data_definition.json'.format(os.environ['VISION_ID']),
                 body=io.StringIO(json.dumps(data_definition)).read())
@@ -57,10 +58,10 @@ def vision_setup(divina_version, worker_profile, driver_role, vision_session, so
                                                 divina_version=divina_version)
     if not build_dataset_ssh(instance=instance, verbosity=verbosity, paramiko_key=paramiko_key, divina_pip_arguments=divina_pip_arguments):
         if not keep_instances_alive:
-            stop_instances(instance_ids=[instance['InstanceId']], ec2_client=vision_ec2_client)
+            aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=vision_ec2_client)
         quit()
     if not keep_instances_alive:
-        stop_instances(instance_ids=[instance['InstanceId']], ec2_client=vision_ec2_client)
+        aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=vision_ec2_client)
     sys.stdout.write('Creating forecasts...\n')
     emr_client = vision_session.client('emr')
     emr_cluster = create_modelling_emr(emr_client=emr_client,
@@ -68,11 +69,11 @@ def vision_setup(divina_version, worker_profile, driver_role, vision_session, so
                                        keep_instances_alive=keep_instances_alive,
                                        ec2_key='vision_{}_ec2_key'.format(os.environ['VISION_ID']))
 
-    run_script_emr(emr_client=emr_client, cluster_id=emr_cluster['JobFlowId'],
-                   keep_instances_alive=keep_instances_alive, filename='train.py')
-    steps = list_steps(emr_client, emr_cluster['JobFlowId'])
+    run_command_emr(emr_client=emr_client, cluster_id=emr_cluster['JobFlowId'],
+                   keep_instances_alive=keep_instances_alive, args=['divina', 'train', '--data_definition', '/home/hadoop/data_definition.json', ''])
+    steps = aws_backoff.list_steps(emr_client, emr_cluster['JobFlowId'])
     last_step_id = steps['Steps'][0]['Id']
-    emr_waiter = get_emr_waiter(emr_client, 'step_complete')
+    emr_waiter = aws_backoff.get_emr_waiter(emr_client, 'step_complete')
     emr_waiter.wait(
         ClusterId=emr_cluster['JobFlowId'],
         StepId=last_step_id,
@@ -94,10 +95,10 @@ def get_sessions(vision_iam, source_iam, vision_sts, source_sts, vision_role=Non
                                'divina_trust_policy.json')) as f:
             vision_role_trust_policy = os.path.expandvars(json.dumps(json.load(f)))
 
-        vision_role = create_role(vision_iam, divina_policy, vision_role_trust_policy, 'divina-vision-role',
+        vision_role = aws_backoff.create_role(vision_iam, divina_policy, vision_role_trust_policy, 'divina-vision-role',
                                   'divina-vision-role-policy', 'role for coysu divina')
 
-    assumed_vision_role = assume_role(sts_client=vision_sts,
+    assumed_vision_role = aws_backoff.assume_role(sts_client=vision_sts,
                                       role_arn="arn:aws:iam::{}:role/{}".format(
                                           os.environ['ACCOUNT_NUMBER'], vision_role['Role']['RoleName']),
                                       session_name="AssumeRoleSession2")
@@ -128,11 +129,11 @@ def get_sessions(vision_iam, source_iam, vision_sts, source_sts, vision_role=Non
                              'import_trust_policy.json')) as f:
             source_role_trust_policy = os.path.expandvars(json.dumps(json.load(f)))
 
-        source_s3_role = create_role(source_iam, source_policy, source_role_trust_policy, 'divina-source-role',
+        source_s3_role = aws_backoff.create_role(source_iam, source_policy, source_role_trust_policy, 'divina-source-role',
                                      'divina-source-role-policy',
                                      'policy for coysu divina to assume when importing datasets')
 
-    assumed_source_role = assume_role(sts_client=source_sts,
+    assumed_source_role = aws_backoff.assume_role(sts_client=source_sts,
                                       role_arn="arn:aws:iam::{}:role/{}".format(
                                           os.environ['SOURCE_ACCOUNT_NUMBER'], source_s3_role['Role']['RoleName']),
                                       session_name="AssumeRoleSession1"
@@ -157,14 +158,14 @@ def create_dataset_ec2(divina_version, s3_client, ec2_client, pricing_client, ec
                        keep_instances_alive=False):
     file_sizes = []
     keys = []
-    for o in list_objects(s3_client=s3_client, bucket=os.environ['DIVINA_BUCKET'],
+    for o in aws_backoff.list_objects(s3_client=s3_client, bucket=os.environ['DIVINA_BUCKET'],
                           prefix='coysu-divina-prototype-{}/data/'.format(os.environ['VISION_ID'])):
-        file_sizes.append(get_s3_object_size(s3_client=s3_client, key=o['Key'], bucket=os.environ['DIVINA_BUCKET']))
+        file_sizes.append(aws_backoff.get_s3_object_size(s3_client=s3_client, key=o['Key'], bucket=os.environ['DIVINA_BUCKET']))
         keys.append(o['Key'])
 
     if ec2_keyfile:
         with open(os.path.join(os.path.expanduser('~'), '.ssh', ec2_keyfile + '.pub')) as f:
-            key = import_key_pair(
+            key = aws_backoff.import_key_pair(
                 key_name='vision_{}_ec2_key'.format(os.environ['VISION_ID']),
                 public_key_material=f.read(), ec2_client=ec2_client
             )
@@ -180,7 +181,7 @@ def create_dataset_ec2(divina_version, s3_client, ec2_client, pricing_client, ec
         'ENVIRONMENT': {'VISION_ID': str(os.environ['VISION_ID']),
                         'DIVINA_BUCKET': os.environ['DIVINA_BUCKET'], 'DIVINA_VERSION': divina_version}}
 
-    security_groups = describe_security_groups(
+    security_groups = aws_backoff.describe_security_groups(
         filters=[
             dict(Name='group-name', Values=['divina-ssh'])
         ], ec2_client=ec2_client
@@ -205,7 +206,7 @@ def create_dataset_ec2(divina_version, s3_client, ec2_client, pricing_client, ec
                                                               ipr in s['IpRanges']
                                                               if all(
                 [s[k] == ip_permissions[0][k] for k in ['FromPort', 'ToPort', 'IpProtocol']])]:
-            authorize_security_group_ingress(
+            aws_backoff.authorize_security_group_ingress(
                 group_id=security_group['GroupId'],
                 ip_permissions=ip_permissions, ec2_client=ec2_client
 
@@ -214,12 +215,12 @@ def create_dataset_ec2(divina_version, s3_client, ec2_client, pricing_client, ec
     else:
         vpc_id = ec2_client.describe_vpcs()['Vpcs'][0]['VpcId']
 
-        security_group = create_security_group(
+        security_group = aws_backoff.create_security_group(
             description='Security group for allowing SSH access to partitioning VM for Coysu Divina',
             group_name='divina-ssh',
             vpc_id=vpc_id, ec2_client=ec2_client
         )
-        authorize_security_group_ingress(
+        aws_backoff.authorize_security_group_ingress(
             group_id=security_group['GroupId'],
             ip_permissions=ip_permissions, ec2_client=ec2_client
 
@@ -252,15 +253,15 @@ def create_dataset_ec2(divina_version, s3_client, ec2_client, pricing_client, ec
                                         )
 
     try:
-        waiter = get_ec2_waiter('instance_running', ec2_client=ec2_client)
+        waiter = aws_backoff.get_ec2_waiter('instance_running', ec2_client=ec2_client)
         waiter.wait(InstanceIds=[i['InstanceId'] for i in instance['Instances']])
-        response = describe_instances(instance_ids=[i['InstanceId'] for i in instance['Instances']],
+        response = aws_backoff.describe_instances(instance_ids=[i['InstanceId'] for i in instance['Instances']],
                                       ec2_client=ec2_client)
         instance = response['Reservations'][0]['Instances'][0]
 
     except Exception as e:
         if not keep_instances_alive:
-            stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
+            aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
         raise e
     return instance, paramiko_key
 
@@ -297,63 +298,6 @@ def build_dataset_ssh(instance, verbosity, paramiko_key, divina_pip_arguments):
     return True
 
 
-def import_data(vision_s3_client, source_s3_client, vision_role_name):
-    user_policy = {
-        "Effect": "Allow",
-        "Principal": {
-            "AWS": "arn:aws:iam::{}:role/{}".format(os.environ['ACCOUNT_NUMBER'],
-                                                    vision_role_name)
-        },
-        "Action": [
-            "s3:GetBucketLocation",
-            "s3:ListBucket",
-            "s3:GetObject"
-        ],
-        "Resource": [
-            "arn:aws:s3:::{}".format(os.environ['IMPORT_BUCKET']),
-            "arn:aws:s3:::{}/*".format(os.environ['IMPORT_BUCKET'])
-        ]
-    }
-
-    sys.stdout.write('Granting Divina access to imported data...\n')
-    try:
-        bucket_policy = json.loads(get_bucket_policy(source_s3_client, bucket=os.environ['IMPORT_BUCKET'])['Policy'])
-        if not user_policy in bucket_policy['Statement']:
-            bucket_policy['Statement'].append(user_policy)
-    except ClientError as e:
-        if e.response['Error']['Code'] == 'NoSuchBucketPolicy':
-            bucket_policy = {'Statement': [user_policy]}
-        else:
-            raise e
-
-    put_bucket_policy(source_s3_client, bucket=os.environ['IMPORT_BUCKET'], policy=json.dumps(bucket_policy))
-
-    sys.stdout.write('Creating Divina cloud storage...\n')
-    try:
-        create_bucket(vision_s3_client, bucket='coysu-divina-prototype-visions',
-                      createBucketConfiguration={
-                          'LocationConstraint': vision_s3_client._client_config.region_name
-                      })
-
-    except Exception as e:
-        raise e
-    try:
-        source_objects = list_objects(source_s3_client, bucket=os.environ['IMPORT_BUCKET'])
-    except KeyError as e:
-        raise e
-
-    sys.stdout.write('Importing data...\n')
-    for file in source_objects:
-        copy_object(copy_source={
-            'Bucket': os.environ['IMPORT_BUCKET'],
-            'Key': file['Key']
-        }, bucket='coysu-divina-prototype-visions',
-            key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'], file['Key']),
-            s3_client=vision_s3_client)
-
-    return None
-
-
 def create_emr_roles(boto3_session):
     iam_client = boto3_session.client('iam')
 
@@ -388,9 +332,9 @@ def create_modelling_emr(emr_client, worker_profile='EMR_EC2_DefaultRole',
                     on_failure)))
 
     cluster = emr_client.run_job_flow(**emr_config['emr_config'])
-    steps = list_steps(emr_client, cluster['JobFlowId'])
+    steps = aws_backoff.list_steps(emr_client, cluster['JobFlowId'])
     last_step_id = steps['Steps'][0]['Id']
-    emr_waiter = get_emr_waiter(emr_client, 'step_complete')
+    emr_waiter = aws_backoff.get_emr_waiter(emr_client, 'step_complete')
     emr_waiter.wait(
         ClusterId=cluster['JobFlowId'],
         StepId=last_step_id,
@@ -402,7 +346,7 @@ def create_modelling_emr(emr_client, worker_profile='EMR_EC2_DefaultRole',
     return cluster
 
 
-def run_script_emr(emr_client, cluster_id, keep_instances_alive, filename):
+def run_command_emr(emr_client, cluster_id, keep_instances_alive, args):
     if keep_instances_alive:
         on_failure = 'CANCEL_AND_WAIT'
     else:
@@ -416,15 +360,12 @@ def run_script_emr(emr_client, cluster_id, keep_instances_alive, filename):
                 "ActionOnFailure": on_failure,
                 "HadoopJarStep": {
                     "Jar": "command-runner.jar",
-                    "Args": [
-                        "spark-submit",
-                        "/home/hadoop/spark_scripts/{}".format(filename)
-                    ]
+                    "Args": args
                 }
             }
         ]
     )
-    emr_waiter = get_emr_waiter(emr_client, 'step_complete')
+    emr_waiter = aws_backoff.get_emr_waiter(emr_client, 'step_complete')
     emr_waiter.wait(
         ClusterId=cluster_id,
         StepId=steps['StepIds'][0],
@@ -449,7 +390,7 @@ def ec2_pricing(pricing_client, region_name, filter_params=None):
     if filter_params:
         products_params['Filters'] = products_params['Filters'] + filter_params
     while True:
-        response = get_products(pricing_client, products_params)
+        response = aws_backoff.get_products(pricing_client, products_params)
         yield from [i for i in response['PriceList']]
         if 'NextToken' not in response:
             break
@@ -473,214 +414,6 @@ def get_region_name(region_code):
         return data['partitions'][0]['regions'][region_code]['description']
     except IOError:
         return default_region
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def create_security_group(description, group_name, vpc_id, ec2_client):
-    return ec2_client.create_security_group(
-        Description=description,
-        GroupName=group_name,
-        VpcId=vpc_id
-    )
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def authorize_security_group_ingress(group_id, ip_permissions, ec2_client):
-    ec2_client.authorize_security_group_ingress(
-        GroupId=group_id,
-        IpPermissions=ip_permissions
-
-    )
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def describe_security_groups(filters, ec2_client):
-    return ec2_client.describe_security_groups(
-        Filters=filters
-    )
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def list_steps(emr_client, cluster_id):
-    return emr_client.list_steps(ClusterId=cluster_id)
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def get_ec2_waiter(step, ec2_client):
-    return ec2_client.get_waiter(step)
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_tries=10)
-def copy_object(copy_source, bucket, key, s3_client):
-    return s3_client.copy_object(CopySource=copy_source, Bucket=bucket,
-                                 Key=key)
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def describe_instances(instance_ids, ec2_client):
-    return ec2_client.describe_instances(InstanceIds=instance_ids)
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def import_key_pair(
-        key_name,
-        public_key_material, ec2_client
-):
-    return ec2_client.import_key_pair(KeyName=key_name, PublicKeyMaterial=public_key_material)
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def stop_instances(instance_ids, ec2_client):
-    ec2_client.stop_instances(InstanceIds=instance_ids)
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def get_emr_waiter(emr_client, step):
-    waiter = emr_client.get_waiter(step)
-    return waiter
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def delete_emr_cluster(emr_cluster, emr_client):
-    emr_client.terminate_job_flows(JobFlowIds=[emr_cluster['JobFlowId']])
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def get_products(pricing_client, products_params):
-    return pricing_client.get_products(**products_params)
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def get_s3_object_size(s3_client, key, bucket):
-    response = s3_client.head_object(Bucket=bucket, Key=key)
-    size = response['ContentLength']
-    return size
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def assume_role(sts_client, role_arn, session_name):
-    assumed_import_role = sts_client.assume_role(
-        RoleArn=role_arn,
-        RoleSessionName=session_name
-    )
-    return assumed_import_role
-
-
-@backoff.on_exception(backoff.expo,
-                      paramiko.client.NoValidConnectionsError)
-def connect_ssh(client, hostname, username, pkey):
-    client.connect(hostname=hostname, username=username, pkey=pkey)
-    return client
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def create_bucket(s3_client, bucket, createBucketConfiguration):
-    try:
-        s3_client.create_bucket(Bucket=bucket,
-                                CreateBucketConfiguration=createBucketConfiguration)
-    except ClientError as e:
-        if e.response['Error']['Code'] != 'BucketAlreadyOwnedByYou':
-            raise e
-        else:
-            sys.stdout.write('Cloud storage already exists...\n')
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_tries=10)
-def list_objects(s3_client, bucket, prefix=None):
-    if prefix:
-        objects = s3_client.list_objects(Bucket=bucket, Prefix=prefix)
-    else:
-        objects = s3_client.list_objects(Bucket=bucket)
-    if not 'Contents' in objects:
-        raise Exception('No data to import. Upload data to bucket: {} and then retry.'.format(bucket))
-    return objects['Contents']
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def upload_file(s3_client, bucket, key, body):
-    return s3_client.put_object(
-        Bucket=bucket,
-        Key=key, Body=body)
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def get_bucket_policy(s3_client, bucket):
-    return s3_client.get_bucket_policy(Bucket=bucket)
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def put_bucket_policy(s3_client, bucket, policy):
-    return s3_client.put_bucket_policy(Bucket=bucket, Policy=policy)
-
-
-@backoff.on_exception(backoff.expo,
-                      ClientError, max_time=30)
-def create_role(iam_client, policy_document, trust_policy_document, role_name, policy_name, description):
-    try:
-        role = iam_client.get_role(RoleName=role_name)
-    except ClientError as e:
-        if e.response['Error']['Code'] == 'NoSuchEntity':
-            sys.stdout.write('Divina role: {} not found. Creating now.\n'.format(role_name))
-            role = iam_client.create_role(
-                Path='/',
-                RoleName=role_name,
-                AssumeRolePolicyDocument=trust_policy_document,
-                Description=description
-            )
-        else:
-            raise e
-
-    try:
-        iam_client.get_policy(
-            PolicyArn='arn:aws:iam::{}:policy/{}'.format(os.environ['ACCOUNT_NUMBER'], policy_name)
-        )
-        policy_version = iam_client.create_policy_version(
-            PolicyArn='arn:aws:iam::{}:policy/{}'.format(os.environ['ACCOUNT_NUMBER'], policy_name),
-            PolicyDocument=policy_document,
-            SetAsDefault=True
-        )
-
-        iam_client.attach_role_policy(
-            RoleName=role_name, PolicyArn='arn:aws:iam::{}:policy/{}'.format(os.environ['ACCOUNT_NUMBER'], policy_name))
-
-        iam_client.delete_policy_version(
-            PolicyArn='arn:aws:iam::{}:policy/{}'.format(os.environ['ACCOUNT_NUMBER'], policy_name),
-            VersionId='v{}'.format(int(policy_version['PolicyVersion']['VersionId'][1:]) - 1)
-        )
-
-    except ClientError as e:
-        if e.response['Error']['Code'] == 'NoSuchEntity':
-            sys.stdout.write('Divina policy: {} not found. Creating now.\n'.format(policy_name))
-            iam_client.create_policy(
-                PolicyName=policy_name,
-                PolicyDocument=policy_document
-            )
-        else:
-            raise e
-
-    iam_client.attach_role_policy(
-        RoleName=role_name, PolicyArn='arn:aws:iam::{}:policy/{}'.format(os.environ['ACCOUNT_NUMBER'], policy_name))
-
-    return role
 
 
 def create_vision(import_bucket, divina_version, source_role=None, vision_role=None,
@@ -707,3 +440,9 @@ def create_vision(import_bucket, divina_version, source_role=None, vision_role=N
                  ec2_keyfile=ec2_keyfile,
                  data_definition=data_definition, keep_instances_alive=keep_instances_alive, verbosity=verbosity,
                  divina_version=divina_version, divina_pip_arguments=divina_pip_arguments)
+
+@backoff.on_exception(backoff.expo,
+                      paramiko.client.NoValidConnectionsError)
+def connect_ssh(client, hostname, username, pkey):
+    client.connect(hostname=hostname, username=username, pkey=pkey)
+    return client
