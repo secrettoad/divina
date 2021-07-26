@@ -43,21 +43,21 @@ def import_data():
 def build_dataset():
     dataset.build_dataset()
 
-@click.argument('aws_endpoint')
+@click.argument('s3_endpoint')
 @click.argument('data_definition', type=click.File('rb'))
 @divina.command()
 def train(s3_endpoint, data_definition):
     sc = get_spark_context_s3a(s3_endpoint)
     train.train(spark_context=sc, data_definition=data_definition)
 
-@click.argument('aws_endpoint')
+@click.argument('s3_endpoint')
 @click.argument('data_definition', type=click.File('rb'))
 @divina.command()
 def predict(s3_endpoint, data_definition):
     sc = get_spark_context_s3a(s3_endpoint)
     predict.predict(spark_context=sc, data_definition=data_definition)
 
-@click.argument('aws_endpoint')
+@click.argument('s3_endpoint')
 @click.argument('data_definition', type=click.File('rb'))
 @divina.command()
 def validate(s3_endpoint, data_definition):
