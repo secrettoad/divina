@@ -23,7 +23,7 @@ def main():
         status='Published',
         sortBy='PUBLISHED_TIME'
     )
-    commands = ['python3 -m pip install --upgrade divina=={} -i https://aws:{}@coysu-169491045780.d.codeartifact.us-west-2.amazonaws.com/pypi/divina/simple/ --extra-index https://www.pypi.org/simple'.format(
+    commands = ['python3 -m pip install --upgrade divina[testing]=={} -i https://aws:{}@coysu-169491045780.d.codeartifact.us-west-2.amazonaws.com/pypi/divina/simple/ --extra-index https://www.pypi.org/simple'.format(
                     versions['versions'][0]['version'], auth_token)]
     run_commands(commands)
 
