@@ -9,6 +9,7 @@ import json
 from pyspark.ml.pipeline import Pipeline
 from divina.models.preprocessing.base import CategoricalEncoder
 from divina.models.ensembles.linear import GLASMA
+import s3fs
 
 
 def train(spark_context, data_definition, vision_id):
