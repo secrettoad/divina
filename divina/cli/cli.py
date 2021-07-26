@@ -3,6 +3,7 @@ from ..forecast import spark_vision, dataset, spark_predict, spark_train, spark_
 import pkg_resources
 from pyspark.sql import SparkSession
 import pyspark
+import sys
 
 
 def get_spark_context_s3a(s3_endpoint):
@@ -21,6 +22,7 @@ def get_spark_context_s3a(s3_endpoint):
         'com.amazonaws.auth.InstanceProfileCredentialsProvider',
         'com.amazonaws.auth.profile.ProfileCredentialsProvider'
     )
+    sys.stdout.write(sc._jsc.sc().listJars())
 
     return sc
 
