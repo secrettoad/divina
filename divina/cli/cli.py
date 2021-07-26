@@ -22,6 +22,7 @@ def get_spark_context_s3a(s3_endpoint):
     return sc
 
 
+
 @click.group()
 def divina():
     pass
