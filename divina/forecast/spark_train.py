@@ -11,13 +11,13 @@ from divina.models.preprocessing.base import CategoricalEncoder
 from divina.models.ensembles.linear import GLASMA
 
 
-def train(spark_context, data_definition):
+def train(spark_context, data_definition, vision_id):
 
     sqlc = pyspark.sql.SQLContext(spark_context)
 
     df = sqlc.read.format("parquet").load(
         "s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/partitions/endo/*".format(
-            os.environ['VISION_ID']))
+            vision_id))
 
     df = df.drop(*data_definition['drop_features'])
 
@@ -36,7 +36,7 @@ def train(spark_context, data_definition):
     os.system(
         "sudo aws s3 cp {} {}".format('/home/hadoop/data_definition.json',
                                       's3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json'.format(
-                                          os.environ['VISION_ID'])))
+                                          vision_id)))
 
     non_features = [data_definition['target'], data_definition['time_index']] + [
         '{}_h_{}'.format(
@@ -82,6 +82,6 @@ def train(spark_context, data_definition):
 
             fit_pipeline.write().overwrite().save(
                 "s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/models/s-{}_h-{}".format(
-                    os.environ['VISION_ID'], s, h))
+                    vision_id, s, h))
 
             sys.stdout.write('Pipeline persisted for horizon {}\n'.format(h))

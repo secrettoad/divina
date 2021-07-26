@@ -46,10 +46,11 @@ def build_dataset():
 
 @click.argument('s3_endpoint')
 @click.argument('data_definition', type=click.File('rb'))
+@click.argument('vision_id', envvar='VISION_ID')
 @divina.command()
 def train(s3_endpoint, data_definition):
     sc = get_spark_context_s3a(s3_endpoint)
-    spark_train.train(spark_context=sc, data_definition=data_definition)
+    spark_train.train(spark_context=sc, data_definition=data_definition, vision_id=vision_id)
 
 
 @click.argument('s3_endpoint')
