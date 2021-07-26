@@ -10,7 +10,7 @@ def get_spark_context_s3a(s3_endpoint):
     conf = pyspark.SparkConf()
     # init & return
     sc = SparkSession.builder.config('spark.jars.packages',
-                                     'com.amazonaws:aws-java-sdk:1.7.4,com.amazonaws:hadoop-aws:2.7.6').getOrCreate().sparkContext.getOrCreate(
+                                     'com.amazonaws:aws-java-sdk:1.7.4,org.apache.hadoop:hadoop-aws:2.7.6').getOrCreate().sparkContext.getOrCreate(
         conf=conf)
 
     # s3a config
