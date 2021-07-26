@@ -13,7 +13,7 @@ from divina.models.ensembles.linear import GLASMA
 
 def train(spark_context, data_definition):
 
-    sqlc = pyspark.sql.SQLContext(spark_context, data_definition)
+    sqlc = pyspark.sql.SQLContext(spark_context)
 
     df = sqlc.read.format("parquet").load(
         "s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/partitions/endo/*".format(
