@@ -2,12 +2,11 @@ import os
 import subprocess
 import sys
 import pathlib
-from pkg_resources import get_distribution
 import boto3
 
 
 def main():
-    pkg_dir = pathlib.Path(*pathlib.Path(__file__).parent.absolute().parts[:-2])
+    pkg_dir = pathlib.Path(*pathlib.Path().resolve().absolute().parts[:-2])
     code_artifact_client = boto3.client('codeartifact')
     auth_token = code_artifact_client.get_authorization_token(domain='coysu')['authorizationToken']
     commands = ['rm -rf {}'.format(os.path.join(pkg_dir, 'dist/*')),
