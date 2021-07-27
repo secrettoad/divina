@@ -7,3 +7,4 @@ click
 backoff
 paramiko
 pandas
+awscli
