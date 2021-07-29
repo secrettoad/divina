@@ -1,0 +1,10 @@
+wheel
+Cython
+moto
+boto3
+pytest
+click
+backoff
+paramiko
+pandas
+awscli
