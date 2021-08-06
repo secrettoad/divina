@@ -19,16 +19,6 @@ def dask_train(dask_client, dask_model, vision_definition, divina_directory, vis
     if 'drop_features' in vision_definition:
         df = df.drop(columns=vision_definition['drop_features'])
 
-    if 'categorical_features' in vision_definition:
-        categorical_features = vision_definition['categorical_features']
-    else:
-        categorical_features = []
-    categorical_features += [c for c in df.columns if c
-                             not in [vision_definition['time_index'],
-                                     vision_definition['target']] and (
-                                     df.dtypes[c] is str) and c not in [c for c
-                                                                        in
-                                                                        categorical_features]]
     for h in vision_definition['time_horizons']:
         if 'signal_dimension' in vision_definition:
             df['{}_h_{}'.format(vision_definition['target'], h)] = df.groupby(vision_definition['signal_dimensions'])[
@@ -49,7 +39,7 @@ def dask_train(dask_client, dask_model, vision_definition, divina_directory, vis
         df_train = df[df[vision_definition['time_index']] < s]
         for h in vision_definition['time_horizons']:
 
-            model = dask_model(time_index=vision_definition['time_index'], categorical_features=categorical_features)
+            model = dask_model
 
             model.fit(df_train[[c for c in df_train.columns if
                                 not c in ['{}_h_{}'.format(vision_definition['target'], h) for h in

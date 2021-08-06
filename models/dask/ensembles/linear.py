@@ -1,9 +1,9 @@
-from ...model import DivinaDaskModel
 from dask_ml.preprocessing import DummyEncoder
 from dask_ml.linear_model import LinearRegression
+from sklearn.pipeline import Pipeline
 
 
-class GLASMA(DivinaDaskModel):
+class GLASMA(Pipeline):
     def __init__(self, time_index, **kwargs):
         self.time_index = time_index
         self.categorical_features = kwargs.get('categorical_features', None)
@@ -16,5 +16,7 @@ class GLASMA(DivinaDaskModel):
 
     def __repr__(self, N_CHAR_MAX=700):
         return repr('GLASMA: {}'.format(','.join(['{}: {}'.format(key, self.__dict__[key]) for key in self.__dict__])))
+
+
 
 

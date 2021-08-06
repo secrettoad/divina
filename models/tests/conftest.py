@@ -110,9 +110,7 @@ def divina_test_version():
 
 
 @pytest.fixture()
-def environment(monkeypatch):
+def account_number(monkeypatch):
     monkeypatch.setenv('ACCOUNT_NUMBER', '123456789012')
-    monkeypatch.setenv('VISION_ID', '49857394875')
-    monkeypatch.setenv('SOURCE_ACCOUNT_NUMBER', '123456789012')
 
 
