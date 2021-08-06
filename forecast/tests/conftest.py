@@ -9,6 +9,14 @@ from dask.distributed import Client
 import pathlib
 import os
 import s3fs
+from ...aws.utils import get_vision_session
+
+
+@pytest.fixture()
+def divina_session():
+    iam = boto3.client('iam')
+    sts = boto3.client('sts')
+    return get_vision_session(vision_iam=iam, vision_sts=sts)
 
 
 @pytest.fixture()
@@ -41,7 +49,7 @@ def vd_no_dataset_directory():
     return {"vision_definition": {
         "target": "c",
         "time_index": 'test1',
-        "dataset_directory": 'dataset-bucket'
+        "dataset_directory": 'divina-test/dataset-bucket'
     }
     }
 
@@ -50,7 +58,7 @@ def vd_no_dataset_directory():
 def vd_no_time_index():
     return {"vision_definition": {
         "target": "c",
-        "dataset_directory": 'dataset-bucket',
+        "dataset_directory": 'divina-test/dataset-bucket',
         "dataset_id": 'test1'
     }
     }
@@ -60,7 +68,7 @@ def vd_no_time_index():
 def vd_no_target():
     return {"vision_definition": {
         "time_index": "a",
-        "dataset_directory": 'dataset-bucket',
+        "dataset_directory": 'divina-test/dataset-bucket',
         "dataset_id": 'test1'
     }
     }
@@ -73,7 +81,7 @@ def vd_time_validation_splits_not_list():
         "target": "c",
         "time_validation_splits": "1970-01-01 00:00:08",
         "time_horizons": [1],
-        "dataset_directory": 'dataset-bucket',
+        "dataset_directory": 'divina-test/dataset-bucket',
         "dataset_id": 'test1'
     }
     }
@@ -86,7 +94,7 @@ def vd_time_horizons_not_list():
         "target": "c",
         "time_validation_splits": ["1970-01-01 00:00:08"],
         "time_horizons": 1,
-        "dataset_directory": 'dataset-bucket',
+        "dataset_directory": 'divina-test/dataset-bucket',
         "dataset_id": 'test1'
     }
     }
@@ -104,7 +112,7 @@ def test_vd_1():
         "target": "c",
         "time_validation_splits": ["1970-01-01 00:00:08"],
         "time_horizons": [1],
-        "dataset_directory": 'dataset-bucket',
+        "dataset_directory": 'divina-test/dataset-bucket',
         "dataset_id": 'test1'
     }
     }
@@ -117,7 +125,7 @@ def test_vd_2():
         "target": "c",
         "time_validation_splits": ["1970-01-01 00:00:08"],
         "time_horizons": [1],
-        "dataset_directory": 'dataset-bucket',
+        "dataset_directory": 'divina-test/dataset-bucket',
         "dataset_id": "test1",
         "joins": [{'dataset_directory': 'dataset-bucket', 'dataset_id': 'test2', 'join_on': ('a', 'test2_a')}]
     }
@@ -264,14 +272,8 @@ def vision_codeartifact():
 
 
 @pytest.fixture()
-def environment(monkeypatch):
+def account_number(monkeypatch):
     monkeypatch.setenv('ACCOUNT_NUMBER', '123456789012')
-    monkeypatch.setenv('DATASET_ID', 'test1')
-    monkeypatch.setenv('DATASET_ID2', 'test2')
-    monkeypatch.setenv('SOURCE_ACCOUNT_NUMBER', '123456789012')
-    monkeypatch.setenv('VISION_BUCKET', 'vision-bucket')
-    monkeypatch.setenv('DATASET_BUCKET', 'dataset-bucket')
-    monkeypatch.setenv('IMPORT_BUCKET', 'source-bucket')
 
 
 @pytest.fixture()

@@ -7,7 +7,6 @@ from zipfile import ZipFile
 from io import BytesIO
 import traceback
 import shutil
-import importlib
 from .errors import FileTypeNotSupported
 import pathlib
 from pkg_resources import get_distribution
@@ -23,33 +22,32 @@ def partition_data(dataset_directory, dataset_id, files, partition_dimensions=No
     for file in files:
         partition_size = 5000000000
         memory_usage = file['df'].memory_usage(deep=True).sum()
-        root_path = os.path.join(dataset_directory,
+        path = os.path.join(dataset_directory,
                                  dataset_id, 'data')
         if int(memory_usage) <= partition_size:
-            path = os.path.join(root_path, '{}.parquet'.format(file['source_path']))
-            file['df'].to_parquet(path, index=False)
+            dd.from_pandas(file['df'], chunksize=10000).to_parquet(path, write_index=False)
         elif partition_dimensions:
-            file['df'].to_parquet(
-                root_path, index=False, partition_cols=partition_dimensions)
+            dd.from_pandas(file['df'], chunksize=10000).to_parquet(
+                path, write_index=False, partition_on=partition_dimensions)
         else:
             partition_rows = partition_size / memory_usage * len(file['df'])
             file['df']['partition'] = np.arange(len(file['df'])) // partition_rows
             partition_cols = ['partition']
-            file['df'].to_parquet(
-                root_path, index=False, partition_cols=partition_cols)
+            dd.from_pandas(file['df'], chunksize=10000).to_parquet(
+                path, write_index=False, partition_on=partition_cols)
         sys.stdout.write('SAVED PARQUET - {} - {}\n'.format(dataset_id, file['source_path']))
 
 
 def profile_data(dataset_directory, dataset_id, files):
     for file in files:
-        root_path = os.path.join(dataset_directory,
+        path = os.path.join(dataset_directory,
                                  dataset_id, 'profile')
-        file['df'].describe().to_parquet(os.path.join(root_path, 'profile.parquet'))
+        dd.from_pandas(file['df'].describe().reset_index(), chunksize=10000).to_parquet(os.path.join(path), write_index=False)
 
 
 def decompress_file(tmp_dir, key, s3, data_directory):
     data = s3.open(
-        os.path.join('{}'.format(data_directory), os.path.join(key))).read()
+        os.path.join('{}'.format(data_directory), key.split('/')[-1])).read()
     files = []
     if key.split('.')[-1] == 'zip':
         if not os.path.isdir('{}/{}'.format(tmp_dir, key.split('/')[-1].replace('.', '-'))):
@@ -63,8 +61,14 @@ def decompress_file(tmp_dir, key, s3, data_directory):
                           'filename': local_path.split('/')[-1]})
     else:
         local_path = '{}/{}'.format(tmp_dir, key.split('/')[-1])
-        with open(local_path, 'w+') as f:
-            f.write(data)
+        if type(data) == bytes:
+            with open(local_path, 'wb+') as f:
+                f.write(data)
+        elif type(data) == str:
+            with open(local_path, 'w+') as f:
+                f.write(data)
+        else:
+            raise Exception('file {} is not string or bytes. cannot write locally'.format(key))
         files = [{'source_path': key, 'local_path': local_path,
                   'filename': local_path.split('/')[-1]}]
     return files
@@ -92,11 +96,9 @@ def rm(f):
     raise TypeError('must be either file or directory')
 
 
-def build_dataset(dataset_directory, data_directory, dataset_id, tmp_dir='tmp_data', partition_dimensions=None):
-    s3fs = importlib.import_module('s3fs')
-    s3 = s3fs.S3FileSystem()
-    if os.path.exists('./user-data.json'):
-        with open('./user-data.json') as f:
+def build_dataset(s3_fs, dataset_directory, data_directory, dataset_id, tmp_dir='tmp_data', partition_dimensions=None):
+    if os.path.exists('./environment.json'):
+        with open('./environment.json') as f:
             os.environ.update(json.load(f)['ENVIRONMENT'])
     data_directories = ['data', 'profile']
     pathlib.Path(tmp_dir).mkdir(
@@ -105,10 +107,10 @@ def build_dataset(dataset_directory, data_directory, dataset_id, tmp_dir='tmp_da
         pathlib.Path(os.path.join('{}/{}'.format(dataset_directory, dataset_id),
                                   d)).mkdir(
             parents=True, exist_ok=True)
-    for key in s3.ls(
+    for key in s3_fs.ls(
             '{}'.format(data_directory)):
         try:
-            files = decompress_file(tmp_dir=tmp_dir, key=key, s3=s3,
+            files = decompress_file(tmp_dir=tmp_dir, key=key, s3=s3_fs,
                                     data_directory=data_directory)
             files = parse_files(files=files)
             partition_data(dataset_directory=dataset_directory, dataset_id=dataset_id, files=files, partition_dimensions=partition_dimensions)
@@ -121,33 +123,32 @@ def build_dataset(dataset_directory, data_directory, dataset_id, tmp_dir='tmp_da
     shutil.rmtree('{}'.format(tmp_dir))
 
 
-def create_partitioning_ec2(data_directory, divina_version, ec2_client, pricing_client, s3_fs, ec2_keyfile=None,
+def create_partitioning_ec2(s3_fs, data_directory, ec2_client, pricing_client, ec2_keyfile=None,
                        keep_instances_alive=False):
     file_sizes = []
     keys = []
 
     for o in s3_fs.ls(data_directory):
         file_sizes.append(
-            s3_fs.info(os.path.join(data_directory, o)))
+            s3_fs.info(o)['size'])
         keys.append(o)
 
+    ec2_keys = ec2_client.describe_key_pairs()
+    if 'divina_ec2_key' in [x['KeyName'] for x in ec2_keys['KeyPairs']]:
+        ec2_client.delete_key_pair(KeyName='divina_ec2_key')
     if ec2_keyfile:
         with open(os.path.join(os.path.expanduser('~'), '.ssh', ec2_keyfile + '.pub')) as f:
             key = aws_backoff.import_key_pair(
-                key_name='vision_{}_ec2_key'.format(os.environ['VISION_ID']),
+                key_name='divina_ec2_key',
                 public_key_material=f.read(), ec2_client=ec2_client
             )
             paramiko_key = paramiko.RSAKey.from_private_key_file(
                 os.path.join(os.path.expanduser('~'), '.ssh', ec2_keyfile), password=os.environ['KEY_PASS'])
     else:
         key = ec2_client.create_key_pair(
-            KeyName='vision_{}_ec2_key'.format(os.environ['VISION_ID'])
+            KeyName='divina_ec2_key'
         )
         paramiko_key = paramiko.RSAKey.from_private_key(io.StringIO(key['KeyMaterial']))
-
-    environment = {
-        'ENVIRONMENT': {'VISION_ID': str(os.environ['VISION_ID']),
-                        'DATASET_BUCKET': data_directory, 'DIVINA_VERSION': divina_version}}
 
     security_groups = aws_backoff.describe_security_groups(
         filters=[
@@ -212,7 +213,6 @@ def create_partitioning_ec2(data_directory, divina_version, ec2_client, pricing_
                                         InstanceType=partitioning_instance_type['product']['attributes'][
                                             'instanceType'],
                                         KeyName=key['KeyName'],
-                                        UserData=json.dumps(environment),
                                         BlockDeviceMappings=[
                                             {"DeviceName": "/dev/xvda", "Ebs": {"VolumeSize": required_disk}}],
                                         SecurityGroupIds=[
@@ -234,20 +234,16 @@ def create_partitioning_ec2(data_directory, divina_version, ec2_client, pricing_
     return instance, paramiko_key
 
 
-def build_dataset_ssh(instance, verbosity, paramiko_key, divina_pip_arguments):
+def build_dataset_ssh(instance, verbosity, paramiko_key, dataset_directory, dataset_id, divina_pip_arguments):
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     paramiko.connect_ssh(client, hostname=instance['PublicIpAddress'], username="ec2-user", pkey=paramiko_key)
-    commands = ['sudo cp /var/lib/cloud/instance/user-data.txt /home/ec2-user/user-data.json',
+    commands = ['sudo echo \'{}\' > /home/ec2-user/environment.json'.format(json.dumps({'ENVIRONMENT': {'DATASET_ID': dataset_id,
+                        'DATASET_BUCKET': dataset_directory}})),
                 'sudo yum install unzip -y', 'sudo yum install python3 -y', 'sudo yum install gcc -y',
-                'sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"',
-                'sudo unzip awscliv2.zip',
-                'sudo ./aws/install -i /usr/local/aws-cli -b /usr/local/bin',
                 'sudo python3 -m pip install divina[dataset]=={} {}'.format(
                     get_distribution('divina').version, "" if divina_pip_arguments is None else divina_pip_arguments),
-                'aws s3 cp s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/vision_definition.json /home/ec2-user/vision_definition.json'.format(
-                    os.environ['VISION_ID']),
                 'sudo chown -R ec2-user /home/ec2-user',
                 'divina build-dataset']
     for cmd in commands:

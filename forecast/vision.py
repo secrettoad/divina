@@ -21,12 +21,10 @@ def vision_setup(divina_version, worker_profile, driver_role, vision_session, so
                  vision_role_name,
                  data_definition=None, keep_instances_alive=False, verbosity=0, vision_role=None, source_role=None, divina_pip_arguments=None):
     vision_iam = vision_session.client('iam')
-    source_iam = source_session.client('iam')
     vision_sts = vision_session.client('sts')
-    source_sts = source_session.client('sts')
-    vision_session, source_session = get_sessions(vision_iam=vision_iam, source_iam=source_iam,
-                                                  vision_role=vision_role, source_role=source_role,
-                                                  vision_sts=vision_sts, source_sts=source_sts
+    vision_session = get_vision_session(vision_iam=vision_iam,
+                                                  vision_role=vision_role,
+                                                  vision_sts=vision_sts
                                                   )
     ###TODO add logic for provided worker and exectutor profiles
     if not worker_profile and driver_role:
@@ -53,7 +51,7 @@ def vision_setup(divina_version, worker_profile, driver_role, vision_session, so
     sys.stdout.write('Building dataset...\n')
     vision_ec2_client = vision_session.client('ec2')
     vision_pricing_client = vision_session.client('pricing', region_name='us-east-1')
-    instance, paramiko_key = create_partitioning_ec2(s3_client=vision_s3_client, ec2_client=vision_ec2_client,
+    instance, paramiko_key = create_partitioning_ec2(ec2_client=vision_ec2_client,
                                                 pricing_client=vision_pricing_client, ec2_keyfile=ec2_keyfile,
                                                 keep_instances_alive=keep_instances_alive,
                                                 divina_version=divina_version)
@@ -83,76 +81,6 @@ def vision_setup(divina_version, worker_profile, driver_role, vision_session, so
             "MaxAttempts": 120
         }
     )
-
-
-def get_sessions(vision_iam, source_iam, vision_sts, source_sts, vision_role=None, source_role=None):
-    if not vision_role:
-        sys.stdout.write('Creating Divina cloud role...\n')
-
-        with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config',
-                               'divina_iam_policy.json')) as f:
-            divina_policy = os.path.expandvars(json.dumps(json.load(f)))
-        with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config',
-                               'divina_trust_policy.json')) as f:
-            vision_role_trust_policy = os.path.expandvars(json.dumps(json.load(f)))
-
-        vision_role = aws_backoff.create_role(vision_iam, divina_policy, vision_role_trust_policy, 'divina-vision-role',
-                                  'divina-vision-role-policy', 'role for coysu divina')
-
-    assumed_vision_role = aws_backoff.assume_role(sts_client=vision_sts,
-                                                  role_arn="arn:aws:iam::{}:role/{}".format(
-                                          os.environ['ACCOUNT_NUMBER'], vision_role['Role']['RoleName']),
-                                                  session_name="AssumeRoleSession2")
-
-    # From the response that contains the assumed role, get the temporary
-    # credentials that can be used to make subsequent API calls
-    vision_credentials = assumed_vision_role['Credentials']
-
-    # Use the temporary credentials that AssumeRole returns to make a
-    # connection to Amazon S3
-    vision_session = boto3.session.Session(
-        aws_access_key_id=vision_credentials['AccessKeyId'],
-        aws_secret_access_key=vision_credentials['SecretAccessKey'],
-        aws_session_token=vision_credentials['SessionToken'], region_name=vision_sts._client_config.region_name,
-    )
-
-    if not source_role:
-        # creates role in source account that has s3 permissions
-        sys.stdout.write('Connecting import cloud role...\n')
-
-        with open(
-                os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config',
-                             'import_iam_policy.json')) as f:
-            source_policy = os.path.expandvars(json.dumps(json.load(f))).replace('${IMPORT_BUCKET}',
-                                                                                 os.environ['IMPORT_BUCKET'])
-        with open(
-                os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config',
-                             'import_trust_policy.json')) as f:
-            source_role_trust_policy = os.path.expandvars(json.dumps(json.load(f)))
-
-        source_s3_role = aws_backoff.create_role(source_iam, source_policy, source_role_trust_policy, 'divina-source-role',
-                                     'divina-source-role-policy',
-                                     'policy for coysu divina to assume when importing datasets')
-
-    assumed_source_role = aws_backoff.assume_role(sts_client=source_sts,
-                                                  role_arn="arn:aws:iam::{}:role/{}".format(
-                                          os.environ['SOURCE_ACCOUNT_NUMBER'], source_s3_role['Role']['RoleName']),
-                                                  session_name="AssumeRoleSession1"
-                                                  )
-
-    # From the response that contains the assumed role, get the temporary
-    # credentials that can be used to make subsequent API calls
-    source_credentials = assumed_source_role['Credentials']
-
-    # Use the temporary credentials that AssumeRole returns to make a
-    # connection to Amazon S3
-    source_session = boto3.session.Session(
-        aws_access_key_id=source_credentials['AccessKeyId'],
-        aws_secret_access_key=source_credentials['SecretAccessKey'],
-        aws_session_token=source_credentials['SessionToken'], region_name=source_sts._client_config.region_name
-    )
-
-    return vision_session, source_session
 
 
 def validate_vision_definition(vision_definition):
