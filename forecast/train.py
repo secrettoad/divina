@@ -53,11 +53,11 @@ def dask_train(dask_client, dask_model, vision_definition, divina_directory, vis
             models["s-{}_h-{}".format(pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"), h)] = model
 
             pathlib.Path(
-                os.path.join(divina_directory, 'coysu-divina-prototype-{}'.format(vision_id)),
+                os.path.join(divina_directory, vision_id),
                              'models').mkdir(
                 parents=True, exist_ok=True)
 
-            joblib.dump(model, "{}/coysu-divina-prototype-{}/models/s-{}_h-{}".format(
+            joblib.dump(model, "{}/{}/models/s-{}_h-{}".format(
                 divina_directory, vision_id, pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"), h))
 
             sys.stdout.write('Pipeline persisted for horizon {}\n'.format(h))

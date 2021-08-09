@@ -139,25 +139,25 @@ def test_dask_train(test_df_1, test_vd_1, dask_client, account_number):
                             vision_id=os.environ['VISION_ID'], divina_directory=os.environ['VISION_BUCKET'])
         pathlib.Path(
             pathlib.Path(__file__).resolve().parent, 'stubs',
-            'coysu-divina-prototype-{}'.format(os.environ['VISION_ID'])).mkdir(
+            os.environ['VISION_ID']).mkdir(
             parents=True, exist_ok=True)
 
         '''Uncomment below to generate stub models'''
 
         pathlib.Path(pathlib.Path(pathlib.Path(__file__).resolve().parent, 'stubs',
-                                  'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']), 'models')).mkdir(
+                                  os.environ['VISION_ID'], 'models')).mkdir(
             parents=True, exist_ok=True)
         for model in models:
             joblib.dump(models[model],
                         str(pathlib.Path(pathlib.Path(__file__).resolve().parent, 'stubs',
-                                         'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']), 'models', model)))
+                                         os.environ['VISION_ID'], 'models', model)))
 
         '''end stubbing'''
 
         assert (compare_sk_models(joblib.load(os.path.abspath(
-            os.path.join(os.environ['VISION_BUCKET'], 'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+            os.path.join(os.environ['VISION_BUCKET'], os.environ['VISION_ID'],
                          'models', 's-19700101-000008_h-1'))), joblib.load(
-            os.path.abspath(os.path.join('stubs', 'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+            os.path.abspath(os.path.join('stubs', os.environ['VISION_ID'],
                                          'models', 's-19700101-000008_h-1')))))
     finally:
         shutil.rmtree(os.environ['VISION_BUCKET'], ignore_errors=True)
@@ -201,13 +201,13 @@ def test_get_composite_dataset(test_df_1, test_df_2, test_vd_2,
 @patch('s3fs.S3FileSystem.ls', os.listdir)
 @patch.dict(os.environ, {"VISION_ID": "test1"})
 @patch.dict(os.environ, {"VISION_BUCKET": "divina-test/vision"})
-def test_dask_predict(dask_client, test_df_1, test_vd_1, test_model_1, account_number):
+def test_dask_predict(s3_fs, dask_client, test_df_1, test_vd_1, test_model_1, account_number):
     try:
         pathlib.Path(
             os.path.join(test_vd_1['vision_definition']['dataset_directory'], test_vd_1['vision_definition']['dataset_id'], 'data')).mkdir(
             parents=True, exist_ok=True)
         pathlib.Path(
-            os.path.join(os.environ['VISION_BUCKET'], 'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+            os.path.join(os.environ['VISION_BUCKET'], os.environ['VISION_ID'],
                          'models')).mkdir(
             parents=True, exist_ok=True)
         ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(os.path.join(test_vd_1['vision_definition']['dataset_directory'],
@@ -215,38 +215,37 @@ def test_dask_predict(dask_client, test_df_1, test_vd_1, test_model_1, account_n
         ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(os.path.join(test_vd_1['vision_definition']['dataset_directory'],
                                                                                        test_vd_1['vision_definition']['dataset_id'],
                                                                                        'profile'))
-        shutil.copy2(os.path.join('stubs', 'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+        shutil.copy2(os.path.join('stubs', os.environ['VISION_ID'],
                                   'models', 's-19700101-000008_h-1'), os.path.join(os.environ['VISION_BUCKET'],
-                                                                                   'coysu-divina-prototype-{}'.format(
-                                                                                       os.environ['VISION_ID']),
+                                                                                       os.environ['VISION_ID'],
                                                                                    'models', 's-19700101-000008_h-1'))
-        with open(os.path.join(os.environ['VISION_BUCKET'], 'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+        with open(os.path.join(os.environ['VISION_BUCKET'], os.environ['VISION_ID'],
                                'vision_definition.json'), 'w+') as f:
             json.dump(test_vd_1, f)
 
-        dask_predict(dask_client=dask_client, vision_definition=test_vd_1['vision_definition'],
+        dask_predict(s3_fs=s3_fs, dask_client=dask_client, vision_definition=test_vd_1['vision_definition'],
                      vision_id=os.environ['VISION_ID'],
                      divina_directory=os.environ['VISION_BUCKET'])
 
         '''Uncomment below to generate stub models'''
 
         pathlib.Path(pathlib.Path(pathlib.Path(__file__).resolve().parent, 'stubs',
-                                  'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']), 'predictions')).mkdir(
+                                  os.environ['VISION_ID'], 'predictions')).mkdir(
             parents=True, exist_ok=True)
         shutil.copytree(
-            os.path.join(os.environ['VISION_BUCKET'], 'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+            os.path.join(os.environ['VISION_BUCKET'], os.environ['VISION_ID'],
                          'predictions', 's-19700101-000008'), os.path.join('stubs',
-                                                                           'coysu-divina-prototype-{}'.format(
-                                                                               os.environ['VISION_ID']),
+
+                                                                               os.environ['VISION_ID'],
                                                                            'predictions', 's-19700101-000008'),
             dirs_exist_ok=True)
 
         '''end stubbing'''
 
         pd.testing.assert_frame_equal(ddf.read_parquet(
-            os.path.join(os.environ['VISION_BUCKET'], 'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+            os.path.join(os.environ['VISION_BUCKET'], os.environ['VISION_ID'],
                          'predictions', 's-19700101-000008')).compute(), ddf.read_parquet(
-            os.path.join('stubs', 'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+            os.path.join('stubs', os.environ['VISION_ID'],
                          'predictions', 's-19700101-000008')).compute())
     finally:
         shutil.rmtree(os.environ['VISION_BUCKET'], ignore_errors=True)
@@ -257,7 +256,7 @@ def test_dask_predict(dask_client, test_df_1, test_vd_1, test_model_1, account_n
 @patch('s3fs.S3FileSystem.ls', os.listdir)
 @patch.dict(os.environ, {"VISION_ID": "test1"})
 @patch.dict(os.environ, {"VISION_BUCKET": "divina-test/vision"})
-def test_dask_validate(test_vd_1, test_df_1, test_metrics_1, account_number, dask_client):
+def test_dask_validate(s3_fs, test_vd_1, test_df_1, test_metrics_1, account_number, dask_client):
     try:
         pathlib.Path(
             os.path.join(test_vd_1['vision_definition']['dataset_directory'], test_vd_1['vision_definition']['dataset_id'], 'data')).mkdir(
@@ -268,14 +267,14 @@ def test_dask_validate(test_vd_1, test_df_1, test_metrics_1, account_number, das
                                                                                        test_vd_1['vision_definition']['dataset_id'],
                                                                                        'profile'))
         pathlib.Path(
-            os.path.join(os.environ['VISION_BUCKET'], 'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+            os.path.join(os.environ['VISION_BUCKET'], os.environ['VISION_ID'],
                          'predictions')).mkdir(
             parents=True, exist_ok=True)
 
-        shutil.copytree(os.path.join('stubs', 'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+        shutil.copytree(os.path.join('stubs', os.environ['VISION_ID'],
                                      'predictions', 's-19700101-000008'), os.path.join(os.environ['VISION_BUCKET'],
-                                                                                       'coysu-divina-prototype-{}'.format(
-                                                                                           os.environ['VISION_ID']),
+
+                                                                                           os.environ['VISION_ID'],
                                                                                        'predictions',
                                                                                        's-19700101-000008'))
 
@@ -286,11 +285,11 @@ def test_dask_validate(test_vd_1, test_df_1, test_metrics_1, account_number, das
                                                                                        test_vd_1['vision_definition']['dataset_id'],
                                                                                        'profile'))
 
-        dask_validate(dask_client=dask_client, vision_definition=test_vd_1['vision_definition'],
+        dask_validate(s3_fs=s3_fs, dask_client=dask_client, vision_definition=test_vd_1['vision_definition'],
                       vision_id=os.environ['VISION_ID'],
                       divina_directory=os.environ['VISION_BUCKET'])
 
-        with open(os.path.join(os.environ['VISION_BUCKET'], 'coysu-divina-prototype-{}'.format(os.environ['VISION_ID']),
+        with open(os.path.join(os.environ['VISION_BUCKET'], os.environ['VISION_ID'],
                                'metrics.json'), 'r') as f:
             metrics = json.load(f)
 
