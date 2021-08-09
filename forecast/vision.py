@@ -41,10 +41,10 @@ def vision_setup(divina_version, worker_profile, driver_role, vision_session, so
 
     aws_backoff.upload_file(s3_client=vision_s3_client,
                             bucket=os.environ['DIVINA_BUCKET'],
-                            key='coysu-divina-prototype-{}/data_definition.json'.format(os.environ['VISION_ID']),
+                            key='{}/data_definition.json'.format(os.environ['VISION_ID']),
                             body=io.StringIO(json.dumps(data_definition)).read())
 
-    os.system('aws s3 sync {} s3://coysu-divina-prototype-visions/coysu-divina-prototype-{}/data_definition.json'.format(os.path.join('..', 'config/data_definition.json'), os.environ['VISION_ID']))
+    os.system('aws s3 sync {} s3://coysu-divina-prototype-visions/{}/data_definition.json'.format(os.path.join('..', 'config/data_definition.json'), os.environ['VISION_ID']))
 
     import_data(vision_s3_client=vision_s3_client, source_s3_client=source_s3_client,
                 vision_role_name=vision_role_name)

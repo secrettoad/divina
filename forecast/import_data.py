@@ -63,7 +63,7 @@ def import_data(vision_s3_client, source_s3_client, vision_role_name):
             'Bucket': os.environ['IMPORT_BUCKET'],
             'Key': file['Key']
         }, bucket='coysu-divina-prototype-visions',
-            key='coysu-divina-prototype-{}/data/{}'.format(os.environ['VISION_ID'], file['Key']),
+            key='{}/data/{}'.format(os.environ['VISION_ID'], file['Key']),
             s3_client=vision_s3_client)
 
     return None

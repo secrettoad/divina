@@ -1,14 +1,10 @@
-import os
-import pyspark
-import pyspark.sql.functions as F
 import json
 import dask.dataframe as dd
-import importlib
 import pandas as pd
 from .dataset import get_dataset
 
 
-def dask_validate(vision_definition, divina_directory, vision_id, dask_client):
+def dask_validate(s3_fs, vision_definition, divina_directory, vision_id, dask_client):
 
     def get_metrics(vision_definition, df, s):
         metrics = {'time_horizons': {}}
@@ -19,14 +15,11 @@ def dask_validate(vision_definition, divina_directory, vision_id, dask_client):
             metrics['time_horizons'][h]['mae'] = df[dd.to_datetime(df[vision_definition['time_index']], unit='s') > s]['resid_h_{}'.format(h)].abs().mean().compute()
         return metrics
 
-    s3fs = importlib.import_module('s3fs')
-    s3_fs = s3fs.S3FileSystem()
-
     metrics = {'splits': {}}
     for s in vision_definition['time_validation_splits']:
 
         df_pred = dd.read_parquet(
-            "{}/coysu-divina-prototype-{}/predictions/s-{}".format(divina_directory, vision_id, pd.to_datetime(s).strftime("%Y%m%d-%H%M%S")))
+            "{}/{}/predictions/s-{}".format(divina_directory, vision_id, pd.to_datetime(s).strftime("%Y%m%d-%H%M%S")))
 
         df_base, profile_base = get_dataset(vision_definition)
         df_base = df_base[[vision_definition['target'], vision_definition['time_index']]]
@@ -37,5 +30,5 @@ def dask_validate(vision_definition, divina_directory, vision_id, dask_client):
             df = df_pred.merge(df_base, on=[vision_definition['time_index']])
         metrics['splits'][s] = get_metrics(vision_definition, df, s)
 
-        with s3_fs.open("{}/coysu-divina-prototype-{}/metrics.json".format(divina_directory, vision_id), 'w') as f:
+        with s3_fs.open("{}/{}/metrics.json".format(divina_directory, vision_id), 'w') as f:
             json.dump(metrics, f)

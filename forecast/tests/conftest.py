@@ -19,14 +19,26 @@ def divina_session():
     return get_vision_session(vision_iam=iam, vision_sts=sts)
 
 
+@pytest.fixture(autouse=True)
+def reset_s3():
+    pass
+
+
+@pytest.fixture(autouse=True)
+def reset_local_filesystem():
+    pass
+
+
 @pytest.fixture()
 def s3_fs():
     return s3fs.S3FileSystem()
 
 
 @pytest.fixture()
-def dask_client():
-    return Client()
+def dask_client(request):
+    client = Client()
+    request.addfinalizer(lambda: client.close())
+    return client
 
 
 @pytest.fixture()
