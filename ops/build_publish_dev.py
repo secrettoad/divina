@@ -2,29 +2,17 @@ import os
 import subprocess
 import sys
 import pathlib
-import boto3
 
 
 def main():
     pkg_dir = pathlib.Path(*pathlib.Path().resolve().absolute().parts[:-1])
-    code_artifact_client = boto3.client('codeartifact', region_name='us-west-2')
-    auth_token = code_artifact_client.get_authorization_token(domain='coysu')['authorizationToken']
     commands = ['rm -rf {}'.format(os.path.join(pkg_dir, 'dist/*')),
-                'python3 -m awscli codeartifact login --tool twine --repository divina --domain coysu --region=us-west-2',
                 'cd {};python setup.py sdist bdist_wheel'.format(pkg_dir),
-                'twine upload {} --repository=codeartifact'.format(os.path.join(pkg_dir, 'dist/*')),
+                'pip uninstall divina -y',
+                'git commit -am "WIP"',
+                'git push'
+                'pip install divina --no-index --find-links file:///{}'.format(pkg_dir),
                 'rm -rf .eggs']
-    run_commands(commands)
-    versions = code_artifact_client.list_package_versions(
-        domain='coysu',
-        repository='divina',
-        format='pypi',
-        package='divina',
-        status='Published',
-        sortBy='PUBLISHED_TIME'
-    )
-    commands = ['python3 -m pip install --upgrade divina[testing]=={} -i https://aws:{}@coysu-169491045780.d.codeartifact.us-west-2.amazonaws.com/pypi/divina/simple/ --extra-index https://www.pypi.org/simple'.format(
-                    versions['versions'][0]['version'], auth_token)]
     run_commands(commands)
 
 

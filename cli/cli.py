@@ -1,29 +1,11 @@
 import click
-from ..forecast import vision, dataset, predict, train, validate
+from ..forecast import vision, predict, train, validate
 import pkg_resources
-from pyspark import SparkContext
-import pyspark
 from ..forecast.dataset import create_partitioning_ec2
 import boto3
-
-
-def get_spark_context_s3(s3_endpoint):
-    # configure
-    conf = pyspark.SparkConf()
-
-    sc = SparkContext.getOrCreate(
-        conf=conf)
-
-    # s3a config
-    sc._jsc.hadoopConfiguration().set('fs.s3.endpoint',
-                                      s3_endpoint)
-    sc._jsc.hadoopConfiguration().set(
-        'fs.s3.aws.credentials.provider',
-        'com.amazonaws.auth.InstanceProfileCredentialsProvider',
-        'com.amazonaws.auth.profile.ProfileCredentialsProvider'
-    )
-
-    return sc
+from ..forecast.dataset import build_dataset_ssh
+from ..aws import aws_backoff
+import s3fs
 
 
 @click.group()
@@ -40,27 +22,31 @@ def forecast(import_bucket, divina_version=pkg_resources.get_distribution('divin
 def dataset():
     pass
 
-@click.argument('data_path', default='s3://divina-dataset')
-@click.argument('ec2_key', default=None)
+
+@click.argument('dataset_name')
+@click.argument('write_path')
+@click.argument('read_path')
+@click.argument('ec2_key_path', default=None)
 @click.argument('verbosity', default=0)
 @click.argument('keep_instances_alive', default=False)
+@click.argument('branch', default='main')
 @dataset.command()
-def build(data_path, ec2_keyfile, verbosity, keep_instances_alive):
+def build(dataset_name, write_path, read_path, ec2_key_path, verbosity, keep_instances_alive, branch):
+
     session = boto3.Session(profile_name='divina')
+
+    s3_fs = s3fs.S3FileSystem(profile='divina')
 
     ec2_client = session.client('ec2')
 
-    instance, paramiko_key = create_partitioning_ec2(vision_session=session, ec2_keyfile=ec2_keyfile,
-                                                     keep_instances_alive=keep_instances_alive, data_directory=)
-    if not build_dataset_ssh(instance=instance, verbosity=verbosity, paramiko_key=paramiko_key,
-                             divina_pip_arguments=divina_pip_arguments):
+    instance, paramiko_key = create_partitioning_ec2(vision_session=session, ec2_keyfile=ec2_key_path,
+                                                     keep_instances_alive=keep_instances_alive, data_directory=read_path, s3_fs=s3_fs)
+    if not build_dataset_ssh(instance=instance, verbosity=verbosity, paramiko_key=paramiko_key, dataset_directory=write_path, dataset_id=dataset_name, branch=branch):
         if not keep_instances_alive:
-            aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=vision_ec2_client)
+            aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
         quit()
     if not keep_instances_alive:
-        aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=vision_ec2_client)
-
-
+        aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
 
 
 @click.argument('s3_endpoint')

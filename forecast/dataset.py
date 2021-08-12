@@ -238,7 +238,7 @@ def create_partitioning_ec2(s3_fs, data_directory, vision_session, ec2_keyfile=N
     return instance, paramiko_key
 
 
-def build_dataset_ssh(instance, verbosity, paramiko_key, dataset_directory, dataset_id, divina_pip_arguments):
+def build_dataset_ssh(instance, verbosity, paramiko_key, dataset_directory, dataset_id, branch):
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -246,8 +246,8 @@ def build_dataset_ssh(instance, verbosity, paramiko_key, dataset_directory, data
     commands = ['sudo echo \'{}\' > /home/ec2-user/environment.json'.format(json.dumps({'ENVIRONMENT': {'DATASET_ID': dataset_id,
                         'DATASET_BUCKET': dataset_directory}})),
                 'sudo yum install unzip -y', 'sudo yum install python3 -y', 'sudo yum install gcc -y',
-                'sudo python3 -m pip install divina[dataset]=={} {}'.format(
-                    get_distribution('divina').version, "" if divina_pip_arguments is None else divina_pip_arguments),
+                'sudo python3 -m pip install git+https://git@github.com/secrettoad/divina.git@{}'.format(
+                    branch),
                 'sudo chown -R ec2-user /home/ec2-user',
                 'divina build-dataset']
     for cmd in commands:
