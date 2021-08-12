@@ -9,14 +9,11 @@ from dask.distributed import Client
 import pathlib
 import os
 import s3fs
-from ...aws.utils import get_vision_session
 
 
 @pytest.fixture()
 def divina_session():
-    iam = boto3.client('iam')
-    sts = boto3.client('sts')
-    return get_vision_session(vision_iam=iam, vision_sts=sts)
+    return boto3.Session(profile_name='divina-test')
 
 
 @pytest.fixture(autouse=True)
@@ -32,6 +29,13 @@ def reset_local_filesystem():
 @pytest.fixture()
 def s3_fs():
     return s3fs.S3FileSystem()
+
+
+@pytest.fixture()
+def dask_client(request):
+    client = Client()
+    request.addfinalizer(lambda: client.close())
+    return client
 
 
 @pytest.fixture()

@@ -123,8 +123,12 @@ def build_dataset(s3_fs, dataset_directory, data_directory, dataset_id, tmp_dir=
     shutil.rmtree('{}'.format(tmp_dir))
 
 
-def create_partitioning_ec2(s3_fs, data_directory, ec2_client, pricing_client, ec2_keyfile=None,
+def create_partitioning_ec2(s3_fs, data_directory, vision_session, ec2_keyfile=None,
                        keep_instances_alive=False):
+
+    ec2_client = vision_session.client('ec2')
+    pricing_client = vision_session.client('pricing', region_name='us-east-1')
+
     file_sizes = []
     keys = []
 
@@ -282,4 +286,3 @@ def get_dataset(vision_definition):
             profile = dd.concat([profile, join_profile], axis=1)
 
     return df, profile
-

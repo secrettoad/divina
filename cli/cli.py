@@ -3,6 +3,8 @@ from ..forecast import vision, dataset, predict, train, validate
 import pkg_resources
 from pyspark import SparkContext
 import pyspark
+from ..forecast.dataset import create_partitioning_ec2
+import boto3
 
 
 def get_spark_context_s3(s3_endpoint):
@@ -29,21 +31,36 @@ def divina():
     pass
 
 
-@click.argument('divina_version')
-@click.argument('import_bucket')
 @divina.command()
 def forecast(import_bucket, divina_version=pkg_resources.get_distribution('divina')):
     vision.create_vision(divina_version=divina_version, import_bucket=import_bucket)
 
 
 @divina.command()
-def import_data():
-    import_data()
+def dataset():
+    pass
+
+@click.argument('data_path', default='s3://divina-dataset')
+@click.argument('ec2_key', default=None)
+@click.argument('verbosity', default=0)
+@click.argument('keep_instances_alive', default=False)
+@dataset.command()
+def build(data_path, ec2_keyfile, verbosity, keep_instances_alive):
+    session = boto3.Session(profile_name='divina')
+
+    ec2_client = session.client('ec2')
+
+    instance, paramiko_key = create_partitioning_ec2(vision_session=session, ec2_keyfile=ec2_keyfile,
+                                                     keep_instances_alive=keep_instances_alive, data_directory=)
+    if not build_dataset_ssh(instance=instance, verbosity=verbosity, paramiko_key=paramiko_key,
+                             divina_pip_arguments=divina_pip_arguments):
+        if not keep_instances_alive:
+            aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=vision_ec2_client)
+        quit()
+    if not keep_instances_alive:
+        aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=vision_ec2_client)
 
 
-@divina.command()
-def build_dataset():
-    dataset.build_dataset()
 
 
 @click.argument('s3_endpoint')
