@@ -2,16 +2,18 @@ import os
 import subprocess
 import sys
 import pathlib
+from pygit2 import Repository
 
 
 def main():
     pkg_dir = pathlib.Path(*pathlib.Path().resolve().absolute().parts[:-1])
+    branch = Repository(pkg_dir).head.shorthand
     commands = ['rm -rf {}'.format(os.path.join(pkg_dir, 'dist/*')),
                 'cd {};python setup.py sdist bdist_wheel'.format(pkg_dir),
                 'pip uninstall divina -y',
                 'git commit -am "WIP"',
                 'git push',
-                'pip install {}/dist'.format(pkg_dir.resolve()),
+                'pip install git+https://github.com/tangentlabs/django-oscar-paypal.git@issue/34/oscar-0.6'.format(pkg_dir.resolve()),
                 'rm -rf .eggs']
     run_commands(commands)
 
