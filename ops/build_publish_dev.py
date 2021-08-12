@@ -13,7 +13,7 @@ def main():
                 'pip uninstall divina -y',
                 'git commit -am "WIP"',
                 'git push',
-                'pip install git+https://github.com/tangentlabs/django-oscar-paypal.git@issue/34/oscar-0.6'.format(pkg_dir.resolve()),
+                'pip install git+https://github.com/secrettoad/divina.git@{}'.format(branch),
                 'rm -rf .eggs']
     run_commands(commands)
 
