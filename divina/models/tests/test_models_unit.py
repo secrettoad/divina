@@ -1,4 +1,4 @@
-from divina.models.spark.ensembles import GLASMA, GLASMAModel
+from divina.divina.models import GLASMA, GLASMAModel
 from ..preprocessing.base import MeanFiller, CategoricalEncoder
 from pyspark.ml.feature import VectorAssembler
 from pyspark.sql import SQLContext, DataFrame

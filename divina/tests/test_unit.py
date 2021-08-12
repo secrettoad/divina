@@ -11,9 +11,8 @@ import boto3
 import paramiko
 import shutil
 import pathlib
-import pytest
 from dask_ml.linear_model import LinearRegression
-from ...models.utils import compare_sk_models
+from divina.divina.models.utils import compare_sk_models
 import joblib
 import pandas as pd
 import dask.dataframe as ddf

@@ -9,11 +9,10 @@ import traceback
 import shutil
 from .errors import FileTypeNotSupported
 import pathlib
-from pkg_resources import get_distribution
 import math
 import paramiko
-from ..aws import aws_backoff
-from ..aws.utils import unnest_ec2_price, ec2_pricing
+from .aws import aws_backoff
+from .aws.utils import unnest_ec2_price, ec2_pricing, connect_ssh
 import io
 import dask.dataframe as dd
 
@@ -131,11 +130,20 @@ def create_partitioning_ec2(s3_fs, data_directory, vision_session, ec2_keyfile=N
 
     file_sizes = []
     keys = []
+    if data_directory[:6] == 's3://':
+        for o in s3_fs.ls(data_directory):
+            file_sizes.append(
+                s3_fs.info(o)['size'])
+            keys.append(o)
+    else:
+        for (dirpaths, dirnames, filenames) in os.walk(data_directory):
+            for filename in filenames:
+                file_sizes.append(
+                    os.stat(pathlib.Path(data_directory, filename)).st_size)
+                keys.append(filename)
 
-    for o in s3_fs.ls(data_directory):
-        file_sizes.append(
-            s3_fs.info(o)['size'])
-        keys.append(o)
+    if len(keys) < 1:
+        raise Exception('No files found at read_path: {}:'.format(data_directory))
 
     ec2_keys = ec2_client.describe_key_pairs()
     if 'divina_ec2_key' in [x['KeyName'] for x in ec2_keys['KeyPairs']]:
@@ -238,16 +246,16 @@ def create_partitioning_ec2(s3_fs, data_directory, vision_session, ec2_keyfile=N
     return instance, paramiko_key
 
 
-def build_dataset_ssh(instance, verbosity, paramiko_key, dataset_directory, dataset_id, divina_pip_arguments):
+def build_dataset_ssh(instance, verbosity, paramiko_key, dataset_directory, dataset_id, branch):
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    paramiko.connect_ssh(client, hostname=instance['PublicIpAddress'], username="ec2-user", pkey=paramiko_key)
+    connect_ssh(client, hostname=instance['PublicIpAddress'], username="ec2-user", pkey=paramiko_key)
     commands = ['sudo echo \'{}\' > /home/ec2-user/environment.json'.format(json.dumps({'ENVIRONMENT': {'DATASET_ID': dataset_id,
                         'DATASET_BUCKET': dataset_directory}})),
-                'sudo yum install unzip -y', 'sudo yum install python3 -y', 'sudo yum install gcc -y',
-                'sudo python3 -m pip install divina[dataset]=={} {}'.format(
-                    get_distribution('divina').version, "" if divina_pip_arguments is None else divina_pip_arguments),
+                'sudo yum install unzip -y', 'sudo yum install python3 -y', 'sudo yum install gcc -y', 'sudo yum install git -y',
+                'sudo python3 -m pip install git+https://git@github.com/secrettoad/divina.git@{}'.format(
+                    branch),
                 'sudo chown -R ec2-user /home/ec2-user',
                 'divina build-dataset']
     for cmd in commands:

@@ -1,4 +1,4 @@
-from ..aws import aws_backoff
+from divina.divina.aws import aws_backoff
 import json
 import os
 import sys
