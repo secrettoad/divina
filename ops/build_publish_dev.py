@@ -2,18 +2,23 @@ import os
 import subprocess
 import sys
 import pathlib
-from pygit2 import Repository
 
 
 def main():
     pkg_dir = pathlib.Path(*pathlib.Path().resolve().absolute().parts[:-1])
-    branch = Repository(pkg_dir).head.shorthand
     commands = ['rm -rf {}'.format(os.path.join(pkg_dir, 'dist/*')),
-                'cd {};python setup.py sdist bdist_wheel'.format(pkg_dir),
-                'pip uninstall divina -y',
+                'cd {};python setup.py sdist bdist_wheel'.format(pkg_dir)
+                ]
+    run_commands(commands)
+    dist_path = pathlib.Path(pkg_dir, 'dist')
+    for file in dist_path.iterdir():
+        if file.suffixes[-2:] == ['.tar', '.gz']:
+            dist_file = file
+            break
+    commands = ['pip uninstall divina -y',
                 'git commit -am "WIP"',
                 'git push',
-                'pip install git+https://github.com/secrettoad/divina.git@{}'.format(branch),
+                'pip install {}'.format(dist_file),
                 'rm -rf .eggs']
     run_commands(commands)
 
