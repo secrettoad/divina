@@ -2,85 +2,17 @@ import boto3
 import os
 import datetime
 import subprocess
-
 import paramiko
-import io
 import sys
 import json
 from ..aws import aws_backoff
-from .import_data import import_data
 import backoff
 from .errors import InvalidDataDefinitionException
 from ..forecast.dataset import create_partitioning_ec2, build_dataset_ssh
+import pathlib
 
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
-
-def vision_setup(divina_version, worker_profile, driver_role, vision_session, source_session,
-                 ec2_keyfile,
-                 vision_role_name,
-                 data_definition=None, keep_instances_alive=False, verbosity=0, vision_role=None, source_role=None, divina_pip_arguments=None):
-    vision_iam = vision_session.client('iam')
-    vision_sts = vision_session.client('sts')
-    vision_session = get_vision_session(vision_iam=vision_iam,
-                                                  vision_role=vision_role,
-                                                  vision_sts=vision_sts
-                                                  )
-    ###TODO add logic for provided worker and exectutor profiles
-    if not worker_profile and driver_role:
-        sys.stdout.write('Creating spark driver and executor cloud roles...\n')
-        create_emr_roles(vision_session)
-
-    if data_definition:
-        sys.stdout.write('Writing data definition...\n')
-        with open(os.path.join('..', 'config/data_definition.json'), 'w+') as f:
-            json.dump(data_definition, f)
-
-    vision_s3_client = vision_session.client('s3')
-    source_s3_client = source_session.client('s3')
-
-    aws_backoff.upload_file(s3_client=vision_s3_client,
-                            bucket=os.environ['DIVINA_BUCKET'],
-                            key='{}/data_definition.json'.format(os.environ['VISION_ID']),
-                            body=io.StringIO(json.dumps(data_definition)).read())
-
-    os.system('aws s3 sync {} s3://coysu-divina-prototype-visions/{}/data_definition.json'.format(os.path.join('..', 'config/data_definition.json'), os.environ['VISION_ID']))
-
-    import_data(vision_s3_client=vision_s3_client, source_s3_client=source_s3_client,
-                vision_role_name=vision_role_name)
-    sys.stdout.write('Building dataset...\n')
-    vision_ec2_client = vision_session.client('ec2')
-    vision_pricing_client = vision_session.client('pricing', region_name='us-east-1')
-    instance, paramiko_key = create_partitioning_ec2(ec2_client=vision_ec2_client,
-                                                pricing_client=vision_pricing_client, ec2_keyfile=ec2_keyfile,
-                                                keep_instances_alive=keep_instances_alive,
-                                                divina_version=divina_version)
-    if not build_dataset_ssh(instance=instance, verbosity=verbosity, paramiko_key=paramiko_key, divina_pip_arguments=divina_pip_arguments):
-        if not keep_instances_alive:
-            aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=vision_ec2_client)
-        quit()
-    if not keep_instances_alive:
-        aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=vision_ec2_client)
-    sys.stdout.write('Creating forecasts...\n')
-    emr_client = vision_session.client('emr')
-    emr_cluster = create_modelling_emr(emr_client=emr_client,
-                                       worker_profile=worker_profile, driver_role=driver_role,
-                                       keep_instances_alive=keep_instances_alive,
-                                       ec2_key='vision_{}_ec2_key'.format(os.environ['VISION_ID']))
-
-    run_command_emr(emr_client=emr_client, cluster_id=emr_cluster['JobFlowId'],
-                   keep_instances_alive=keep_instances_alive, args=['divina', 'train', '--data_definition', '/home/hadoop/data_definition.json', ''])
-    steps = aws_backoff.list_steps(emr_client, emr_cluster['JobFlowId'])
-    last_step_id = steps['Steps'][0]['Id']
-    emr_waiter = aws_backoff.get_emr_waiter(emr_client, 'step_complete')
-    emr_waiter.wait(
-        ClusterId=emr_cluster['JobFlowId'],
-        StepId=last_step_id,
-        WaiterConfig={
-            "Delay": 30,
-            "MaxAttempts": 120
-        }
-    )
 
 
 def validate_vision_definition(vision_definition):
@@ -179,29 +111,52 @@ def run_command_emr(emr_client, cluster_id, keep_instances_alive, args):
     return steps
 
 
-def create_vision(import_bucket, divina_version, source_role=None, vision_role=None,
+def create_vision(s3_fs,
                   worker_profile='EMR_EC2_DefaultRole',
-                  driver_role='EMR_DefaultRole', region='us-east-2', ec2_keyfile=None, data_definition=None,
-                  keep_instances_alive=False, verbosity=0, divina_pip_arguments=None):
+                  driver_role='EMR_DefaultRole', region='us-east-2', ec2_keyfile=None, vision_definition=None,
+                  keep_instances_alive=False, verbosity=0, divina_directory, divina_pip_arguments=None):
     os.environ['VISION_ID'] = str(round(datetime.datetime.now().timestamp()))
     os.environ['DIVINA_BUCKET'] = 'coysu-divina-prototype-visions'
-    os.environ['IMPORT_BUCKET'] = import_bucket
 
     sys.stdout.write('Authenticating to the cloud...\n')
-    source_session = boto3.session.Session(aws_access_key_id=os.environ['SOURCE_AWS_ACCESS_KEY_ID'],
-                                           aws_secret_access_key=os.environ['SOURCE_AWS_SECRET_ACCESS_KEY'],
-                                           region_name=region)
+    try:
+        vision_session = boto3.session.Session(profile_name='divina', region_name=region)
+    except:
+        raise Exception('No AWS profile named "divina" found')
 
-    vision_session = boto3.session.Session(aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
-                                           aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
-                                           region_name=region)
+    if not worker_profile and driver_role:
+        sys.stdout.write('Creating spark driver and executor cloud roles...\n')
+        create_emr_roles(vision_session)
 
-    vision_setup(vision_session=vision_session, source_session=source_session,
-                 vision_role=vision_role, source_role=source_role, worker_profile=worker_profile,
-                 driver_role=driver_role, vision_role_name='divina-vision-role',
-                 ec2_keyfile=ec2_keyfile,
-                 data_definition=data_definition, keep_instances_alive=keep_instances_alive, verbosity=verbosity,
-                 divina_version=divina_version, divina_pip_arguments=divina_pip_arguments)
+    vision_session = boto3.Session()
+
+    with s3_fs.open(pathlib.Path(divina_directory, '{}/vision_definition.json'.format(os.environ['VISION_ID'])), 'w+') as f:
+        json.dump(vision_definition, f)
+
+    sys.stdout.write('Building dataset...\n')
+
+    sys.stdout.write('Creating forecasts...\n')
+    emr_client = vision_session.client('emr')
+    emr_cluster = create_modelling_emr(emr_client=emr_client,
+                                       worker_profile=worker_profile, driver_role=driver_role,
+                                       keep_instances_alive=keep_instances_alive,
+                                       ec2_key='vision_{}_ec2_key'.format(os.environ['VISION_ID']))
+
+    run_command_emr(emr_client=emr_client, cluster_id=emr_cluster['JobFlowId'],
+                    keep_instances_alive=keep_instances_alive,
+                    args=['divina', 'train', '--data_definition', '/home/hadoop/data_definition.json', ''])
+    steps = aws_backoff.list_steps(emr_client, emr_cluster['JobFlowId'])
+    last_step_id = steps['Steps'][0]['Id']
+    emr_waiter = aws_backoff.get_emr_waiter(emr_client, 'step_complete')
+    emr_waiter.wait(
+        ClusterId=emr_cluster['JobFlowId'],
+        StepId=last_step_id,
+        WaiterConfig={
+            "Delay": 30,
+            "MaxAttempts": 120
+        }
+    )
+
 
 @backoff.on_exception(backoff.expo,
                       paramiko.client.NoValidConnectionsError)

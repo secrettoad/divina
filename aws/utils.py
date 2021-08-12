@@ -1,10 +1,7 @@
 from .aws_backoff import get_products, assume_role, create_role
 import json
 from pkg_resources import resource_filename
-import boto3
 import os
-import sys
-
 
 def ec2_pricing(pricing_client, region_name, filter_params=None):
     products_params = {'ServiceCode': 'AmazonEC2',
@@ -37,6 +34,7 @@ def get_region_name(region_code):
     except IOError:
         return default_region
 
+
 def unnest_ec2_price(product):
     od = product['terms']['OnDemand']
     id1 = list(od)[0]
@@ -44,35 +42,16 @@ def unnest_ec2_price(product):
     return {od[id1]['priceDimensions'][id2]['unit'] + '_USD': od[id1]['priceDimensions'][id2]['pricePerUnit']['USD']}
 
 
-def get_vision_session(vision_iam, vision_sts, vision_role=None):
-    if not vision_role:
-        sys.stdout.write('Creating Divina cloud role...\n')
-
-        with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config',
+def create_vision_role(vision_session):
+    vision_iam = vision_session.client('iam')
+    with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config',
                                'divina_iam_policy.json')) as f:
-            divina_policy = os.path.expandvars(json.dumps(json.load(f)))
-        with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config',
+        divina_policy = os.path.expandvars(json.dumps(json.load(f)))
+    with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config',
                                'divina_trust_policy.json')) as f:
-            vision_role_trust_policy = os.path.expandvars(json.dumps(json.load(f)))
+        vision_role_trust_policy = os.path.expandvars(json.dumps(json.load(f)))
 
-        vision_role = create_role(vision_iam, divina_policy, vision_role_trust_policy, 'divina-vision-role',
+    vision_role = create_role(vision_iam, divina_policy, vision_role_trust_policy, 'divina-vision-role',
                                               'divina-vision-role-policy', 'role for coysu divina')
 
-    assumed_vision_role = assume_role(sts_client=vision_sts,
-                                                  role_arn="arn:aws:iam::{}:role/{}".format(
-                                                      os.environ['ACCOUNT_NUMBER'], vision_role['Role']['RoleName']),
-                                                  session_name="AssumeRoleSession2")
-
-    # From the response that contains the assumed role, get the temporary
-    # credentials that can be used to make subsequent API calls
-    vision_credentials = assumed_vision_role['Credentials']
-
-    # Use the temporary credentials that AssumeRole returns to make a
-    # connection to Amazon S3
-    vision_session = boto3.session.Session(
-        aws_access_key_id=vision_credentials['AccessKeyId'],
-        aws_secret_access_key=vision_credentials['SecretAccessKey'],
-        aws_session_token=vision_credentials['SessionToken'], region_name=vision_sts._client_config.region_name,
-    )
-
-    return vision_session
+    return vision_role
