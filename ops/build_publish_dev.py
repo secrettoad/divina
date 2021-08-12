@@ -11,7 +11,7 @@ def main():
                 'pip uninstall divina -y',
                 'git commit -am "WIP"',
                 'git push',
-                'pip install '.format(pathlib.Path(pkg_dir, 'dist')),
+                'pip install '.format(pathlib.Path(pkg_dir)),
                 'rm -rf .eggs']
     run_commands(commands)
 

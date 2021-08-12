@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: divina
-Version: 0.0.1.dev81
+Version: 0.0.1.dev82
 Summary: Package for causal, scalable forecasting
 Home-page: www.coysu.com
 Author: Coysu Consulting
@@ -18,5 +18,5 @@ Classifier: Intended Audience :: Developers
 Classifier: Intended Audience :: Information Technology
 Classifier: Operating System :: OS Independent
 Classifier: Programming Language :: Python
-Provides-Extra: dataset
 Provides-Extra: testing
+Provides-Extra: dataset
