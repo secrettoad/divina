@@ -5,10 +5,9 @@ import subprocess
 import paramiko
 import sys
 import json
-from ..aws import aws_backoff
+from divina.divina.aws import aws_backoff
 import backoff
 from .errors import InvalidDataDefinitionException
-from ..forecast.dataset import create_partitioning_ec2, build_dataset_ssh
 import pathlib
 
 
@@ -156,10 +155,3 @@ def create_vision(s3_fs,
             "MaxAttempts": 120
         }
     )
-
-
-@backoff.on_exception(backoff.expo,
-                      paramiko.client.NoValidConnectionsError)
-def connect_ssh(client, hostname, username, pkey):
-    client.connect(hostname=hostname, username=username, pkey=pkey)
-    return client

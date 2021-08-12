@@ -4,7 +4,7 @@ import sys
 import pathlib
 
 
-def main():
+def build_and_install():
     pkg_dir = pathlib.Path(*pathlib.Path().resolve().absolute().parts[:-1])
     commands = ['rm -rf {}'.format(os.path.join(pkg_dir, 'dist/*')),
                 'cd {};python setup.py sdist bdist_wheel'.format(pkg_dir)
@@ -16,10 +16,14 @@ def main():
             dist_file = file
             break
     commands = ['pip uninstall divina -y',
-                'git commit -am "WIP"',
-                'git push',
                 'pip install {}'.format(dist_file),
                 'rm -rf .eggs']
+    run_commands(commands)
+
+
+def commit_and_push():
+    commands = ['git commit -am "WIP"',
+    'git push']
     run_commands(commands)
 
 
@@ -46,4 +50,4 @@ def run_commands(commands):
 
 
 if __name__ == "__main__":
-    main()
+    build_and_install()

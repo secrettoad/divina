@@ -1,17 +1,14 @@
-from ..vision import create_vision
-from ...ops import build_publish_dev
-import pytest
 from unittest.mock import patch
 import os
 from ..dataset import create_partitioning_ec2
 import paramiko
-from ...aws.aws_backoff import stop_instances
+from ..aws.aws_backoff import stop_instances
 from ..dataset import build_dataset
 from dask import dataframe as ddf
 import pandas as pd
 import pathlib
 import json
-from ...models.utils import compare_sk_models
+from divina.divina.models.utils import compare_sk_models
 from dask_ml.linear_model import LinearRegression
 from ..train import dask_train
 import joblib
@@ -23,10 +20,8 @@ from ..validate import dask_validate
 def test_dataset_infrastructure(s3_fs, test_df_1, divina_session, divina_test_version):
     test_df_1.to_csv(
         os.path.join(os.environ['DATA_BUCKET'], 'test_df_1.csv'), index=False)
-    pricing = divina_session.client('pricing', 'us-east-1')
     ec2 = divina_session.client('ec2', 'us-east-2')
-    instance, paramiko_key = create_partitioning_ec2(s3_fs=s3_fs, ec2_client=ec2,
-                                                     pricing_client=pricing,
+    instance, paramiko_key = create_partitioning_ec2(s3_fs=s3_fs, vision_session=divina_session,
                                                      data_directory=os.environ['DATA_BUCKET'])
     try:
         assert (all([x in instance for x in ['ImageId', 'InstanceId']]) and instance['State'][

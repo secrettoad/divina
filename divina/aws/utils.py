@@ -2,6 +2,9 @@ from .aws_backoff import get_products, assume_role, create_role
 import json
 from pkg_resources import resource_filename
 import os
+import backoff
+import paramiko
+
 
 def ec2_pricing(pricing_client, region_name, filter_params=None):
     products_params = {'ServiceCode': 'AmazonEC2',
@@ -55,3 +58,10 @@ def create_vision_role(vision_session):
                                               'divina-vision-role-policy', 'role for coysu divina')
 
     return vision_role
+
+
+@backoff.on_exception(backoff.expo,
+                      paramiko.client.NoValidConnectionsError)
+def connect_ssh(client, hostname, username, pkey):
+    client.connect(hostname=hostname, username=username, pkey=pkey)
+    return client
