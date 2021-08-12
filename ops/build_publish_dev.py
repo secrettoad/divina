@@ -10,7 +10,7 @@ def main():
                 'cd {};python setup.py sdist bdist_wheel'.format(pkg_dir),
                 'pip uninstall divina -y',
                 'git commit -am "WIP"',
-                'git push'
+                'git push',
                 'pip install divina --no-index --find-links file:///{}'.format(pkg_dir),
                 'rm -rf .eggs']
     run_commands(commands)
