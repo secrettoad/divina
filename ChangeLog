@@ -1,0 +1,99 @@
+CHANGES
+=======
+
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* WIP
+* wip e2e tests
+* base integration tests implemented
+* more integration tests passing
+* adding everything
+* datasets abstracted to filepaths and profiles added
+* datasets implmemented
+* dask implemented in unit tests
+* WIP: switching to dask
+* WIP: train test
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: before convert run emr script to bash with cli
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP: dataset
+* WIP dataset
+* testing build\_publish\_dev
+* WIP starting cli
+* WIP starting cli
+* WIP starting cli
+* WIP starting cli
+* WIP starting cli
+* WIP:packaging
+* incremental unit testing
+* first moto test passing
+* security group with ssh access enabled on partitioning EC2
+* fix naming with single partition
+* large dataset build works
+* base validation implemented with splits
+* WIP: about to start streaming in partitioning
+* base spark model implemented
+* WIP spark model implementation
+* partitioning implemented
+* WIP files decompressed and parsed
+* WIP encoding files during partitioning
+* s3 source copy implemented
+* modify source bucket policy for copy
+* data partition works on small dataset
+* ec2 cheapest instance WIP. still need to filter dedicated instance types
+* emr loads and saves s3. pip3 and python3 work
+* pyspark context available on EMR
+* emr cluster working
+* abstracted and made iam role creation optional - works
+* clean up data ingestion
+* first commit
+* first commit
