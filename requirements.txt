@@ -10,7 +10,6 @@ chardet==4.0.0
 click==8.0.1
 cloudpickle==1.6.0
 dask==2021.7.2
--e git+git@github.com:secrettoad/divina.git@487e56e589c658ea47da52bf8ef6e42959bd5aae#egg=divina
 fsspec==2021.7.0
 idna==3.2
 importlib-metadata==4.6.4
@@ -33,5 +32,6 @@ toolz==0.11.1
 typing-extensions==3.10.0.0
 urllib3==1.26.6
 wrapt==1.12.1
+wheel==0.37.0
 yarl==1.6.3
 zipp==3.5.0
