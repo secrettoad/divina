@@ -275,7 +275,6 @@ def build_dataset_ssh(instance, verbosity, paramiko_key, dataset_directory, data
 
 
 
-
 def get_dataset(vision_definition):
 
     df = dd.read_parquet("{}/{}/data/*".format(vision_definition['dataset_directory'],
