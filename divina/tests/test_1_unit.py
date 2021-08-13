@@ -1,10 +1,10 @@
 import os
 import json
 from unittest.mock import patch, MagicMock
-from ..vision import create_partitioning_ec2, create_modelling_emr, validate_vision_definition
+from ..vision import validate_vision_definition
 from ..train import dask_train
 from ..predict import dask_predict
-from ..dataset import build_dataset, get_dataset
+from ..dataset import build_dataset, get_dataset, create_partitioning_ec2
 from ..validate import dask_validate
 from ..errors import InvalidDataDefinitionException
 import boto3
@@ -16,6 +16,7 @@ from divina.divina.models.utils import compare_sk_models
 import joblib
 import pandas as pd
 import dask.dataframe as ddf
+from ..aws.utils import create_modelling_emr
 
 
 def test_validate_vision_definition(vd_no_target, vd_time_horizons_not_list, vd_time_validation_splits_not_list,
@@ -45,8 +46,7 @@ def test_dataset_infrastructure(s3_fs, test_df_1, vision_ec2, divina_test_versio
     with patch('boto3.client'):
         mock_vision_pricing = boto3.client('pricing')
     mock_vision_pricing.get_products.return_value = ec2_pricing_stub
-    instance, paramiko_key = create_partitioning_ec2(s3_fs, ec2_client=vision_ec2,
-                                                     pricing_client=mock_vision_pricing,
+    instance, paramiko_key = create_partitioning_ec2(s3_fs, ec2_client=vision_ec2, pricing_client=mock_vision_pricing,
                                                      data_directory=os.environ['DATA_BUCKET'])
     assert (all([x in instance for x in ['ImageId', 'InstanceId']]) and instance['State']['Name'] == 'running' and type(
         paramiko_key) == paramiko.rsakey.RSAKey)

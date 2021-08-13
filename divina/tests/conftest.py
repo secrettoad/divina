@@ -9,11 +9,13 @@ from dask.distributed import Client
 import pathlib
 import os
 import s3fs
+from unittest.mock import patch
 
 
+@patch.dict(os.environ, {'AWS_SHARED_CREDENTIALS_FILE': '~/.aws/credentials'})
 @pytest.fixture()
 def divina_session():
-    return boto3.Session(profile_name='divina-test')
+    return boto3.Session()
 
 
 @pytest.fixture(autouse=True)
