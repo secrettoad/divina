@@ -3,7 +3,6 @@ import json
 from pkg_resources import resource_filename
 import os
 import backoff
-import paramiko
 import subprocess
 
 
@@ -138,10 +137,3 @@ def create_vision_role(vision_session):
                                               'divina-vision-role-policy', 'role for coysu divina')
 
     return vision_role
-
-
-@backoff.on_exception(backoff.expo,
-                      paramiko.client.NoValidConnectionsError)
-def connect_ssh(client, hostname, username, pkey):
-    client.connect(hostname=hostname, username=username, pkey=pkey)
-    return client

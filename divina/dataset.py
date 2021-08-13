@@ -10,9 +10,8 @@ import shutil
 from .errors import FileTypeNotSupported
 import pathlib
 import math
-import paramiko
 from .aws import aws_backoff
-from .aws.utils import unnest_ec2_price, ec2_pricing, connect_ssh
+from .aws.utils import unnest_ec2_price, ec2_pricing
 from botocore.exceptions import WaiterError
 import dask.dataframe as dd
 
@@ -193,8 +192,8 @@ def _build(s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_clien
     try:
         running_waiter = aws_backoff.get_ec2_waiter('instance_running', ec2_client=ec2_client)
         running_waiter.wait(InstanceIds=[instance['InstanceId']])
-        stopped_waiter = aws_backoff.get_ec2_waiter('instance_stopped', ec2_client=ec2_client)
-        stopped_waiter.wait(InstanceIds=[instance['InstanceId']])
+        terminated_waiter = aws_backoff.get_ec2_waiter('instance_terminated', ec2_client=ec2_client)
+        terminated_waiter.wait(InstanceIds=[instance['InstanceId']])
         response = aws_backoff.describe_instances(instance_ids=[instance['InstanceId']],
                                                   ec2_client=ec2_client)
         instance = response['Reservations'][0]['Instances'][0]
@@ -202,7 +201,7 @@ def _build(s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_clien
             aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
     except WaiterError as e:
         instance = e.last_response['Reservations'][0]['Instances'][0]
-        if instance['State']['Name'] == 'terminated':
+        if instance['State']['Name'] == 'stopped':
             ###TODO implement EC2 logging
             raise Exception('Remote error during dataset build. Instance terminated. Log file can be found here: ')
         else:
@@ -210,36 +209,6 @@ def _build(s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_clien
                 aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
             raise e
     return instance
-
-
-def build_dataset_ssh(instance, verbosity, paramiko_key, dataset_directory, dataset_id, branch):
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-    connect_ssh(client, hostname=instance['PublicIpAddress'], username="ec2-user", pkey=paramiko_key)
-    commands = ['sudo echo \'{}\' > /home/ec2-user/environment.json'.format(
-        json.dumps({'ENVIRONMENT': {'DATASET_ID': dataset_id,
-                                    'DATASET_BUCKET': dataset_directory}})),
-        'sudo yum install unzip -y', 'sudo yum install python3 -y', 'sudo yum install gcc -y',
-        'sudo yum install git -y',
-        'sudo python3 -m pip install git+https://git@github.com/secrettoad/divina.git@{}'.format(
-            branch),
-        'sudo chown -R ec2-user /home/ec2-user',
-        'divina build-dataset']
-    for cmd in commands:
-        stdin, stdout, stderr = client.exec_command(cmd)
-        if verbosity > 0:
-            for line in stdout:
-                sys.stdout.write(line)
-        exit_status = stdout.channel.recv_exit_status()
-        if not exit_status == 0:
-            if verbosity > 2:
-                for line in stderr:
-                    sys.stderr.write(line)
-            client.close()
-            return False
-    client.close()
-    return True
 
 
 def get_dataset(vision_definition):
