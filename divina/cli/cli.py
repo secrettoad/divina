@@ -1,13 +1,21 @@
 import click
 from .. import predict, train, validate
 import pkg_resources
-from ..dataset import create_partitioning_ec2
+from ..dataset import _build
 import boto3
-from ..dataset import build_dataset_ssh
 from ..aws import aws_backoff
 import s3fs
-from botocore.exceptions import ProfileNotFound
-import sys
+
+
+def cli_build(dataset_name, write_path, read_path, ec2_keypair_name=None, keep_instances_alive=False):
+    session = boto3.session.Session()
+    s3_fs = s3fs.S3FileSystem()
+
+    ec2_client = session.client('ec2', 'us-east-2')
+    pricing_client = session.client('pricing', region_name='us-east-1')
+
+    _build(dataset_name=dataset_name, write_path=write_path, ec2_client=ec2_client, pricing_client=pricing_client, ec2_keypair_name=ec2_keypair_name,
+                                                     keep_instances_alive=keep_instances_alive, read_path=read_path, s3_fs=s3_fs)
 
 
 @click.group()
@@ -24,35 +32,19 @@ def forecast(import_bucket, divina_version=pkg_resources.get_distribution('divin
 def dataset():
     pass
 
+
 @click.option('--verbose', '-v', is_flag=True, help="Print more output.")
 @click.argument('ec2_key_path', default=None, required=False)
 @click.argument('keep_instances_alive', default=False, required=False)
-@click.argument('branch', default='main', required=False)
 @click.argument('region', default='us-east-2', required=False)
 @click.argument('dataset_name')
 @click.argument('write_path')
 @click.argument('read_path')
 @dataset.command()
-def build(dataset_name, write_path, read_path, ec2_key_path, verbose, keep_instances_alive, branch, region):
-    if verbose:
-        verbose = 3
-    try:
-        session = boto3.session.Session(profile_name='divina', region_name=region)
-        s3_fs = s3fs.S3FileSystem(profile='divina')
-    except ProfileNotFound as e:
-        sys.stdout.write('"divina" aws profile not found in ~/.aws/.credentials. check out the instructions here on how to add your credentials: TODO')
-        quit()
-
-    ec2_client = session.client('ec2')
-
-    instance, paramiko_key = create_partitioning_ec2(vision_session=session, ec2_keyfile=ec2_key_path,
-                                                     keep_instances_alive=keep_instances_alive, data_directory=read_path, s3_fs=s3_fs)
-    if not build_dataset_ssh(instance=instance, verbosity=verbose, paramiko_key=paramiko_key, dataset_directory=write_path, dataset_id=dataset_name, branch=branch):
-        if not keep_instances_alive:
-            aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
-        raise Exception('Dataset build failed. For more information, use verbosity=3')
-    if not keep_instances_alive:
-        aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
+def build(dataset_name, write_path, read_path, ec2_keypair_name, verbose, keep_instances_alive):
+    if not read_path[:5] == 's3://' and write_path[:5] == 's3://':
+        raise Exception('both read_path and write_path must begin with \'s3://\'')
+    cli_build(dataset_name=dataset_name, write_path=write_path, read_path=read_path, ec2_keypair_name=ec2_keypair_name, keep_instances_alive=keep_instances_alive)
 
 
 @click.argument('s3_endpoint')
