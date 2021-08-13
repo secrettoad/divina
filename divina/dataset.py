@@ -274,7 +274,6 @@ def build_dataset_ssh(instance, verbosity, paramiko_key, dataset_directory, data
     return True
 
 
-
 def get_dataset(vision_definition):
 
     df = dd.read_parquet("{}/{}/data/*".format(vision_definition['dataset_directory'],
@@ -295,3 +294,4 @@ def get_dataset(vision_definition):
             profile = dd.concat([profile, join_profile], axis=1)
 
     return df, profile
+
