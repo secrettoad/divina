@@ -1,7 +1,6 @@
 from unittest.mock import patch
 import os
 from ..dataset import create_partitioning_ec2
-import paramiko
 from ..aws.aws_backoff import stop_instances
 from ..dataset import build_dataset
 from dask import dataframe as ddf
@@ -23,12 +22,11 @@ def test_dataset_infrastructure(s3_fs, test_df_1, divina_session, divina_test_ve
         os.path.join(os.environ['DATA_BUCKET'], 'test_df_1.csv'), index=False)
     ec2 = divina_session.client('ec2', 'us-east-2')
     pricing_client = divina_session.client('pricing', region_name='us-east-1')
-    instance, paramiko_key = create_partitioning_ec2(s3_fs=s3_fs, ec2_client=ec2, pricing_client=pricing_client,
+    instance = create_partitioning_ec2(s3_fs=s3_fs, ec2_client=ec2, pricing_client=pricing_client,
                                                      data_directory=os.environ['DATA_BUCKET'])
     try:
         assert (all([x in instance for x in ['ImageId', 'InstanceId']]) and instance['State'][
-            'Name'] == 'running' and type(
-            paramiko_key) == paramiko.rsakey.RSAKey)
+            'Name'] == 'running')
     finally:
         stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2)
 
