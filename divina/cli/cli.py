@@ -7,14 +7,14 @@ from ..aws import aws_backoff
 import s3fs
 
 
-def cli_build(dataset_name, write_path, read_path, ec2_keypair_name=None, keep_instances_alive=False):
+def cli_build(dataset_name, write_path, read_path, commit, ec2_keypair_name=None, keep_instances_alive=False):
     session = boto3.session.Session()
     s3_fs = s3fs.S3FileSystem()
 
     ec2_client = session.client('ec2', 'us-east-2')
     pricing_client = session.client('pricing', region_name='us-east-1')
 
-    _build(dataset_name=dataset_name, write_path=write_path, ec2_client=ec2_client, pricing_client=pricing_client, ec2_keypair_name=ec2_keypair_name,
+    _build(commit=commit, dataset_name=dataset_name, write_path=write_path, ec2_client=ec2_client, pricing_client=pricing_client, ec2_keypair_name=ec2_keypair_name,
                                                      keep_instances_alive=keep_instances_alive, read_path=read_path, s3_fs=s3_fs)
 
 
@@ -33,18 +33,17 @@ def dataset():
     pass
 
 
-@click.option('--verbose', '-v', is_flag=True, help="Print more output.")
-@click.argument('ec2_key_path', default=None, required=False)
+@click.argument('ec2_keypair_name', default=None, required=False)
 @click.argument('keep_instances_alive', default=False, required=False)
-@click.argument('region', default='us-east-2', required=False)
+@click.argument('commit', default='main', required=False)
 @click.argument('dataset_name')
 @click.argument('write_path')
 @click.argument('read_path')
 @dataset.command()
-def build(dataset_name, write_path, read_path, ec2_keypair_name, verbose, keep_instances_alive):
+def build(dataset_name, write_path, read_path, ec2_keypair_name, keep_instances_alive, commit):
     if not read_path[:5] == 's3://' and write_path[:5] == 's3://':
         raise Exception('both read_path and write_path must begin with \'s3://\'')
-    cli_build(dataset_name=dataset_name, write_path=write_path, read_path=read_path, ec2_keypair_name=ec2_keypair_name, keep_instances_alive=keep_instances_alive)
+    cli_build(dataset_name=dataset_name, write_path=write_path, read_path=read_path, ec2_keypair_name=ec2_keypair_name, keep_instances_alive=keep_instances_alive, commit=commit)
 
 
 @click.argument('s3_endpoint')

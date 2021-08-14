@@ -120,8 +120,8 @@ def build_dataset(s3_fs, dataset_directory, data_directory, dataset_id, tmp_dir=
     shutil.rmtree('{}'.format(tmp_dir))
 
 
-def _build(s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_client, ec2_keypair_name=None,
-           keep_instances_alive=False, branch='main'):
+def _build(commit, s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_client, ec2_keypair_name=None,
+           keep_instances_alive=False):
     file_sizes = []
     keys = []
     if read_path[:5] == 's3://':
@@ -165,7 +165,7 @@ def _build(s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_clien
                sudo python3 -m pip install git+https://git@github.com/secrettoad/divina.git@{};
                sudo chown -R ec2-user /home/ec2-user;
                divina dataset build {} {} {} ) && sudo shutdown now; ) || sudo shutdown now -h;'''.format(
-        branch, read_path, write_path, dataset_name,
+        commit, read_path, write_path, dataset_name,
     )
     userdata = ''
 
