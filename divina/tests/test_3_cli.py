@@ -55,5 +55,5 @@ def test_build_dataset_small(s3_fs, test_df_1, git_sha):
 @patch.dict(os.environ, {"VISION_ID": 'test1'})
 @patch.dict(os.environ, {"VISION_BUCKET": "s3://divina-test/vision"})
 def test_train_vision_small(s3_fs, test_df_1, git_sha, test_vd_1):
-    cli_train_vision(vision_definition=test_vd_1, write_path=os.environ['VISION_ID'], vision_name=os.environ['VISION_ID'], keep_instances_alive=False, local=False, dask_address=None, commit=git_sha, ec2_keypair_name='divina_ec2_key')
+    cli_train_vision(vision_definition=test_vd_1['vision_definition'], write_path=os.environ['VISION_ID'], vision_name=os.environ['VISION_ID'], keep_instances_alive=False, local=False, dask_address=None, commit=git_sha, ec2_keypair_name='divina_ec2_key')
     assert(1 == 1)
