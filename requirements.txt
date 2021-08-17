@@ -35,3 +35,4 @@ wrapt==1.12.1
 wheel==0.37.0
 yarl==1.6.3
 zipp==3.5.0
+pyarrow

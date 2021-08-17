@@ -1,5 +1,4 @@
 import sys
-import importlib
 import os
 import dask.dataframe as dd
 import joblib
@@ -8,9 +7,7 @@ from .dataset import get_dataset
 import pathlib
 
 
-def dask_train(dask_client, dask_model, vision_definition, divina_directory, vision_id):
-    s3fs = importlib.import_module('s3fs')
-    s3 = s3fs.S3FileSystem()
+def dask_train(s3_fs, dask_client, dask_model, vision_definition, divina_directory, vision_id):
 
     df, profile = get_dataset(vision_definition)
 

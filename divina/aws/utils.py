@@ -2,7 +2,6 @@ from .aws_backoff import *
 import json
 from pkg_resources import resource_filename
 import os
-import backoff
 import subprocess
 
 
@@ -136,4 +135,13 @@ def create_vision_role(vision_session):
     vision_role = create_role(vision_iam, divina_policy, vision_role_trust_policy, 'divina-vision-role',
                                               'divina-vision-role-policy', 'role for coysu divina')
 
-    return vision_role
+    vision_instance_profile = vision_iam.create_instance_profile(
+        InstanceProfileName='divina-vision-instance-profile'
+    )
+
+    vision_iam.add_role_to_instance_profile(
+        InstanceProfileName='divina-vision-instance-profile',
+        RoleName='divina-vision-role'
+    )
+
+    return vision_role, vision_instance_profile
