@@ -29,7 +29,7 @@ def cli_train_vision(vision_definition, write_path, vision_name, commit='main', 
             dask_train(s3_fs=s3_fs, dask_client=dask_client, dask_model=dask_model, vision_definition=vision_definition,
                        divina_directory=write_path, vision_id=vision_name)
     elif not dask_address:
-        with EC2Cluster(key_name=ec2_keypair_name) as cluster:
+        with EC2Cluster() as cluster:
             with Client(cluster) as dask_client:
                 dask_train(s3_fs=s3_fs, dask_client=dask_client, dask_model=dask_model, vision_definition=vision_definition, divina_directory=write_path, vision_id=vision_name)
     else:
