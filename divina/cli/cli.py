@@ -3,12 +3,11 @@ from .. import predict, train, validate
 from ..dataset import _build
 import boto3
 from ..train import dask_train
-from ..aws.utils import create_modelling_emr
 import s3fs
 from dask_cloudprovider.aws import EC2Cluster
 from dask.distributed import Client
 from dask_ml.linear_model import LinearRegression
-
+import pyarrow
 
 def cli_build_dataset(dataset_name, write_path, read_path, commit='main', ec2_keypair_name=None, keep_instances_alive=False, local=False):
     session = boto3.session.Session()
@@ -29,10 +28,18 @@ def cli_train_vision(vision_definition, write_path, vision_name, commit='main', 
             dask_train(s3_fs=s3_fs, dask_client=dask_client, dask_model=dask_model, vision_definition=vision_definition,
                        divina_directory=write_path, vision_id=vision_name)
     elif not dask_address:
-        with EC2Cluster(key_name=ec2_keypair_name, security=False) as cluster:
+        if not keep_instances_alive:
+            with EC2Cluster(key_name=ec2_keypair_name, security=False) as cluster:
+                cluster.adapt(minimum=0, maximum=10)
+                with Client(cluster) as dask_client:
+                    #dask_client.run(os.system("python3 -m pip install "))
+                    dask_train(s3_fs=s3_fs, dask_client=dask_client, dask_model=dask_model, vision_definition=vision_definition, divina_directory=write_path, vision_id=vision_name)
+        else:
+            cluster = EC2Cluster(key_name=ec2_keypair_name, security=False)
             cluster.adapt(minimum=0, maximum=10)
             with Client(cluster) as dask_client:
                 dask_train(s3_fs=s3_fs, dask_client=dask_client, dask_model=dask_model, vision_definition=vision_definition, divina_directory=write_path, vision_id=vision_name)
+
     else:
         with Client(dask_address) as dask_client:
                 dask_train(s3_fs=s3_fs, dask_client=dask_client, dask_model=dask_model, vision_definition=vision_definition, divina_directory=write_path, vision_id=vision_name)
