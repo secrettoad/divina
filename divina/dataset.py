@@ -120,8 +120,8 @@ def build_dataset(s3_fs, dataset_directory, data_directory, dataset_id, tmp_dir=
     shutil.rmtree('{}'.format(tmp_dir))
 
 
-def _build(s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_client, ec2_keypair_name=None,
-           keep_instances_alive=False, branch='main'):
+def build_remote(commit, s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_client, ec2_keypair_name=None,
+           keep_instances_alive=False, partition_dimensions=None):
     file_sizes = []
     keys = []
     if read_path[:5] == 's3://':
@@ -159,15 +159,14 @@ def _build(s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_clien
     partitioning_instance_type = eligible_instance_types[min(range(len(eligible_instance_types)), key=lambda index:
     eligible_instance_types[index]['Hrs_USD'])]
 
+    ###TODO start here test --local locally
     userdata = '''#!/bin/bash
-               ( ( sudo yum install python3 -y;
-               sudo yum install git -y;
-               sudo python3 -m pip install git+https://git@github.com/secrettoad/divina.git@{};
-               sudo chown -R ec2-user /home/ec2-user;
-               divina dataset build {} {} {} ) && sudo shutdown now; ) || sudo shutdown now -h;'''.format(
-        branch, read_path, write_path, dataset_name,
+                       ( ( sudo yum install python3 -y;
+                       sudo yum install git -y;
+                       sudo python3 -m pip install git+https://git@github.com/secrettoad/divina.git@{};
+                       divina dataset build {} {} {} --local) && sudo shutdown now; ) || sudo shutdown now -h;'''.format(
+        commit, read_path, write_path, dataset_name,
     )
-    userdata = ''
 
     if not ec2_keypair_name:
         instance = ec2_client.run_instances(ImageId='ami-0b223f209b6d4a220', MinCount=1, MaxCount=1,
@@ -192,8 +191,8 @@ def _build(s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_clien
     try:
         running_waiter = aws_backoff.get_ec2_waiter('instance_running', ec2_client=ec2_client)
         running_waiter.wait(InstanceIds=[instance['InstanceId']])
-        terminated_waiter = aws_backoff.get_ec2_waiter('instance_terminated', ec2_client=ec2_client)
-        terminated_waiter.wait(InstanceIds=[instance['InstanceId']])
+        stopped_waiter = aws_backoff.get_ec2_waiter('instance_stopped', ec2_client=ec2_client)
+        stopped_waiter.wait(InstanceIds=[instance['InstanceId']])
         response = aws_backoff.describe_instances(instance_ids=[instance['InstanceId']],
                                                   ec2_client=ec2_client)
         instance = response['Reservations'][0]['Instances'][0]
@@ -201,15 +200,25 @@ def _build(s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_clien
             aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
     except WaiterError as e:
         instance = e.last_response['Reservations'][0]['Instances'][0]
-        if instance['State']['Name'] == 'stopped':
+        if instance['State']['Name'] == 'shutting-down':
             ###TODO implement EC2 logging
             raise Exception('Remote error during dataset build. Instance terminated. Log file can be found here: ')
         else:
-            if not keep_instances_alive:
-                aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
             raise e
+    finally:
+        if not keep_instances_alive:
+            aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
     return instance
 
+def _build(commit, s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_client, ec2_keypair_name=None,
+           keep_instances_alive=False, local=False, partition_dimensions=None):
+
+    if not local:
+        build_remote(commit=commit, s3_fs=s3_fs, read_path=read_path, write_path=write_path, dataset_name=dataset_name, ec2_client=ec2_client, pricing_client=pricing_client, ec2_keypair_name=ec2_keypair_name,
+           keep_instances_alive=keep_instances_alive, partition_dimensions=partition_dimensions)
+
+    else:
+        build_dataset(s3_fs=s3_fs, dataset_directory=write_path, data_directory=read_path, dataset_id=dataset_name, partition_dimensions=partition_dimensions)
 
 def get_dataset(vision_definition):
     df = dd.read_parquet("{}/{}/data/*".format(vision_definition['dataset_directory'],

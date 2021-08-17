@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 from ..vision import validate_vision_definition
 from ..train import dask_train
 from ..predict import dask_predict
-from ..dataset import build_dataset, get_dataset, create_partitioning_ec2
+from ..dataset import build_dataset, get_dataset, build_remote
 from ..validate import dask_validate
 from ..errors import InvalidDataDefinitionException
 import boto3
@@ -34,9 +34,10 @@ def test_validate_vision_definition(vd_no_target, vd_time_horizons_not_list, vd_
 @patch('s3fs.S3FileSystem.open', open)
 @patch('s3fs.S3FileSystem.ls', lambda s, x: [os.path.join(x, y) for y in os.listdir(x)])
 @patch('s3fs.S3FileSystem.info', lambda s, x: {'size': os.path.getsize(x)})
-@patch.dict(os.environ, {"VISION_ID": "test1"})
+@patch.dict(os.environ, {"DATASET_ID": "test1"})
 @patch.dict(os.environ, {"DATA_BUCKET": "divina-test/data"})
-def test_dataset_infrastructure(s3_fs, test_df_1, vision_ec2, divina_test_version, ec2_pricing_stub,
+@patch.dict(os.environ, {"DATASET_BUCKET": "divina-test/dataset"})
+def test_dataset_build_remote(s3_fs, test_df_1, vision_ec2, divina_test_version, ec2_pricing_stub,
                                 account_number):
     pathlib.Path(
         os.environ['DATA_BUCKET']).mkdir(
@@ -45,11 +46,16 @@ def test_dataset_infrastructure(s3_fs, test_df_1, vision_ec2, divina_test_versio
         os.path.join(os.environ['DATA_BUCKET'], 'test_df_1.csv'), index=False)
     with patch('boto3.client'):
         mock_vision_pricing = boto3.client('pricing')
+    mock_waiter = MagicMock(spec=["wait"])
+    mock_waiter.wait = None
+    vision_ec2.get_waiter = mock_waiter
     mock_vision_pricing.get_products.return_value = ec2_pricing_stub
-    instance, paramiko_key = create_partitioning_ec2(s3_fs, ec2_client=vision_ec2, pricing_client=mock_vision_pricing,
-                                                     data_directory=os.environ['DATA_BUCKET'])
-    assert (all([x in instance for x in ['ImageId', 'InstanceId']]) and instance['State']['Name'] == 'running' and type(
-        paramiko_key) == paramiko.rsakey.RSAKey)
+    instance = build_remote(commit='test-dummy', s3_fs=s3_fs, read_path=os.environ['DATA_BUCKET'],
+                                          write_path=os.environ["DATASET_BUCKET"],
+                                          dataset_name=os.environ["DATASET_ID"], ec2_client=vision_ec2,
+                                          pricing_client=mock_vision_pricing
+                                          )
+    assert (all([x in instance for x in ['ImageId', 'InstanceId']]))
 
 
 @patch('s3fs.S3FileSystem.open', open)
@@ -67,7 +73,8 @@ def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
         pathlib.Path(
             os.environ['DATASET_BUCKET'], os.environ['DATASET_ID']).mkdir(
             parents=True, exist_ok=True)
-        build_dataset(s3_fs=s3_fs, dataset_directory=os.environ['DATASET_BUCKET'], data_directory=os.environ['DATA_BUCKET'],
+        build_dataset(s3_fs=s3_fs, dataset_directory=os.environ['DATASET_BUCKET'],
+                      data_directory=os.environ['DATA_BUCKET'],
                       dataset_id=os.environ['DATASET_ID'])
 
         '''Uncomment below to generate stub datasets'''
@@ -75,7 +82,6 @@ def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
             os.path.join('stubs',
                          '{}'.format(os.environ['DATASET_ID']))).mkdir(
             parents=True, exist_ok=True)
-
 
         shutil.copytree(
             os.path.join(os.environ['DATASET_BUCKET'], '{}'.format(os.environ['DATASET_ID'])), os.path.join('stubs',
@@ -120,19 +126,23 @@ def test_dask_train(test_df_1, test_vd_1, dask_client, account_number):
                          'models')).mkdir(
             parents=True, exist_ok=True)
         pathlib.Path(
-            os.path.join(test_vd_1['vision_definition']['dataset_directory'], '{}'.format(test_vd_1['vision_definition']['dataset_id']),
+            os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                         '{}'.format(test_vd_1['vision_definition']['dataset_id']),
                          'data')).mkdir(
             parents=True, exist_ok=True)
         pathlib.Path(
-            os.path.join(test_vd_1['vision_definition']['dataset_directory'], '{}'.format(test_vd_1['vision_definition']['dataset_id']),
+            os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                         '{}'.format(test_vd_1['vision_definition']['dataset_id']),
                          'profile')).mkdir(
             parents=True, exist_ok=True)
-        ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(os.path.join(test_vd_1['vision_definition']['dataset_directory'],
-                                                                            test_vd_1['vision_definition']['dataset_id'], 'data'))
-        ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(os.path.join(test_vd_1['vision_definition']['dataset_directory'],
-                                                                                       test_vd_1['vision_definition'][
-                                                                                           'dataset_id'],
-                                                                                       'profile'))
+        ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
+            os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                         test_vd_1['vision_definition']['dataset_id'], 'data'))
+        ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(
+            os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                         test_vd_1['vision_definition'][
+                             'dataset_id'],
+                         'profile'))
         models = dask_train(dask_client=dask_client, dask_model=LinearRegression(),
                             vision_definition=test_vd_1['vision_definition'],
                             vision_id=os.environ['VISION_ID'], divina_directory=os.environ['VISION_BUCKET'])
@@ -175,19 +185,24 @@ def test_get_composite_dataset(test_df_1, test_df_2, test_vd_2,
                                  path)).mkdir(
                     parents=True, exist_ok=True)
             pathlib.Path(
-                os.path.join(test_vd_2['vision_definition']['dataset_directory'], '{}'.format(test_vd_2['vision_definition']['dataset_id']),
+                os.path.join(test_vd_2['vision_definition']['dataset_directory'],
+                             '{}'.format(test_vd_2['vision_definition']['dataset_id']),
                              path)).mkdir(
                 parents=True, exist_ok=True)
-        ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(os.path.join(test_vd_2['vision_definition']['dataset_directory'],
-                                                                            test_vd_2['vision_definition']['dataset_id'], 'data'))
-        ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(os.path.join(test_vd_2['vision_definition']['dataset_directory'],
-                                                                                       test_vd_2['vision_definition']['dataset_id'],
-                                                                                       'profile'))
-        ddf.from_pandas(test_df_2, chunksize=10000).to_parquet(os.path.join(test_vd_2['vision_definition']['joins'][0]['dataset_directory'],
-                                                                            test_vd_2['vision_definition']['joins'][0]['dataset_id'], 'data'))
-        ddf.from_pandas(test_df_2.describe(), chunksize=10000).to_parquet(os.path.join(test_vd_2['vision_definition']['joins'][0]['dataset_directory'],
-                                                                                       test_vd_2['vision_definition']['joins'][0]['dataset_id'],
-                                                                                       'profile'))
+        ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
+            os.path.join(test_vd_2['vision_definition']['dataset_directory'],
+                         test_vd_2['vision_definition']['dataset_id'], 'data'))
+        ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(
+            os.path.join(test_vd_2['vision_definition']['dataset_directory'],
+                         test_vd_2['vision_definition']['dataset_id'],
+                         'profile'))
+        ddf.from_pandas(test_df_2, chunksize=10000).to_parquet(
+            os.path.join(test_vd_2['vision_definition']['joins'][0]['dataset_directory'],
+                         test_vd_2['vision_definition']['joins'][0]['dataset_id'], 'data'))
+        ddf.from_pandas(test_df_2.describe(), chunksize=10000).to_parquet(
+            os.path.join(test_vd_2['vision_definition']['joins'][0]['dataset_directory'],
+                         test_vd_2['vision_definition']['joins'][0]['dataset_id'],
+                         'profile'))
         df, profile = get_dataset(test_vd_2['vision_definition'])
 
         pd.testing.assert_frame_equal(df.compute(), test_composite_df_1)
@@ -203,20 +218,23 @@ def test_get_composite_dataset(test_df_1, test_df_2, test_vd_2,
 def test_dask_predict(s3_fs, dask_client, test_df_1, test_vd_1, test_model_1, account_number):
     try:
         pathlib.Path(
-            os.path.join(test_vd_1['vision_definition']['dataset_directory'], test_vd_1['vision_definition']['dataset_id'], 'data')).mkdir(
+            os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                         test_vd_1['vision_definition']['dataset_id'], 'data')).mkdir(
             parents=True, exist_ok=True)
         pathlib.Path(
             os.path.join(os.environ['VISION_BUCKET'], os.environ['VISION_ID'],
                          'models')).mkdir(
             parents=True, exist_ok=True)
-        ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(os.path.join(test_vd_1['vision_definition']['dataset_directory'],
-                                                                            test_vd_1['vision_definition']['dataset_id'], 'data'))
-        ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(os.path.join(test_vd_1['vision_definition']['dataset_directory'],
-                                                                                       test_vd_1['vision_definition']['dataset_id'],
-                                                                                       'profile'))
+        ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
+            os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                         test_vd_1['vision_definition']['dataset_id'], 'data'))
+        ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(
+            os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                         test_vd_1['vision_definition']['dataset_id'],
+                         'profile'))
         shutil.copy2(os.path.join('stubs', os.environ['VISION_ID'],
                                   'models', 's-19700101-000008_h-1'), os.path.join(os.environ['VISION_BUCKET'],
-                                                                                       os.environ['VISION_ID'],
+                                                                                   os.environ['VISION_ID'],
                                                                                    'models', 's-19700101-000008_h-1'))
         with open(os.path.join(os.environ['VISION_BUCKET'], os.environ['VISION_ID'],
                                'vision_definition.json'), 'w+') as f:
@@ -235,7 +253,7 @@ def test_dask_predict(s3_fs, dask_client, test_df_1, test_vd_1, test_model_1, ac
             os.path.join(os.environ['VISION_BUCKET'], os.environ['VISION_ID'],
                          'predictions', 's-19700101-000008'), os.path.join('stubs',
 
-                                                                               os.environ['VISION_ID'],
+                                                                           os.environ['VISION_ID'],
                                                                            'predictions', 's-19700101-000008'),
             dirs_exist_ok=True)
 
@@ -258,13 +276,16 @@ def test_dask_predict(s3_fs, dask_client, test_df_1, test_vd_1, test_model_1, ac
 def test_dask_validate(s3_fs, test_vd_1, test_df_1, test_metrics_1, account_number, dask_client):
     try:
         pathlib.Path(
-            os.path.join(test_vd_1['vision_definition']['dataset_directory'], test_vd_1['vision_definition']['dataset_id'], 'data')).mkdir(
+            os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                         test_vd_1['vision_definition']['dataset_id'], 'data')).mkdir(
             parents=True, exist_ok=True)
-        ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(os.path.join(test_vd_1['vision_definition']['dataset_directory'],
-                                                                            test_vd_1['vision_definition']['dataset_id'], 'data'))
-        ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(os.path.join(test_vd_1['vision_definition']['dataset_directory'],
-                                                                                       test_vd_1['vision_definition']['dataset_id'],
-                                                                                       'profile'))
+        ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
+            os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                         test_vd_1['vision_definition']['dataset_id'], 'data'))
+        ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(
+            os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                         test_vd_1['vision_definition']['dataset_id'],
+                         'profile'))
         pathlib.Path(
             os.path.join(os.environ['VISION_BUCKET'], os.environ['VISION_ID'],
                          'predictions')).mkdir(
@@ -273,16 +294,18 @@ def test_dask_validate(s3_fs, test_vd_1, test_df_1, test_metrics_1, account_numb
         shutil.copytree(os.path.join('stubs', os.environ['VISION_ID'],
                                      'predictions', 's-19700101-000008'), os.path.join(os.environ['VISION_BUCKET'],
 
-                                                                                           os.environ['VISION_ID'],
+                                                                                       os.environ['VISION_ID'],
                                                                                        'predictions',
                                                                                        's-19700101-000008'))
 
-        ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(os.path.join(test_vd_1['vision_definition']['dataset_directory'],
-                                                                            '{}/data'.format(
-                                                                                test_vd_1['vision_definition']['dataset_id'])))
-        ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(os.path.join(test_vd_1['vision_definition']['dataset_directory'],
-                                                                                       test_vd_1['vision_definition']['dataset_id'],
-                                                                                       'profile'))
+        ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
+            os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                         '{}/data'.format(
+                             test_vd_1['vision_definition']['dataset_id'])))
+        ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(
+            os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                         test_vd_1['vision_definition']['dataset_id'],
+                         'profile'))
 
         dask_validate(s3_fs=s3_fs, dask_client=dask_client, vision_definition=test_vd_1['vision_definition'],
                       vision_id=os.environ['VISION_ID'],

@@ -1,0 +1,22 @@
+Metadata-Version: 2.1
+Name: divina
+Version: 0.0.1.dev39
+Summary: Package for causal, scalable forecasting
+Home-page: www.coysu.com
+Author: Coysu Consulting
+Author-email: john@coysu.com
+License: BSD-2
+Description: 
+        
+        
+Keywords: setup,distutils
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Console
+Classifier: Environment :: AWS
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Information Technology
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Provides-Extra: testing
+Provides-Extra: dataset

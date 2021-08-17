@@ -9,7 +9,8 @@ from divina.divina.aws import aws_backoff
 import backoff
 from .errors import InvalidDataDefinitionException
 import pathlib
-from .aws.utils import create_emr_roles, create_modelling_emr, run_command_emr
+from .aws.utils import create_emr_roles, create_modelling_emr, run_command_emr, create_vision_role
+from .dataset import _build
 
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
@@ -34,34 +35,34 @@ def validate_vision_definition(vision_definition):
 
 def create_vision(s3_fs, divina_directory,
                   worker_profile='EMR_EC2_DefaultRole',
-                  driver_role='EMR_DefaultRole', region='us-east-2', ec2_keyfile=None, vision_definition=None,
-                  keep_instances_alive=False, verbosity=0):
+                  driver_role='EMR_DefaultRole', region='us-east-2', ec2_keypair_name=None, vision_definition=None,
+                  keep_instances_alive=False, verbosity=0, commit='main'):
     os.environ['VISION_ID'] = str(round(datetime.datetime.now().timestamp()))
     os.environ['DIVINA_BUCKET'] = 'coysu-divina-prototype-visions'
 
     sys.stdout.write('Authenticating to the cloud...\n')
-    try:
-        vision_session = boto3.session.Session(profile_name='divina', region_name=region)
-    except:
-        raise Exception('No AWS profile named "divina" found')
+    vision_session = boto3.session.Session(region_name=region)
 
     if not worker_profile and driver_role:
         sys.stdout.write('Creating spark driver and executor cloud roles...\n')
         create_emr_roles(vision_session)
 
-    vision_session = boto3.Session()
-
     with s3_fs.open(pathlib.Path(divina_directory, '{}/vision_definition.json'.format(os.environ['VISION_ID'])), 'w+') as f:
         json.dump(vision_definition, f)
 
-    sys.stdout.write('Building dataset...\n')
+    create_vision_role(vision_session=vision_session)
 
     sys.stdout.write('Creating forecasts...\n')
     emr_client = vision_session.client('emr')
-    emr_cluster = create_modelling_emr(emr_client=emr_client,
-                                       worker_profile=worker_profile, driver_role=driver_role,
-                                       keep_instances_alive=keep_instances_alive,
-                                       ec2_key='vision_{}_ec2_key'.format(os.environ['VISION_ID']))
+    if ec2_keypair_name:
+        emr_cluster = create_modelling_emr(emr_client=emr_client,
+                                           worker_profile=worker_profile, driver_role=driver_role,
+                                           keep_instances_alive=keep_instances_alive,
+                                           ec2_key=ec2_keypair_name)
+    else:
+        emr_cluster = create_modelling_emr(emr_client=emr_client,
+                                           worker_profile=worker_profile, driver_role=driver_role,
+                                           keep_instances_alive=keep_instances_alive)
 
     run_command_emr(emr_client=emr_client, cluster_id=emr_cluster['JobFlowId'],
                     keep_instances_alive=keep_instances_alive,

@@ -1,6 +1,6 @@
 from unittest.mock import patch
 import os
-from ..dataset import create_partitioning_ec2
+from ..dataset import build_remote
 from ..aws.aws_backoff import stop_instances
 from ..dataset import build_dataset
 from dask import dataframe as ddf
@@ -15,18 +15,20 @@ from ..predict import dask_predict
 from ..validate import dask_validate
 
 
-@patch.dict(os.environ, {"VISION_ID": "test1"})
+@patch.dict(os.environ, {"DATASET_ID": "test1"})
 @patch.dict(os.environ, {"DATA_BUCKET": "s3://divina-test/data"})
-def test_dataset_infrastructure(s3_fs, test_df_1, divina_session, divina_test_version):
+@patch.dict(os.environ, {"DATASET_BUCKET": "s3://divina-test/dataset"})
+def test_dataset_build_remote(s3_fs, test_df_1, divina_session, divina_test_version):
     test_df_1.to_csv(
         os.path.join(os.environ['DATA_BUCKET'], 'test_df_1.csv'), index=False)
     ec2 = divina_session.client('ec2', 'us-east-2')
-    pricing_client = divina_session.client('pricing', region_name='us-east-1')
-    instance = create_partitioning_ec2(s3_fs=s3_fs, ec2_client=ec2, pricing_client=pricing_client,
-                                                     data_directory=os.environ['DATA_BUCKET'])
+    pricing = divina_session.client('pricing', region_name='us-east-1')
+    instance = build_remote(commit='test-dummy', s3_fs=s3_fs, read_path=os.environ['DATA_BUCKET'],
+                                          write_path=os.environ["DATASET_BUCKET"],
+                                          dataset_name=os.environ["DATASET_ID"], ec2_client=ec2,
+                                          pricing_client=pricing)
     try:
-        assert (all([x in instance for x in ['ImageId', 'InstanceId']]) and instance['State'][
-            'Name'] == 'running')
+        assert (all([x in instance for x in ['ImageId', 'InstanceId']]))
     finally:
         stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2)
 
@@ -34,7 +36,7 @@ def test_dataset_infrastructure(s3_fs, test_df_1, divina_session, divina_test_ve
 @patch.dict(os.environ, {"DATA_BUCKET": "s3://divina-test/data"})
 @patch.dict(os.environ, {"DATASET_BUCKET": "s3://divina-test/dataset"})
 @patch.dict(os.environ, {"DATASET_ID": "test1"})
-def test_dataset_build(s3_fs, test_df_1):
+def test_dataset_build_local(s3_fs, test_df_1):
     test_df_1.to_csv(
         os.path.join(os.environ['DATA_BUCKET'], 'test_df_1.csv'), index=False)
     build_dataset(s3_fs=s3_fs, dataset_directory=os.environ['DATASET_BUCKET'], data_directory=os.environ['DATA_BUCKET'],
