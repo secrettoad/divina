@@ -20,7 +20,7 @@ def cli_build_dataset(dataset_name, write_path, read_path, commit='main', ec2_ke
                                                      keep_instances_alive=keep_instances_alive, read_path=read_path, s3_fs=s3_fs, local=local)
 
 
-def cli_train_vision(vision_definition, write_path, vision_name, commit='main', ec2_keypair_name=None, keep_instances_alive=False, local=False, dask_address=None):
+def cli_train_vision(vision_definition, write_path, vision_name, ec2_keypair_name=None, keep_instances_alive=False, local=False, dask_address=None):
     s3_fs = s3fs.S3FileSystem()
     dask_model = LinearRegression
     if local:
