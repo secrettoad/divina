@@ -5,7 +5,7 @@ ARG USERNAME=divina
 
 # Apt update & apt install required packages
 # whois: required for mkpasswd
-RUN apt update && apt -y install openssh-server whois && apt install sudo
+RUN apt update && apt install sudo && apt install git && apt install
 
 # Add a non-root user & set password
 RUN useradd -ms /bin/bash $USERNAME
@@ -15,10 +15,7 @@ RUN sudo adduser $USERNAME sudo
 
 # Remove no-needed packages
 RUN apt purge -y whois && apt -y autoremove && apt -y autoclean && apt -y clean
-RUN apt-get update && \
-    apt-get install -y curl \
-    wget \
-    openjdk-11-jdk
+RUN apt-get update
 
 # Change to non-root user
 #USER $USERNAME
@@ -26,16 +23,8 @@ RUN apt-get update && \
 
 # Copy the entrypoint
 COPY entrypoint.sh entrypoint.sh
+COPY requirements.txt requirements.txt
 RUN chmod +x /entrypoint.sh
-
-# Create the ssh directory and authorized_keys file 
-USER $USERNAME
-RUN mkdir /home/$USERNAME/.ssh && touch /home/$USERNAME/.ssh/authorized_keys
-USER root
-
-# Set volumes
-VOLUME /home/$USERNAME/.ssh
-VOLUME /etc/ssh
 
 # Run entrypoint
 CMD ["/entrypoint.sh"]

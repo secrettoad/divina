@@ -29,10 +29,9 @@ def cli_train_vision(vision_definition, write_path, vision_name, commit='main', 
                        divina_directory=write_path, vision_id=vision_name)
     elif not dask_address:
         if not keep_instances_alive:
-            with EC2Cluster(key_name=ec2_keypair_name, security=False) as cluster:
+            with EC2Cluster(key_name=ec2_keypair_name, security=False, docker_image='jhurdle/divina:latest') as cluster:
                 cluster.adapt(minimum=0, maximum=10)
                 with Client(cluster) as dask_client:
-                    #dask_client.run(os.system("python3 -m pip install "))
                     dask_train(s3_fs=s3_fs, dask_client=dask_client, dask_model=dask_model, vision_definition=vision_definition, divina_directory=write_path, vision_id=vision_name)
         else:
             cluster = EC2Cluster(key_name=ec2_keypair_name, security=False)

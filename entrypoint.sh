@@ -14,3 +14,5 @@ service ssh start
 
 # link auth.log to container log
 tail -f /var/log/auth.log
+
+python3 -m pip install -r requirements.txt
