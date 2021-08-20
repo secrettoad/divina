@@ -8,7 +8,6 @@ from ..dataset import build_dataset, get_dataset, build_remote
 from ..validate import dask_validate
 from ..errors import InvalidDataDefinitionException
 import boto3
-import paramiko
 import shutil
 import pathlib
 from dask_ml.linear_model import LinearRegression
@@ -38,7 +37,7 @@ def test_validate_vision_definition(vd_no_target, vd_time_horizons_not_list, vd_
 @patch.dict(os.environ, {"DATA_BUCKET": "divina-test/data"})
 @patch.dict(os.environ, {"DATASET_BUCKET": "divina-test/dataset"})
 def test_dataset_build_remote(s3_fs, test_df_1, vision_ec2, divina_test_version, ec2_pricing_stub,
-                                account_number):
+                              account_number):
     pathlib.Path(
         os.environ['DATA_BUCKET']).mkdir(
         parents=True, exist_ok=True)
@@ -51,17 +50,17 @@ def test_dataset_build_remote(s3_fs, test_df_1, vision_ec2, divina_test_version,
     vision_ec2.get_waiter = mock_waiter
     mock_vision_pricing.get_products.return_value = ec2_pricing_stub
     instance = build_remote(commit='test-dummy', s3_fs=s3_fs, read_path=os.environ['DATA_BUCKET'],
-                                          write_path=os.environ["DATASET_BUCKET"],
-                                          dataset_name=os.environ["DATASET_ID"], ec2_client=vision_ec2,
-                                          pricing_client=mock_vision_pricing
-                                          )
+                            write_path=os.environ["DATASET_BUCKET"],
+                            dataset_name=os.environ["DATASET_ID"], ec2_client=vision_ec2,
+                            pricing_client=mock_vision_pricing
+                            )
     assert (all([x in instance for x in ['ImageId', 'InstanceId']]))
 
 
 @patch('s3fs.S3FileSystem.open', open)
 @patch('s3fs.S3FileSystem.ls', os.listdir)
-@patch.dict(os.environ, {"DATA_BUCKET": "divina-test/data-bucket"})
-@patch.dict(os.environ, {"DATASET_BUCKET": "divina-test/dataset-bucket"})
+@patch.dict(os.environ, {"DATA_BUCKET": "divina-test/data"})
+@patch.dict(os.environ, {"DATASET_BUCKET": "divina-test/dataset"})
 @patch.dict(os.environ, {"DATASET_ID": "test1"})
 def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
     try:
@@ -75,8 +74,8 @@ def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
             parents=True, exist_ok=True)
         build_dataset(s3_fs=s3_fs, dataset_directory=os.environ['DATASET_BUCKET'],
                       data_directory=os.environ['DATA_BUCKET'],
-                      dataset_id=os.environ['DATASET_ID'])
-
+                      dataset_id=os.environ['DATASE'
+                                            'T_ID'])
         '''Uncomment below to generate stub datasets'''
         pathlib.Path(
             os.path.join('stubs',
@@ -143,7 +142,7 @@ def test_dask_train(test_df_1, test_vd_1, dask_client, account_number):
                          test_vd_1['vision_definition'][
                              'dataset_id'],
                          'profile'))
-        models = dask_train(dask_client=dask_client, dask_model=LinearRegression(),
+        models = dask_train(dask_client=dask_client, dask_model=LinearRegression,
                             vision_definition=test_vd_1['vision_definition'],
                             vision_id=os.environ['VISION_ID'], divina_directory=os.environ['VISION_BUCKET'])
         pathlib.Path(
@@ -176,7 +175,7 @@ def test_dask_train(test_df_1, test_vd_1, dask_client, account_number):
 @patch('s3fs.S3FileSystem.open', open)
 @patch('s3fs.S3FileSystem.ls', os.listdir)
 def test_get_composite_dataset(test_df_1, test_df_2, test_vd_2,
-                               test_composite_profile_1, test_composite_df_1, dask_client):
+                               test_composite_profile_1, test_composite_dataset_1, dask_client):
     try:
         for path in ['data', 'profile']:
             for dataset in test_vd_2['vision_definition']['joins']:
@@ -205,7 +204,7 @@ def test_get_composite_dataset(test_df_1, test_df_2, test_vd_2,
                          'profile'))
         df, profile = get_dataset(test_vd_2['vision_definition'])
 
-        pd.testing.assert_frame_equal(df.compute(), test_composite_df_1)
+        pd.testing.assert_frame_equal(df.compute(), test_composite_dataset_1)
         pd.testing.assert_frame_equal(profile.compute(), test_composite_profile_1)
     finally:
         shutil.rmtree(test_vd_2['vision_definition']['dataset_directory'], ignore_errors=True)

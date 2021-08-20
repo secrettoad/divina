@@ -210,6 +210,7 @@ def build_remote(commit, s3_fs, read_path, write_path, dataset_name, ec2_client,
             aws_backoff.stop_instances(instance_ids=[instance['InstanceId']], ec2_client=ec2_client)
     return instance
 
+
 def _build(commit, s3_fs, read_path, write_path, dataset_name, ec2_client, pricing_client, ec2_keypair_name=None,
            keep_instances_alive=False, local=False, partition_dimensions=None):
 
@@ -220,7 +221,9 @@ def _build(commit, s3_fs, read_path, write_path, dataset_name, ec2_client, prici
     else:
         build_dataset(s3_fs=s3_fs, dataset_directory=write_path, data_directory=read_path, dataset_id=dataset_name, partition_dimensions=partition_dimensions)
 
+
 def get_dataset(vision_definition):
+
     df = dd.read_parquet("{}/{}/data/*".format(vision_definition['dataset_directory'],
                                                vision_definition['dataset_id']))
     profile = dd.read_parquet("{}/{}/profile/*".format(vision_definition['dataset_directory'],

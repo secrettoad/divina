@@ -1,16 +1,12 @@
 import boto3
 import os
 import datetime
-import subprocess
-import paramiko
 import sys
 import json
 from divina.divina.aws import aws_backoff
-import backoff
 from .errors import InvalidDataDefinitionException
 import pathlib
 from .aws.utils import create_emr_roles, create_modelling_emr, run_command_emr, create_vision_role
-from .dataset import _build
 
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars

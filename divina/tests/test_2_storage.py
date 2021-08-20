@@ -18,15 +18,15 @@ from ..validate import dask_validate
 @patch.dict(os.environ, {"DATASET_ID": "test1"})
 @patch.dict(os.environ, {"DATA_BUCKET": "s3://divina-test/data"})
 @patch.dict(os.environ, {"DATASET_BUCKET": "s3://divina-test/dataset"})
-def test_dataset_build_remote(s3_fs, test_df_1, divina_session, divina_test_version):
+def test_dataset_build_remote_compute_remote_data(s3_fs, test_df_1, divina_session, divina_test_version):
     test_df_1.to_csv(
         os.path.join(os.environ['DATA_BUCKET'], 'test_df_1.csv'), index=False)
     ec2 = divina_session.client('ec2', 'us-east-2')
     pricing = divina_session.client('pricing', region_name='us-east-1')
     instance = build_remote(commit='test-dummy', s3_fs=s3_fs, read_path=os.environ['DATA_BUCKET'],
-                                          write_path=os.environ["DATASET_BUCKET"],
-                                          dataset_name=os.environ["DATASET_ID"], ec2_client=ec2,
-                                          pricing_client=pricing)
+                            write_path=os.environ["DATASET_BUCKET"],
+                            dataset_name=os.environ["DATASET_ID"], ec2_client=ec2,
+                            pricing_client=pricing)
     try:
         assert (all([x in instance for x in ['ImageId', 'InstanceId']]))
     finally:
@@ -36,20 +36,17 @@ def test_dataset_build_remote(s3_fs, test_df_1, divina_session, divina_test_vers
 @patch.dict(os.environ, {"DATA_BUCKET": "s3://divina-test/data"})
 @patch.dict(os.environ, {"DATASET_BUCKET": "s3://divina-test/dataset"})
 @patch.dict(os.environ, {"DATASET_ID": "test1"})
-def test_dataset_build_local(s3_fs, test_df_1):
+def test_dataset_build_local_compute_remote_data(s3_fs, test_df_1):
     test_df_1.to_csv(
         os.path.join(os.environ['DATA_BUCKET'], 'test_df_1.csv'), index=False)
     build_dataset(s3_fs=s3_fs, dataset_directory=os.environ['DATASET_BUCKET'], data_directory=os.environ['DATA_BUCKET'],
                   dataset_id=os.environ['DATASET_ID'])
-
     pd.testing.assert_frame_equal(ddf.read_parquet(
         os.path.join(os.environ['DATASET_BUCKET'], os.environ['DATASET_ID'], 'data')).compute(),
-                                  ddf.read_parquet(
-                                      os.path.join('stubs', os.environ['DATASET_ID'], 'data')).compute())
+                                  test_df_1)
     pd.testing.assert_frame_equal(ddf.read_parquet(
         os.path.join(os.environ['DATASET_BUCKET'], os.environ['DATASET_ID'], 'profile')).compute(),
-                                  ddf.read_parquet(
-                                      os.path.join('stubs', os.environ['DATASET_ID'], 'profile')).compute())
+                                  test_df_1.describe().reset_index())
 
 
 @patch.dict(os.environ, {"VISION_BUCKET": "s3://divina-test/vision"})
@@ -63,10 +60,11 @@ def test_train(test_df_1, test_vd_1, dask_client, account_number):
                      test_vd_1['vision_definition'][
                          'dataset_id'],
                      'profile'))
-    with open(os.path.join(test_vd_1['vision_definition']['dataset_directory'], test_vd_1['vision_definition']['dataset_id'],
+    with open(os.path.join(test_vd_1['vision_definition']['dataset_directory'],
+                           test_vd_1['vision_definition']['dataset_id'],
                            'vision_definition.json'), 'w+') as f:
         json.dump(test_vd_1, f)
-    dask_train(dask_client=dask_client, dask_model=LinearRegression(),
+    dask_train(dask_client=dask_client, dask_model=LinearRegression,
                vision_definition=test_vd_1['vision_definition'],
                vision_id=os.environ['VISION_ID'], divina_directory=os.environ['VISION_BUCKET'])
     pathlib.Path(
@@ -92,9 +90,9 @@ def test_predict(s3_fs, dask_client, test_df_1, test_vd_1, test_model_1, account
                      test_vd_1['vision_definition']['dataset_id'],
                      'profile'))
     s3_fs.put(os.path.join('stubs', os.environ['VISION_ID'],
-                              'models', 's-19700101-000008_h-1'), os.path.join(os.environ['VISION_BUCKET'],
-                                                                               os.environ['VISION_ID'],
-                                                                               'models', 's-19700101-000008_h-1'))
+                           'models', 's-19700101-000008_h-1'), os.path.join(os.environ['VISION_BUCKET'],
+                                                                            os.environ['VISION_ID'],
+                                                                            'models', 's-19700101-000008_h-1'), recursive=True)
 
     dask_predict(s3_fs=s3_fs, dask_client=dask_client, vision_definition=test_vd_1['vision_definition'],
                  vision_id=os.environ['VISION_ID'],
@@ -119,18 +117,18 @@ def test_validate(s3_fs, test_vd_1, test_df_1, test_metrics_1, account_number, d
                      'profile'))
 
     s3_fs.put(os.path.join('stubs', os.environ['VISION_ID'],
-                                 'predictions', 's-19700101-000008'), os.path.join(os.environ['VISION_BUCKET'],
+                           'predictions', 's-19700101-000008'), os.path.join(os.environ['VISION_BUCKET'],
 
-                                                                                   os.environ['VISION_ID'],
-                                                                                   'predictions',
-                                                                                   's-19700101-000008'))
+                                                                             os.environ['VISION_ID'],
+                                                                             'predictions',
+                                                                             's-19700101-000008'), recursive=True)
 
     dask_validate(s3_fs=s3_fs, dask_client=dask_client, vision_definition=test_vd_1['vision_definition'],
                   vision_id=os.environ['VISION_ID'],
                   divina_directory=os.environ['VISION_BUCKET'])
 
     with s3_fs.open(os.path.join(os.environ['VISION_BUCKET'], os.environ['VISION_ID'],
-                           'metrics.json'), 'r') as f:
+                                 'metrics.json'), 'r') as f:
         metrics = json.load(f)
 
     assert (metrics == test_metrics_1)

@@ -19,7 +19,7 @@ def dask_validate(s3_fs, vision_definition, divina_directory, vision_id, dask_cl
     for s in vision_definition['time_validation_splits']:
 
         df_pred = dd.read_parquet(
-            "{}/{}/predictions/s-{}".format(divina_directory, vision_id, pd.to_datetime(s).strftime("%Y%m%d-%H%M%S")))
+            "{}/{}/predictions/s-{}/*".format(divina_directory, vision_id, pd.to_datetime(s).strftime("%Y%m%d-%H%M%S")))
 
         df_base, profile_base = get_dataset(vision_definition)
         df_base = df_base[[vision_definition['target'], vision_definition['time_index']]]

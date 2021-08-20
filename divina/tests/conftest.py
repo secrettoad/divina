@@ -11,6 +11,28 @@ import os
 import s3fs
 from unittest.mock import patch
 
+@pytest.fixture(autouse=True)
+def run_before_and_after_tests(s3_fs):
+    try:
+        s3_fs.mkdir('s3://divina-test', region_name=os.environ['AWS_DEFAULT_REGION'])
+    except FileExistsError:
+        s3_fs.rm('s3://divina-test', recursive=True)
+        s3_fs.mkdir('s3://divina-test', region_name=os.environ['AWS_DEFAULT_REGION'])
+    '''try:
+        os.mkdir('divina-test')
+    except FileExistsError:
+        shutil.rmtree('divina-test')
+        os.mkdir('divina-test')'''
+    yield
+    try:
+        s3_fs.rm('s3://divina-test', recursive=True)
+    except FileNotFoundError:
+        pass
+    '''try:
+        shutil.rmtree('divina-test')
+    except FileNotFoundError:
+        pass'''
+
 
 @patch.dict(os.environ, {'AWS_SHARED_CREDENTIALS_FILE': '~/.aws/credentials'})
 @pytest.fixture()
@@ -67,7 +89,7 @@ def vd_no_dataset_directory():
     return {"vision_definition": {
         "target": "c",
         "time_index": 'test1',
-        "dataset_directory": 'divina-test/dataset-bucket'
+        "dataset_directory": 'divina-test/dataset'
     }
     }
 
@@ -76,7 +98,7 @@ def vd_no_dataset_directory():
 def vd_no_time_index():
     return {"vision_definition": {
         "target": "c",
-        "dataset_directory": 'divina-test/dataset-bucket',
+        "dataset_directory": 'divina-test/dataset',
         "dataset_id": 'test1'
     }
     }
@@ -86,7 +108,7 @@ def vd_no_time_index():
 def vd_no_target():
     return {"vision_definition": {
         "time_index": "a",
-        "dataset_directory": 'divina-test/dataset-bucket',
+        "dataset_directory": 'divina-test/dataset',
         "dataset_id": 'test1'
     }
     }
@@ -99,7 +121,7 @@ def vd_time_validation_splits_not_list():
         "target": "c",
         "time_validation_splits": "1970-01-01 00:00:08",
         "time_horizons": [1],
-        "dataset_directory": 'divina-test/dataset-bucket',
+        "dataset_directory": 'divina-test/dataset',
         "dataset_id": 'test1'
     }
     }
@@ -112,7 +134,7 @@ def vd_time_horizons_not_list():
         "target": "c",
         "time_validation_splits": ["1970-01-01 00:00:08"],
         "time_horizons": 1,
-        "dataset_directory": 'divina-test/dataset-bucket',
+        "dataset_directory": 'divina-test/dataset',
         "dataset_id": 'test1'
     }
     }
@@ -120,7 +142,7 @@ def vd_time_horizons_not_list():
 
 @pytest.fixture()
 def test_metrics_1():
-    return {'splits': {'1970-01-01 00:00:08': {'time_horizons': {'1': {'mae': 0.11934697481571988}}}}}
+    return {'splits': {'1970-01-01 00:00:08': {'time_horizons': {'1': {'mae': 8.40376381901896}}}}}
 
 
 @pytest.fixture()
@@ -130,7 +152,7 @@ def test_vd_1():
         "target": "c",
         "time_validation_splits": ["1970-01-01 00:00:08"],
         "time_horizons": [1],
-        "dataset_directory": 'divina-test/dataset-bucket',
+        "dataset_directory": 'divina-test/dataset',
         "dataset_id": 'test1'
     }
     }
@@ -143,40 +165,29 @@ def test_vd_2():
         "target": "c",
         "time_validation_splits": ["1970-01-01 00:00:08"],
         "time_horizons": [1],
-        "dataset_directory": 'divina-test/dataset-bucket',
+        "dataset_directory": 'divina-test/dataset',
         "dataset_id": "test1",
-        "joins": [{'dataset_directory': 'dataset-bucket', 'dataset_id': 'test2', 'join_on': ('a', 'test2_a')}]
+        "joins": [{'dataset_directory': 'dataset', 'dataset_id': 'test2', 'join_on': ('a', 'test2_a')}]
     }
     }
 
 
 @pytest.fixture()
-def test_composite_df_1():
-    df = pd.DataFrame([[1.0, 2.0, 3.0, 1.0, 2.0, 3.0],
-                       [1.0, 2.0, 3.0, 1.0, 2.0, 3.0],
-                       [1.0, 2.0, 3.0, 1.0, 2.0, 3.0],
-                       [1.0, 2.0, 3.0, 1.0, 2.0, 3.0],
-                       [4.0, 5.0, 6.0, 4.0, np.NaN, 6.0],
-                       [4.0, 5.0, 6.0, 4.0, np.NaN, 6.0],
-                       [4.0, 5.0, 6.0, 4.0, np.NaN, 6.0],
-                       [4.0, 5.0, 6.0, 4.0, np.NaN, 6.0],
-                       [5.0, 5.0, 6.0, np.NaN, np.NaN, np.NaN],
-                       [5.0, 5.0, 6.0, np.NaN, np.NaN, np.NaN],
-                       [5.0, 5.0, 6.0, np.NaN, np.NaN, np.NaN],
-                       [6.0, 5.0, 6.0, np.NaN, np.NaN, np.NaN],
-                       [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN],
-                       [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN],
-                       [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN],
-                       [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN],
-                       [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN],
-                       [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN],
-                       [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-                       [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-                       [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-                       [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-                       [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-                       [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-                       [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN]]
+def test_vd_3():
+    return {"vision_definition": {
+        "time_index": "a",
+        "target": "c",
+        "time_validation_splits": ["1970-01-01 00:00:08"],
+        "time_horizons": [1],
+        "dataset_directory": 's3://divina-test/dataset',
+        "dataset_id": 'test1'
+    }
+    }
+
+
+@pytest.fixture()
+def test_composite_dataset_1():
+    df = pd.DataFrame([[4.0, 5.0, 6.0, 4.0, np.NaN, 6.0], [1.0, 2.0, 3.0, 1.0, 2.0, 3.0], [6.0, 5.0, 6.0, np.NaN, np.NaN, np.NaN], [4.0, 5.0, 6.0, 4.0, np.NaN, 6.0], [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN], [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN], [4.0, 5.0, 6.0, 4.0, np.NaN, 6.0], [5.0, 5.0, 6.0, np.NaN, np.NaN, np.NaN], [1.0, 2.0, 3.0, 1.0, 2.0, 3.0], [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN], [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN], [1.0, 2.0, 3.0, 1.0, 2.0, 3.0], [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN], [1.0, 2.0, 3.0, 1.0, 2.0, 3.0], [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN], [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN], [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN], [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN], [5.0, 5.0, 6.0, np.NaN, np.NaN, np.NaN], [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN], [4.0, 5.0, 6.0, 4.0, np.NaN, 6.0], [5.0, 5.0, 6.0, np.NaN, np.NaN, np.NaN], [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN], [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN], [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN]]
                       )
     df.columns = ['a', 'b', 'c', 'test2_a', 'test2_e', 'test2_f']
     return df
@@ -206,7 +217,7 @@ def test_df_1():
                        [5.0, 5.0, 6.0],
                        [6.0, 5.0, 6.0],
                        [7.0, 8.0, 9],
-                       [10.0, 11.0, 12.0]]).sample(25, replace=True, random_state=11)
+                       [10.0, 11.0, 12.0]]).sample(25, replace=True, random_state=11).reset_index(drop=True)
     df.columns = ['a', 'b', 'c']
     return df
 

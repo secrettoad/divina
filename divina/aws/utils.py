@@ -21,7 +21,7 @@ def create_modelling_emr(emr_client, worker_profile='EMR_EC2_DefaultRole',
         on_failure = 'CANCEL_AND_WAIT'
     else:
         on_failure = 'TERMINATE_CLUSTER'
-    with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config/emr_config.json'), 'r') as f:
+    with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config/emr_config_spark.json'), 'r') as f:
         if ec2_key:
             emr_config = json.loads(
                 os.path.expandvars(json.dumps(json.load(f)).replace('${WORKER_PROFILE}', worker_profile).replace(
