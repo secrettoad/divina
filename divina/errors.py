@@ -6,7 +6,11 @@ class FileTypeNotSupported(Exception):
         message -- explanation of the error
     """
 
-    def __init__(self, extension, message="Extension: {} not supported. Please supply either csv or npz files.\n"):
+    def __init__(
+        self,
+        extension,
+        message="Extension: {} not supported. Please supply either csv or npz files.\n",
+    ):
         self.extension = extension
         self.message = message.format(extension)
         super().__init__(self.message)
@@ -23,7 +27,11 @@ class InvalidDataDefinitionException(Exception):
         message -- explanation of the error
     """
 
-    def __init__(self, extension, message="Invalid data defition. Please make sure your data definition adheres to the design outlaid in the divina documentation.\n"):
+    def __init__(
+        self,
+        extension,
+        message="Invalid data defition. Please make sure your data definition adheres to the design outlaid in the divina documentation.\n",
+    ):
         self.extension = extension
         self.message = message.format(extension)
         super().__init__(self.message)
