@@ -3,6 +3,7 @@ from ..dataset import build_dataset_dask
 from ..train import dask_train
 from ..predict import dask_predict
 from ..validate import dask_validate
+from ..aws.utils import create_divina_role
 from dask_cloudprovider.aws import EC2Cluster
 from dask.distributed import Client
 from dask_ml.linear_model import LinearRegression
@@ -11,44 +12,51 @@ from botocore.exceptions import NoCredentialsError
 import os
 import sys
 import json
+import boto3
+import s3fs
+
+
+def upsert_divina_iam():
+    divina_session = boto3.session.Session()
+    role, instance_profile = create_divina_role(divina_session)
+    return role, instance_profile
 
 
 def cli_build_dataset(
-    read_path,
-    write_path,
-    dataset_name,
-    ec2_keypair_name=None,
-    keep_instances_alive=False,
-    local=False,
-    debug=False,
-    dask_address=None,
+        read_path,
+        write_path,
+        dataset_name,
+        s3_fs,
+        ec2_keypair_name=None,
+        keep_instances_alive=False,
+        local=False,
+        debug=False,
+        dask_client=None,
 ):
-
     if local:
         with Client():
-            build_dataset_dask(
-                read_path=read_path, write_path=write_path, dataset_name=dataset_name
-            )
-    elif not dask_address:
+            build_dataset_dask(s3_fs=s3_fs,
+                               read_path=read_path, write_path=write_path, dataset_name=dataset_name
+                               )
+    elif not dask_client:
         if not keep_instances_alive:
             try:
                 with EC2Cluster(
-                    key_name=ec2_keypair_name,
-                    security=False,
-                    docker_image="jhurdle/divina:latest",
-                    debug=debug,
-                    env_vars={
-                        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                    },
+                        key_name=ec2_keypair_name,
+                        security=False,
+                        docker_image="jhurdle/divina:latest",
+                        debug=debug,
+                        env_vars={
+                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                        }
+
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
-                        build_dataset_dask(
-                            read_path=read_path,
-                            write_path=write_path,
-                            dataset_name=dataset_name,
-                        )
+                        build_dataset_dask(s3_fs=s3_fs,
+                                           read_path=read_path, write_path=write_path, dataset_name=dataset_name
+                                           )
             except NoRegionError:
                 sys.stderr.write(
                     "No AWS region configured. Please set AWS_DEFAULT_REGION environment variable."
@@ -65,63 +73,64 @@ def cli_build_dataset(
                 env_vars={
                     "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                },
+                }
             )
             cluster.adapt(minimum=0, maximum=10)
             with Client(cluster):
-                build_dataset_dask(
-                    read_path=read_path,
-                    write_path=write_path,
-                    dataset_name=dataset_name,
-                )
+                build_dataset_dask(s3_fs=s3_fs,
+                                   read_path=read_path, write_path=write_path, dataset_name=dataset_name
+                                   )
 
     else:
-        with Client(dask_address):
-            build_dataset_dask(
-                read_path=read_path, write_path=write_path, dataset_name=dataset_name
-            )
+        try:
+            build_dataset_dask(s3_fs=s3_fs,
+                                   read_path=read_path, write_path=write_path, dataset_name=dataset_name
+                                   )
+        except:
+            pass
 
 
 def cli_train_vision(
-    vision_definition,
-    write_path,
-    vision_name,
-    ec2_keypair_name=None,
-    keep_instances_alive=False,
-    local=False,
-    debug=False,
-    dask_address=None,
+        s3_fs,
+        vision_definition,
+        write_path,
+        vision_name,
+        ec2_keypair_name=None,
+        keep_instances_alive=False,
+        local=False,
+        debug=False,
+        dask_client=None,
 ):
     dask_model = LinearRegression
     if local:
-        with Client() as dask_client:
+        with Client():
             dask_train(
-                dask_client=dask_client,
+                s3_fs=s3_fs,
                 dask_model=dask_model,
                 vision_definition=vision_definition,
-                divina_directory=write_path,
+                write_path=write_path,
                 vision_id=vision_name,
             )
-    elif not dask_address:
+    elif not dask_client:
         if not keep_instances_alive:
             try:
                 with EC2Cluster(
-                    key_name=ec2_keypair_name,
-                    security=False,
-                    docker_image="jhurdle/divina:latest",
-                    debug=debug,
-                    env_vars={
-                        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                    },
+                        key_name=ec2_keypair_name,
+                        security=False,
+                        docker_image="jhurdle/divina:latest",
+                        debug=debug,
+                        env_vars={
+                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                        }
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
-                    with Client(cluster) as dask_client:
+                    with Client(cluster):
                         dask_train(
-                            dask_client=dask_client,
+                            s3_fs=s3_fs,
                             dask_model=dask_model,
                             vision_definition=vision_definition,
-                            divina_directory=write_path,
+                            write_path=write_path,
                             vision_id=vision_name,
                         )
             except NoRegionError:
@@ -140,69 +149,69 @@ def cli_train_vision(
                 env_vars={
                     "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                },
+                }
             )
             cluster.adapt(minimum=0, maximum=10)
-            with Client(cluster) as dask_client:
+            with Client(cluster):
                 dask_train(
-                    dask_client=dask_client,
+                    s3_fs=s3_fs,
                     dask_model=dask_model,
                     vision_definition=vision_definition,
-                    divina_directory=write_path,
+                    write_path=write_path,
                     vision_id=vision_name,
                 )
 
     else:
-        with Client(dask_address) as dask_client:
-            dask_train(
-                dask_client=dask_client,
-                dask_model=dask_model,
-                vision_definition=vision_definition,
-                divina_directory=write_path,
-                vision_id=vision_name,
-            )
+        dask_train(
+            s3_fs=s3_fs,
+            dask_model=dask_model,
+            vision_definition=vision_definition,
+            write_path=write_path,
+            vision_id=vision_name,
+        )
 
 
 def cli_predict_vision(
-    s3_fs,
-    vision_definition,
-    write_path,
-    vision_name,
-    ec2_keypair_name=None,
-    keep_instances_alive=False,
-    local=False,
-    debug=False,
-    dask_address=None,
+        s3_fs,
+        vision_definition,
+        write_path,
+        read_path,
+        vision_name,
+        ec2_keypair_name=None,
+        keep_instances_alive=False,
+        local=False,
+        debug=False,
+        dask_client=None,
 ):
     if local:
-        with Client() as dask_client:
+        with Client():
             dask_predict(
                 s3_fs=s3_fs,
-                dask_client=dask_client,
                 vision_definition=vision_definition,
-                divina_directory=write_path,
+                write_path=write_path,
+                read_path=read_path,
                 vision_id=vision_name,
             )
-    elif not dask_address:
+    elif not dask_client:
         if not keep_instances_alive:
             try:
                 with EC2Cluster(
-                    key_name=ec2_keypair_name,
-                    security=False,
-                    docker_image="jhurdle/divina:latest",
-                    debug=debug,
-                    env_vars={
-                        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                    },
+                        key_name=ec2_keypair_name,
+                        security=False,
+                        docker_image="jhurdle/divina:latest",
+                        debug=debug,
+                        env_vars={
+                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                        }
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
-                    with Client(cluster) as dask_client:
+                    with Client(cluster):
                         dask_predict(
                             s3_fs=s3_fs,
-                            dask_client=dask_client,
                             vision_definition=vision_definition,
-                            divina_directory=write_path,
+                            write_path=write_path,
+                            read_path=read_path,
                             vision_id=vision_name,
                         )
             except NoRegionError:
@@ -221,69 +230,69 @@ def cli_predict_vision(
                 env_vars={
                     "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                },
+                }
             )
             cluster.adapt(minimum=0, maximum=10)
-            with Client(cluster) as dask_client:
+            with Client(cluster):
                 dask_predict(
                     s3_fs=s3_fs,
-                    dask_client=dask_client,
                     vision_definition=vision_definition,
-                    divina_directory=write_path,
+                    write_path=write_path,
+                    read_path=read_path,
                     vision_id=vision_name,
                 )
 
     else:
-        with Client(dask_address) as dask_client:
-            dask_predict(
+        dask_predict(
                 s3_fs=s3_fs,
-                dask_client=dask_client,
                 vision_definition=vision_definition,
-                divina_directory=write_path,
+                write_path=write_path,
+                read_path=read_path,
                 vision_id=vision_name,
-            )
+        )
 
 
 def cli_validate_vision(
-    s3_fs,
-    vision_definition,
-    write_path,
-    vision_name,
-    ec2_keypair_name=None,
-    keep_instances_alive=False,
-    local=False,
-    debug=False,
-    dask_address=None,
+        s3_fs,
+        vision_definition,
+        write_path,
+        read_path,
+        vision_name,
+        ec2_keypair_name=None,
+        keep_instances_alive=False,
+        local=False,
+        debug=False,
+        dask_client=None,
 ):
     if local:
-        with Client() as dask_client:
+        with Client():
             dask_validate(
                 s3_fs=s3_fs,
-                dask_client=dask_client,
                 vision_definition=vision_definition,
-                divina_directory=write_path,
+                write_path=write_path,
+                read_path=read_path,
                 vision_id=vision_name,
             )
-    elif not dask_address:
+    elif not dask_client:
         if not keep_instances_alive:
             try:
                 with EC2Cluster(
-                    key_name=ec2_keypair_name,
-                    security=False,
-                    docker_image="jhurdle/divina:latest",
-                    debug=debug,
-                    env_vars={
-                        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                    },
+                        key_name=ec2_keypair_name,
+                        security=False,
+                        docker_image="jhurdle/divina:latest",
+                        debug=debug,
+                        env_vars={
+                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                        }
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
-                    with Client(cluster) as dask_client:
+                    with Client(cluster):
                         dask_validate(
                             s3_fs=s3_fs,
-                            dask_client=dask_client,
                             vision_definition=vision_definition,
-                            divina_directory=write_path,
+                            write_path=write_path,
+                            read_path=read_path,
                             vision_id=vision_name,
                         )
             except NoRegionError:
@@ -302,27 +311,26 @@ def cli_validate_vision(
                 env_vars={
                     "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                },
+                }
             )
             cluster.adapt(minimum=0, maximum=10)
-            with Client(cluster) as dask_client:
+            with Client(cluster):
                 dask_validate(
                     s3_fs=s3_fs,
-                    dask_client=dask_client,
                     vision_definition=vision_definition,
-                    divina_directory=write_path,
+                    write_path=write_path,
+                    read_path=read_path,
                     vision_id=vision_name,
                 )
 
     else:
-        with Client(dask_address) as dask_client:
-            dask_validate(
+        dask_validate(
                 s3_fs=s3_fs,
-                dask_client=dask_client,
                 vision_definition=vision_definition,
-                divina_directory=write_path,
+                write_path=write_path,
+                read_path=read_path,
                 vision_id=vision_name,
-            )
+        )
 
 
 @click.group()
@@ -348,16 +356,17 @@ def vision():
 @click.option("-l", "--local", is_flag=True)
 @dataset.command()
 def build(
-    dataset_name,
-    write_path,
-    read_path,
-    ec2_keypair_name,
-    keep_instances_alive,
-    local,
+        dataset_name,
+        write_path,
+        read_path,
+        ec2_keypair_name,
+        keep_instances_alive,
+        local,
 ):
     if not read_path[:5] == "s3://" and write_path[:5] == "s3://":
         raise Exception("both read_path and write_path must begin with 's3://'")
     cli_build_dataset(
+        s3_fs=s3fs.S3FileSystem(),
         dataset_name=dataset_name,
         write_path=write_path,
         read_path=read_path,
@@ -376,22 +385,23 @@ def build(
 @click.option("-d", "--debug", is_flag=True)
 @vision.command()
 def train(
-    vision_definition,
-    vision_name,
-    keep_instances_alive,
-    ec2_keypair_name,
-    write_path,
-    local,
-    debug,
+        vision_definition,
+        vision_name,
+        keep_instances_alive,
+        ec2_keypair_name,
+        write_path,
+        local,
+        debug,
 ):
     cli_train_vision(
+        s3_fs=s3fs.S3FileSystem(),
         vision_definition=json.load(vision_definition),
         write_path=write_path,
         vision_name=vision_name,
         ec2_keypair_name=ec2_keypair_name,
         keep_instances_alive=keep_instances_alive,
         local=local,
-        debug=debug,
+        debug=debug
     )
 
 

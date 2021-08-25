@@ -9,8 +9,8 @@ def create_emr_roles(boto3_session):
     iam_client = boto3_session.client("iam")
 
     if not all(
-        x in [r["RoleName"] for r in iam_client.list_roles()["Roles"]]
-        for x in ["EMR_EC2_DefaultRole", "EMR_DefaultRole"]
+            x in [r["RoleName"] for r in iam_client.list_roles()["Roles"]]
+            for x in ["EMR_EC2_DefaultRole", "EMR_DefaultRole"]
     ):
         subprocess.run(["aws", "emr", "create-default-roles"])
 
@@ -18,38 +18,38 @@ def create_emr_roles(boto3_session):
 
 
 def create_modelling_emr(
-    emr_client,
-    worker_profile="EMR_EC2_DefaultRole",
-    driver_role="EMR_DefaultRole",
-    keep_instances_alive=False,
-    ec2_key=None,
+        emr_client,
+        worker_profile="EMR_EC2_DefaultRole",
+        driver_role="EMR_DefaultRole",
+        keep_instances_alive=False,
+        ec2_key=None,
 ):
     if keep_instances_alive:
         on_failure = "CANCEL_AND_WAIT"
     else:
         on_failure = "TERMINATE_CLUSTER"
     with open(
-        os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "config/emr_config_spark.json"
-        ),
-        "r",
+            os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), "config/emr_config_spark.json"
+            ),
+            "r",
     ) as f:
         if ec2_key:
             emr_config = json.loads(
                 os.path.expandvars(
                     json.dumps(json.load(f))
-                    .replace("${WORKER_PROFILE}", worker_profile)
-                    .replace("${DRIVER_ROLE}", driver_role)
-                    .replace("${EMR_ON_FAILURE}", on_failure)
+                        .replace("${WORKER_PROFILE}", worker_profile)
+                        .replace("${DRIVER_ROLE}", driver_role)
+                        .replace("${EMR_ON_FAILURE}", on_failure)
                 ).replace("${EC2_KEYNAME}", ec2_key)
             )
         else:
             emr_config = json.loads(
                 os.path.expandvars(
                     json.dumps(json.load(f))
-                    .replace("${WORKER_PROFILE}", worker_profile)
-                    .replace("${DRIVER_ROLE}", driver_role)
-                    .replace("${EMR_ON_FAILURE}", on_failure)
+                        .replace("${WORKER_PROFILE}", worker_profile)
+                        .replace("${DRIVER_ROLE}", driver_role)
+                        .replace("${EMR_ON_FAILURE}", on_failure)
                 )
             )
 
@@ -137,41 +137,107 @@ def unnest_ec2_price(product):
     }
 
 
-def create_vision_role(vision_session):
-    vision_iam = vision_session.client("iam")
+def create_divina_role(divina_session):
+    divina_iam = divina_session.client("iam")
     with open(
-        os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "config",
-            "divina_iam_policy.json",
-        )
+            os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "config",
+                "divina_iam_policy.json",
+            )
     ) as f:
         divina_policy = os.path.expandvars(json.dumps(json.load(f)))
     with open(
-        os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "config",
-            "divina_trust_policy.json",
-        )
+            os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "config",
+                "divina_trust_policy.json",
+            )
     ) as f:
-        vision_role_trust_policy = os.path.expandvars(json.dumps(json.load(f)))
+        divina_role_trust_policy = os.path.expandvars(json.dumps(json.load(f)))
 
-    vision_role = create_role(
-        vision_iam,
+    try:
+        divina_iam.remove_role_from_instance_profile(InstanceProfileName='divina-instance-profile',
+                                                     RoleName='divina-role')
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'NoSuchEntity':
+            pass
+        else:
+            raise e
+    try:
+        divina_iam.detach_role_policy(
+            RoleName='divina-role',
+            PolicyArn='arn:aws:iam::{}:policy/divina-role-policy'.format(os.environ['ACCOUNT_NUMBER'])
+        )
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'NoSuchEntity':
+            pass
+        else:
+            raise e
+    try:
+        divina_iam.delete_role(RoleName='divina-role')
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'NoSuchEntity':
+            pass
+        else:
+            raise e
+    divina_role = create_role(
+        divina_iam,
         divina_policy,
-        vision_role_trust_policy,
-        "divina-vision-role",
-        "divina-vision-role-policy",
+        divina_role_trust_policy,
+        "divina-role",
+        "divina-role-policy",
         "role for coysu divina",
     )
 
-    vision_instance_profile = vision_iam.create_instance_profile(
-        InstanceProfileName="divina-vision-instance-profile"
+    try:
+        divina_iam.create_instance_profile(
+            InstanceProfileName="divina-instance-profile"
+        )
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'EntityAlreadyExists':
+            pass
+        else:
+            raise e
+    divina_iam.add_role_to_instance_profile(
+        InstanceProfileName="divina-instance-profile",
+        RoleName="divina-role",
     )
 
-    vision_iam.add_role_to_instance_profile(
-        InstanceProfileName="divina-vision-instance-profile",
-        RoleName="divina-vision-role",
-    )
+    return divina_role
 
-    return vision_role, vision_instance_profile
+
+def grant_bucket_access(access_role_name, bucket_name, boto3_session):
+    s3_client = boto3_session.client('s3')
+    user_policy = {
+        "Effect": "Allow",
+        "Principal": {
+            "AWS": "arn:aws:iam::{}:role/{}".format(
+                os.environ["ACCOUNT_NUMBER"], access_role_name
+            )
+        },
+        "Action": ["s3:GetBucketLocation", "s3:ListBucket", "s3:GetObject"],
+        "Resource": [
+            "arn:aws:s3:::{}".format(bucket_name),
+            "arn:aws:s3:::{}/*".format(bucket_name),
+        ],
+    }
+    try:
+        bucket_policy = json.loads(
+            get_bucket_policy(
+                s3_client, bucket=bucket_name
+            )["Policy"]
+        )
+        if not user_policy in bucket_policy["Statement"]:
+            bucket_policy["Statement"].append(user_policy)
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "NoSuchBucketPolicy":
+            bucket_policy = {"Statement": [user_policy]}
+        else:
+            raise e
+
+    put_bucket_policy(
+        s3_client,
+        bucket=bucket_name,
+        policy=json.dumps(bucket_policy),
+    )

@@ -14,32 +14,26 @@ from divina.divina.models.utils import compare_sk_models
 import json
 
 
-@patch.dict(os.environ, {"DATASET_BUCKET": "s3://divina-test/dataset"})
+@patch.dict(os.environ, {"DATASET_BUCKET": "{}/dataset".format(os.environ['TEST_BUCKET'])})
 @patch.dict(os.environ, {"DATASET_ID": "test1"})
-@patch.dict(os.environ, {"DATA_BUCKET": "s3://divina-test/data"})
-def test_build_dataset_small(s3_fs, test_df_1):
+@patch.dict(os.environ, {"DATA_BUCKET": "{}/data".format(os.environ['TEST_BUCKET'])})
+def test_build_dataset_small(s3_fs, test_df_1, dask_client_remote):
     test_df_1.to_csv(
         os.path.join(os.environ["DATA_BUCKET"], "test_df_1.csv"), index=False
     )
-    ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join("stubs", os.environ["DATASET_ID"], "data")
-    )
-    ddf.from_pandas(test_df_1, chunksize=10000).describe().to_parquet(
-        os.path.join("stubs", os.environ["DATASET_ID"], "profile")
-    )
     cli_build_dataset(
+        s3_fs=s3_fs,
         dataset_name=os.environ["DATASET_ID"],
         write_path=os.environ["DATASET_BUCKET"],
         read_path=os.environ["DATA_BUCKET"],
         ec2_keypair_name="divina2",
+        dask_client=dask_client_remote
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
             os.path.join(os.environ["DATASET_BUCKET"], os.environ["DATASET_ID"], "data")
         ).compute(),
-        ddf.read_parquet(
-            os.path.join("stubs", os.environ["DATASET_ID"], "data")
-        ).compute(),
+        test_df_1,
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
@@ -47,15 +41,13 @@ def test_build_dataset_small(s3_fs, test_df_1):
                 os.environ["DATASET_BUCKET"], os.environ["DATASET_ID"], "profile"
             )
         ).compute(),
-        ddf.read_parquet(
-            os.path.join("stubs", os.environ["DATASET_ID"], "profile")
-        ).compute(),
+        test_df_1.describe(),
     )
 
 
 @patch.dict(os.environ, {"VISION_ID": "test1"})
-@patch.dict(os.environ, {"VISION_BUCKET": "s3://divina-test/vision"})
-def test_train_small(s3_fs, test_df_1, test_model_1, test_vd_3):
+@patch.dict(os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ['TEST_BUCKET'])})
+def test_train_small(s3_fs, test_df_1, test_model_1, test_vd_3, dask_client_remote):
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
             test_vd_3["vision_definition"]["dataset_directory"],
@@ -72,30 +64,31 @@ def test_train_small(s3_fs, test_df_1, test_model_1, test_vd_3):
     )
     vision_definition = test_vd_3["vision_definition"]
     cli_train_vision(
+        s3_fs=s3_fs,
         vision_definition=vision_definition,
         write_path=os.environ["VISION_BUCKET"],
         vision_name=os.environ["VISION_ID"],
         keep_instances_alive=False,
-        local=False,
-        dask_address=None,
+        dask_client=dask_client_remote,
         ec2_keypair_name="divina2",
     )
-    assert compare_sk_models(
-        joblib.load(
-            os.path.join(
-                os.environ["VISION_BUCKET"],
-                os.environ["VISION_ID"],
-                "models",
-                "s-19700101-000008_h-1",
-            )
-        ),
-        test_model_1
-    )
+    with s3_fs.open(os.path.join(
+            os.environ["VISION_BUCKET"],
+            os.environ["VISION_ID"],
+            "models",
+            "s-19700101-000008_h-1",
+    ), 'rb') as f:
+        assert compare_sk_models(
+            joblib.load(
+                f
+            ),
+            test_model_1
+        )
 
 
 @patch.dict(os.environ, {"VISION_ID": "test1"})
-@patch.dict(os.environ, {"VISION_BUCKET": "s3://divina-test/vision"})
-def test_predict_small(s3_fs, test_df_1, test_model_1, test_predictions_1, test_vd_3):
+@patch.dict(os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ['TEST_BUCKET'])})
+def test_predict_small(s3_fs, test_df_1, test_model_1, test_predictions_1, test_vd_3, dask_client_remote):
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
             test_vd_3["vision_definition"]["dataset_directory"],
@@ -125,11 +118,10 @@ def test_predict_small(s3_fs, test_df_1, test_model_1, test_predictions_1, test_
         s3_fs=s3_fs,
         vision_definition=vision_definition,
         write_path=os.environ["VISION_BUCKET"],
+        read_path=os.environ["VISION_BUCKET"],
         vision_name=os.environ["VISION_ID"],
         keep_instances_alive=False,
-        local=False,
-        dask_address=None,
-        ec2_keypair_name="divina2",
+        dask_client=dask_client_remote,
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
@@ -145,9 +137,9 @@ def test_predict_small(s3_fs, test_df_1, test_model_1, test_predictions_1, test_
 
 
 @patch.dict(os.environ, {"VISION_ID": "test1"})
-@patch.dict(os.environ, {"VISION_BUCKET": "s3://divina-test/vision"})
+@patch.dict(os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ['TEST_BUCKET'])})
 def test_validate_small(
-    s3_fs, test_vd_3, test_df_1, test_metrics_1, test_predictions_1, dask_client
+        s3_fs, test_vd_3, test_df_1, test_metrics_1, test_predictions_1, dask_client_remote
 ):
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
@@ -172,21 +164,22 @@ def test_validate_small(
     ))
 
     cli_validate_vision(
-        s3_fs,
+        s3_fs=s3_fs,
         vision_definition=test_vd_3["vision_definition"],
         write_path=os.environ["VISION_BUCKET"],
+        read_path=os.environ["VISION_BUCKET"],
         vision_name=os.environ["VISION_ID"],
         ec2_keypair_name="divina2",
         keep_instances_alive=False,
         local=False,
-        dask_address=None,
+        dask_client=dask_client_remote,
     )
 
     with s3_fs.open(
-        os.path.join(
-            os.environ["VISION_BUCKET"], os.environ["VISION_ID"], "metrics.json"
-        ),
-        "r",
+            os.path.join(
+                os.environ["VISION_BUCKET"], os.environ["VISION_ID"], "metrics.json"
+            ),
+            "r",
     ) as f:
         metrics = json.load(f)
 

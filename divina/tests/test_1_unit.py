@@ -55,6 +55,7 @@ def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
         parents=True, exist_ok=True
     )
     build_dataset_dask(
+        s3_fs=s3_fs,
         read_path=os.environ["DATA_BUCKET"],
         write_path=os.environ["DATASET_BUCKET"],
         dataset_name=os.environ["DATASET_ID"],
@@ -83,7 +84,7 @@ def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
 @patch("s3fs.S3FileSystem.ls", os.listdir)
 @patch.dict(os.environ, {"VISION_BUCKET": "divina-test/vision"})
 @patch.dict(os.environ, {"VISION_ID": "test1"})
-def test_dask_train(test_df_1, test_vd_1, test_model_1, dask_client):
+def test_dask_train(s3_fs, test_df_1, test_vd_1, test_model_1, dask_client):
     pathlib.Path(
         os.path.join(
             test_vd_1["vision_definition"]["dataset_directory"],
@@ -113,11 +114,11 @@ def test_dask_train(test_df_1, test_vd_1, test_model_1, dask_client):
         )
     )
     dask_train(
-        dask_client=dask_client,
+        s3_fs=s3_fs,
         dask_model=LinearRegression,
         vision_definition=test_vd_1["vision_definition"],
         vision_id=os.environ["VISION_ID"],
-        divina_directory=os.environ["VISION_BUCKET"],
+        write_path=os.environ["VISION_BUCKET"],
     )
 
     assert compare_sk_models(
@@ -247,10 +248,10 @@ def test_dask_predict(
 
     dask_predict(
         s3_fs=s3_fs,
-        dask_client=dask_client,
         vision_definition=test_vd_1["vision_definition"],
         vision_id=os.environ["VISION_ID"],
-        divina_directory=os.environ["VISION_BUCKET"],
+        read_path=os.environ["VISION_BUCKET"],
+        write_path=os.environ["VISION_BUCKET"],
     )
 
     pd.testing.assert_frame_equal(
@@ -298,10 +299,10 @@ def test_dask_validate(
 
     dask_validate(
         s3_fs=s3_fs,
-        dask_client=dask_client,
         vision_definition=test_vd_1["vision_definition"],
         vision_id=os.environ["VISION_ID"],
-        divina_directory=os.environ["VISION_BUCKET"],
+        read_path=os.environ["VISION_BUCKET"],
+        write_path=os.environ["VISION_BUCKET"],
     )
 
     with open(

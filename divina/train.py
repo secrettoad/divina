@@ -5,10 +5,18 @@ import joblib
 import pandas as pd
 from .dataset import get_dataset
 import pathlib
+import backoff
+from botocore.exceptions import ClientError
 
-
-def dask_train(dask_client, dask_model, vision_definition, divina_directory, vision_id):
-
+@backoff.on_exception(backoff.expo, ClientError, max_time=30)
+def dask_train(s3_fs, dask_model, vision_definition, write_path, vision_id):
+    if write_path[:5] == "s3://":
+        if not s3_fs.exists(write_path):
+            s3_fs.mkdir('{}/{}'.format(write_path, 'models'), create_parents=True, region_name=os.environ["AWS_DEFAULT_REGION"], acl='private')
+    else:
+        pathlib.Path(os.path.join(write_path, vision_id), "models").mkdir(
+            parents=True, exist_ok=True
+        )
     df, profile = get_dataset(vision_definition)
 
     sys.stdout.write("Loading dataset\n")
@@ -67,19 +75,16 @@ def dask_train(dask_client, dask_model, vision_definition, divina_directory, vis
                 "s-{}_h-{}".format(pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"), h)
             ] = model
 
-            pathlib.Path(os.path.join(divina_directory, vision_id), "models").mkdir(
-                parents=True, exist_ok=True
-            )
-
-            joblib.dump(
-                model,
-                "{}/{}/models/s-{}_h-{}".format(
-                    divina_directory,
+            with s3_fs.open("{}/{}/models/s-{}_h-{}".format(
+                    write_path,
                     vision_id,
                     pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                     h,
-                ),
-            )
+                ), 'wb') as f:
+                joblib.dump(
+                    model,
+                    f
+                )
 
             sys.stdout.write("Pipeline persisted for horizon {}\n".format(h))
 

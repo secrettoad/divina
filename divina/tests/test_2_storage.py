@@ -12,9 +12,9 @@ from ..predict import dask_predict
 from ..validate import dask_validate
 
 
-@patch.dict(os.environ, {"DATASET_BUCKET": "s3://divina-test/dataset"})
+@patch.dict(os.environ, {"DATASET_BUCKET": "{}/dataset".format(os.environ['TEST_BUCKET'])})
 @patch.dict(os.environ, {"DATASET_ID": "test1"})
-@patch.dict(os.environ, {"DATA_BUCKET": "s3://divina-test/data"})
+@patch.dict(os.environ, {"DATA_BUCKET": "{}/data".format(os.environ['TEST_BUCKET'])})
 def test_build_dataset_small(s3_fs, test_df_1):
     test_df_1.to_csv(
         os.path.join(os.environ["DATA_BUCKET"], "test_df_1.csv"), index=False
@@ -26,6 +26,7 @@ def test_build_dataset_small(s3_fs, test_df_1):
         os.path.join("stubs", os.environ["DATASET_ID"], "profile")
     )
     build_dataset_dask(
+        s3_fs=s3_fs,
         dataset_name=os.environ["DATASET_ID"],
         write_path=os.environ["DATASET_BUCKET"],
         read_path=os.environ["DATA_BUCKET"],
@@ -50,9 +51,9 @@ def test_build_dataset_small(s3_fs, test_df_1):
     )
 
 
-@patch.dict(os.environ, {"VISION_BUCKET": "s3://divina-test/vision"})
+@patch.dict(os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ['TEST_BUCKET'])})
 @patch.dict(os.environ, {"VISION_ID": "test1"})
-def test_train(test_df_1, test_vd_1, dask_client, test_model_1):
+def test_train(s3_fs, test_df_1, test_vd_1, dask_client, test_model_1):
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
             test_vd_1["vision_definition"]["dataset_directory"],
@@ -77,29 +78,29 @@ def test_train(test_df_1, test_vd_1, dask_client, test_model_1):
     ) as f:
         json.dump(test_vd_1, f)
     dask_train(
-        dask_client=dask_client,
+        s3_fs=s3_fs,
         dask_model=LinearRegression,
         vision_definition=test_vd_1["vision_definition"],
         vision_id=os.environ["VISION_ID"],
-        divina_directory=os.environ["VISION_BUCKET"],
+        write_path=os.environ["VISION_BUCKET"],
     )
-    assert compare_sk_models(
-        joblib.load(
-            os.path.abspath(
-                os.path.join(
-                    os.environ["VISION_BUCKET"],
-                    os.environ["VISION_ID"],
-                    "models",
-                    "s-19700101-000008_h-1",
-                )
-            )
-        ),
-        test_model_1,
-    )
+
+    with s3_fs.open(os.path.join(
+            os.environ["VISION_BUCKET"],
+            os.environ["VISION_ID"],
+            "models",
+            "s-19700101-000008_h-1",
+    ), 'rb') as f:
+        assert compare_sk_models(
+            joblib.load(
+                f
+            ),
+            test_model_1
+        )
 
 
 @patch.dict(os.environ, {"VISION_ID": "test1"})
-@patch.dict(os.environ, {"VISION_BUCKET": "s3://divina-test/vision"})
+@patch.dict(os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ['TEST_BUCKET'])})
 def test_predict(
     s3_fs, dask_client, test_df_1, test_vd_1, test_predictions_1, test_model_1
 ):
@@ -134,10 +135,10 @@ def test_predict(
 
     dask_predict(
         s3_fs=s3_fs,
-        dask_client=dask_client,
         vision_definition=test_vd_1["vision_definition"],
         vision_id=os.environ["VISION_ID"],
-        divina_directory=os.environ["VISION_BUCKET"],
+        read_path=os.environ["VISION_BUCKET"],
+        write_path=os.environ["VISION_BUCKET"],
     )
 
     pd.testing.assert_frame_equal(
@@ -154,7 +155,7 @@ def test_predict(
 
 
 @patch.dict(os.environ, {"VISION_ID": "test1"})
-@patch.dict(os.environ, {"VISION_BUCKET": "s3://divina-test/vision"})
+@patch.dict(os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ['TEST_BUCKET'])})
 def test_validate(
     s3_fs, test_vd_1, test_df_1, test_metrics_1, test_predictions_1, dask_client
 ):
@@ -182,10 +183,10 @@ def test_validate(
 
     dask_validate(
         s3_fs=s3_fs,
-        dask_client=dask_client,
         vision_definition=test_vd_1["vision_definition"],
         vision_id=os.environ["VISION_ID"],
-        divina_directory=os.environ["VISION_BUCKET"],
+        read_path=os.environ["VISION_BUCKET"],
+        write_path=os.environ["VISION_BUCKET"],
     )
 
     with s3_fs.open(

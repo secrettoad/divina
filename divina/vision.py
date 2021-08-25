@@ -10,7 +10,7 @@ from .aws.utils import (
     create_emr_roles,
     create_modelling_emr,
     run_command_emr,
-    create_vision_role,
+    create_divina_role,
 )
 
 
@@ -79,7 +79,7 @@ def create_vision(
     ) as f:
         json.dump(vision_definition, f)
 
-    create_vision_role(vision_session=vision_session)
+    create_divina_role(divina_session=vision_session)
 
     sys.stdout.write("Creating forecasts...\n")
     emr_client = vision_session.client("emr")

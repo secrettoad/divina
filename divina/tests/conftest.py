@@ -1,35 +1,39 @@
 import pytest
 import pandas as pd
 import numpy as np
-import boto3
 import moto
 import pkg_resources
 from .stubs import pricing_stubs
 from dask.distributed import Client
-import pathlib
 import os
 import s3fs
 from unittest.mock import patch
 import shutil
 from dask_ml.linear_model import LinearRegression
 import dask.dataframe as ddf
+import boto3
+from dask_cloudprovider.aws import EC2Cluster
+import sys
+import logging
+import fsspec
 
 
 @pytest.fixture(autouse=True)
 def run_before_and_after_tests(s3_fs):
     try:
-        s3_fs.mkdir("s3://divina-test", region_name=os.environ["AWS_DEFAULT_REGION"])
+        s3_fs.mkdir(os.environ['TEST_BUCKET'], region_name=os.environ["AWS_DEFAULT_REGION"], acl='private')
     except FileExistsError:
-        s3_fs.rm("s3://divina-test", recursive=True)
-        s3_fs.mkdir("s3://divina-test", region_name=os.environ["AWS_DEFAULT_REGION"])
+        s3_fs.rm(os.environ['TEST_BUCKET'], recursive=True)
+        s3_fs.mkdir(os.environ['TEST_BUCKET'], region_name=os.environ["AWS_DEFAULT_REGION"], acl='private')
     try:
         os.mkdir("divina-test")
     except FileExistsError:
         shutil.rmtree("divina-test")
         os.mkdir("divina-test")
+    fsspec.filesystem('s3').invalidate_cache()
     yield
     try:
-        s3_fs.rm("s3://divina-test", recursive=True)
+        s3_fs.rm(os.environ['TEST_BUCKET'], recursive=True)
     except FileNotFoundError:
         pass
     try:
@@ -66,11 +70,23 @@ def dask_client(request):
     return client
 
 
-@pytest.fixture()
-def dask_client(request):
-    client = Client()
-    request.addfinalizer(lambda: client.close())
-    return client
+@pytest.fixture(scope='session')
+def dask_client_remote():
+    cluster = EC2Cluster(
+                        key_name='divina2',
+                        security=False,
+                        docker_image="jhurdle/divina:latest",
+                        debug=False,
+                        env_vars={
+                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                            "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
+                        }
+                )
+    cluster.adapt(minimum=1, maximum=10)
+    client = Client(cluster)
+    yield client
+    client.close()
 
 
 @pytest.fixture()
@@ -240,7 +256,7 @@ def test_vd_3():
             "target": "c",
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": [1],
-            "dataset_directory": "s3://divina-test/dataset",
+            "dataset_directory": "{}/dataset".format(os.environ['TEST_BUCKET']),
             "dataset_id": "test1",
         }
     }
