@@ -405,17 +405,65 @@ def train(
     )
 
 
-@click.argument("s3_endpoint")
-@click.argument("data_definition", type=click.File("rb"))
-@divina.command()
-def predict(s3_endpoint, data_definition):
-    sc = get_spark_context_s3(s3_endpoint)
-    predict.predict(spark_context=sc, data_definition=data_definition)
+@click.argument("ec2_keypair_name", default=None, required=False)
+@click.argument("keep_instances_alive", default=False, required=False)
+@click.argument("vision_definition", type=click.File("rb"))
+@click.argument("vision_name")
+@click.argument("write_path")
+@click.argument("read_path")
+@click.option("-l", "--local", is_flag=True)
+@click.option("-d", "--debug", is_flag=True)
+@vision.command()
+def predict(
+        vision_definition,
+        vision_name,
+        keep_instances_alive,
+        ec2_keypair_name,
+        write_path,
+        read_path,
+        local,
+        debug,
+):
+    cli_predict_vision(
+        s3_fs=s3fs.S3FileSystem(),
+        vision_definition=json.load(vision_definition),
+        write_path=write_path,
+        read_path=read_path,
+        vision_name=vision_name,
+        ec2_keypair_name=ec2_keypair_name,
+        keep_instances_alive=keep_instances_alive,
+        local=local,
+        debug=debug
+    )
 
 
-@click.argument("s3_endpoint")
-@click.argument("data_definition", type=click.File("rb"))
-@divina.command()
-def validate(s3_endpoint, data_definition):
-    sc = get_spark_context_s3(s3_endpoint)
-    validate.validate(spark_context=sc, data_definition=data_definition)
+@click.argument("ec2_keypair_name", default=None, required=False)
+@click.argument("keep_instances_alive", default=False, required=False)
+@click.argument("vision_definition", type=click.File("rb"))
+@click.argument("vision_name")
+@click.argument("write_path")
+@click.argument("read_path")
+@click.option("-l", "--local", is_flag=True)
+@click.option("-d", "--debug", is_flag=True)
+@vision.command()
+def validate(
+        vision_definition,
+        vision_name,
+        keep_instances_alive,
+        ec2_keypair_name,
+        write_path,
+        read_path,
+        local,
+        debug,
+):
+    cli_validate_vision(
+        s3_fs=s3fs.S3FileSystem(),
+        vision_definition=json.load(vision_definition),
+        write_path=write_path,
+        read_path=read_path,
+        vision_name=vision_name,
+        ec2_keypair_name=ec2_keypair_name,
+        keep_instances_alive=keep_instances_alive,
+        local=local,
+        debug=debug
+    )
