@@ -9,7 +9,7 @@ from ..cli.cli import (
 import dask.dataframe as ddf
 import pandas as pd
 import joblib
-from divina.divina.utils import compare_sk_models
+from ..utils import compare_sk_models
 import json
 
 

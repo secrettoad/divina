@@ -4,7 +4,7 @@ from ..dataset import build_dataset_dask
 from dask import dataframe as ddf
 import pandas as pd
 import json
-from divina.divina.utils import compare_sk_models
+from ..utils import compare_sk_models
 from dask_ml.linear_model import LinearRegression
 from ..train import dask_train
 import joblib
