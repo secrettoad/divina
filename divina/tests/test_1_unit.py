@@ -1,20 +1,18 @@
 import os
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from ..vision import validate_vision_definition
 from ..train import dask_train
 from ..predict import dask_predict
 from ..dataset import get_dataset, build_dataset_dask
 from ..validate import dask_validate
 from ..errors import InvalidDataDefinitionException
-import shutil
 import pathlib
 from dask_ml.linear_model import LinearRegression
-from divina.divina.models.utils import compare_sk_models
+from ..utils import compare_sk_models
 import joblib
 import pandas as pd
 import dask.dataframe as ddf
-from ..aws.utils import create_modelling_emr
 
 
 def test_validate_vision_definition(

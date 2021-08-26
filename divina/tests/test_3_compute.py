@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import patch
 import os
 from ..cli.cli import (
@@ -10,7 +9,7 @@ from ..cli.cli import (
 import dask.dataframe as ddf
 import pandas as pd
 import joblib
-from divina.divina.models.utils import compare_sk_models
+from divina.divina.utils import compare_sk_models
 import json
 
 
