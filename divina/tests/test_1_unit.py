@@ -286,7 +286,7 @@ def test_dask_validate(
         os.path.join(
             test_vd_1["vision_definition"]["dataset_directory"],
             test_vd_1["vision_definition"]["dataset_id"],
-            "data"
+            "data",
         )
     )
     ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(

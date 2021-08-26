@@ -12,9 +12,11 @@ from ..predict import dask_predict
 from ..validate import dask_validate
 
 
-@patch.dict(os.environ, {"DATASET_BUCKET": "{}/dataset".format(os.environ['TEST_BUCKET'])})
+@patch.dict(
+    os.environ, {"DATASET_BUCKET": "{}/dataset".format(os.environ["TEST_BUCKET"])}
+)
 @patch.dict(os.environ, {"DATASET_ID": "test1"})
-@patch.dict(os.environ, {"DATA_BUCKET": "{}/data".format(os.environ['TEST_BUCKET'])})
+@patch.dict(os.environ, {"DATA_BUCKET": "{}/data".format(os.environ["TEST_BUCKET"])})
 def test_build_dataset_small(s3_fs, test_df_1):
     test_df_1.to_csv(
         os.path.join(os.environ["DATA_BUCKET"], "test_df_1.csv"), index=False
@@ -51,7 +53,9 @@ def test_build_dataset_small(s3_fs, test_df_1):
     )
 
 
-@patch.dict(os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ['TEST_BUCKET'])})
+@patch.dict(
+    os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ["TEST_BUCKET"])}
+)
 @patch.dict(os.environ, {"VISION_ID": "test1"})
 def test_train(s3_fs, test_df_1, test_vd_1, dask_client, test_model_1):
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
@@ -85,22 +89,22 @@ def test_train(s3_fs, test_df_1, test_vd_1, dask_client, test_model_1):
         write_path=os.environ["VISION_BUCKET"],
     )
 
-    with s3_fs.open(os.path.join(
+    with s3_fs.open(
+        os.path.join(
             os.environ["VISION_BUCKET"],
             os.environ["VISION_ID"],
             "models",
             "s-19700101-000008_h-1",
-    ), 'rb') as f:
-        assert compare_sk_models(
-            joblib.load(
-                f
-            ),
-            test_model_1
-        )
+        ),
+        "rb",
+    ) as f:
+        assert compare_sk_models(joblib.load(f), test_model_1)
 
 
 @patch.dict(os.environ, {"VISION_ID": "test1"})
-@patch.dict(os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ['TEST_BUCKET'])})
+@patch.dict(
+    os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ["TEST_BUCKET"])}
+)
 def test_predict(
     s3_fs, dask_client, test_df_1, test_vd_1, test_predictions_1, test_model_1
 ):
@@ -118,20 +122,19 @@ def test_predict(
             "profile",
         )
     )
-    joblib.dump(
-        test_model_1,
-        'tmp'
-    )
-    joblib.dump(
-        test_model_1,
-        's-19700101-000008_h-1')
-    s3_fs.put('s-19700101-000008_h-1', os.path.join(
+    joblib.dump(test_model_1, "tmp")
+    joblib.dump(test_model_1, "s-19700101-000008_h-1")
+    s3_fs.put(
+        "s-19700101-000008_h-1",
+        os.path.join(
             os.environ["VISION_BUCKET"],
             os.environ["VISION_ID"],
             "models",
             "s-19700101-000008_h-1",
-    ), recursive=True)
-    os.remove('s-19700101-000008_h-1')
+        ),
+        recursive=True,
+    )
+    os.remove("s-19700101-000008_h-1")
 
     dask_predict(
         s3_fs=s3_fs,
@@ -155,7 +158,9 @@ def test_predict(
 
 
 @patch.dict(os.environ, {"VISION_ID": "test1"})
-@patch.dict(os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ['TEST_BUCKET'])})
+@patch.dict(
+    os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ["TEST_BUCKET"])}
+)
 def test_validate(
     s3_fs, test_vd_1, test_df_1, test_metrics_1, test_predictions_1, dask_client
 ):
@@ -174,12 +179,14 @@ def test_validate(
         )
     )
 
-    ddf.from_pandas(test_predictions_1, chunksize=10000).to_parquet(os.path.join(
+    ddf.from_pandas(test_predictions_1, chunksize=10000).to_parquet(
+        os.path.join(
             os.environ["VISION_BUCKET"],
             os.environ["VISION_ID"],
             "predictions",
             "s-19700101-000008",
-        ))
+        )
+    )
 
     dask_validate(
         s3_fs=s3_fs,

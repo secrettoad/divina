@@ -5,6 +5,8 @@ import joblib
 from .dataset import get_dataset
 import backoff
 from botocore.exceptions import ClientError
+import os
+
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def dask_predict(s3_fs, vision_definition, vision_id, read_path, write_path):
@@ -15,7 +17,12 @@ def dask_predict(s3_fs, vision_definition, vision_id, read_path, write_path):
 
     if write_path[:5] == "s3://":
         if not s3_fs.exists(write_path):
-            s3_fs.mkdir(write_path, create_parents=True, region_name=os.environ["AWS_DEFAULT_REGION"], acl='private')
+            s3_fs.mkdir(
+                write_path,
+                create_parents=True,
+                region_name=os.environ["AWS_DEFAULT_REGION"],
+                acl="private",
+            )
 
     for s in vision_definition["time_validation_splits"]:
 

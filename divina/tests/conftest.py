@@ -21,19 +21,27 @@ import fsspec
 @pytest.fixture(autouse=True)
 def run_before_and_after_tests(s3_fs):
     try:
-        s3_fs.mkdir(os.environ['TEST_BUCKET'], region_name=os.environ["AWS_DEFAULT_REGION"], acl='private')
+        s3_fs.mkdir(
+            os.environ["TEST_BUCKET"],
+            region_name=os.environ["AWS_DEFAULT_REGION"],
+            acl="private",
+        )
     except FileExistsError:
-        s3_fs.rm(os.environ['TEST_BUCKET'], recursive=True)
-        s3_fs.mkdir(os.environ['TEST_BUCKET'], region_name=os.environ["AWS_DEFAULT_REGION"], acl='private')
+        s3_fs.rm(os.environ["TEST_BUCKET"], recursive=True)
+        s3_fs.mkdir(
+            os.environ["TEST_BUCKET"],
+            region_name=os.environ["AWS_DEFAULT_REGION"],
+            acl="private",
+        )
     try:
         os.mkdir("divina-test")
     except FileExistsError:
         shutil.rmtree("divina-test")
         os.mkdir("divina-test")
-    fsspec.filesystem('s3').invalidate_cache()
+    fsspec.filesystem("s3").invalidate_cache()
     yield
     try:
-        s3_fs.rm(os.environ['TEST_BUCKET'], recursive=True)
+        s3_fs.rm(os.environ["TEST_BUCKET"], recursive=True)
     except FileNotFoundError:
         pass
     try:
@@ -70,19 +78,19 @@ def dask_client(request):
     return client
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def dask_client_remote():
     cluster = EC2Cluster(
-                        key_name='divina2',
-                        security=False,
-                        docker_image="jhurdle/divina:latest",
-                        debug=False,
-                        env_vars={
-                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                            "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
-                        }
-                )
+        key_name="divina2",
+        security=False,
+        docker_image="jhurdle/divina:latest",
+        debug=False,
+        env_vars={
+            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+            "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
+        },
+    )
     cluster.adapt(minimum=1, maximum=10)
     client = Client(cluster)
     yield client
@@ -173,7 +181,7 @@ def test_model_1(test_df_1):
 def test_metrics_1():
     return {
         "splits": {
-            '1970-01-01 00:00:08': {'time_horizons': {'1': {'mae': 0.3750750300119954}}}
+            "1970-01-01 00:00:08": {"time_horizons": {"1": {"mae": 0.3750750300119954}}}
         }
     }
 
@@ -209,7 +217,7 @@ def test_predictions_1():
             [7.0, 8.754595588235304],
         ]
     )
-    df.columns = ['a', 'c_h_1_pred']
+    df.columns = ["a", "c_h_1_pred"]
     return df
 
 
@@ -256,7 +264,7 @@ def test_vd_3():
             "target": "c",
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": [1],
-            "dataset_directory": "{}/dataset".format(os.environ['TEST_BUCKET']),
+            "dataset_directory": "{}/dataset".format(os.environ["TEST_BUCKET"]),
             "dataset_id": "test1",
         }
     }

@@ -43,10 +43,17 @@ def get_dataset(vision_definition):
     return df, profile
 
 
-def build_dataset_dask(s3_fs, read_path, write_path, dataset_name, partition_dimensions=None):
+def build_dataset_dask(
+    s3_fs, read_path, write_path, dataset_name, partition_dimensions=None
+):
     if write_path[:5] == "s3://":
         if not s3_fs.exists(write_path):
-            s3_fs.mkdir(write_path, create_parents=True, region_name=os.environ["AWS_DEFAULT_REGION"], acl='private')
+            s3_fs.mkdir(
+                write_path,
+                create_parents=True,
+                region_name=os.environ["AWS_DEFAULT_REGION"],
+                acl="private",
+            )
     try:
         df = dd.read_parquet(read_path)
     except:

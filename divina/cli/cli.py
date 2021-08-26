@@ -23,40 +23,45 @@ def upsert_divina_iam():
 
 
 def cli_build_dataset(
-        read_path,
-        write_path,
-        dataset_name,
-        s3_fs,
-        ec2_keypair_name=None,
-        keep_instances_alive=False,
-        local=False,
-        debug=False,
-        dask_client=None,
+    read_path,
+    write_path,
+    dataset_name,
+    s3_fs,
+    ec2_keypair_name=None,
+    keep_instances_alive=False,
+    local=False,
+    debug=False,
+    dask_client=None,
 ):
     if local:
         with Client():
-            build_dataset_dask(s3_fs=s3_fs,
-                               read_path=read_path, write_path=write_path, dataset_name=dataset_name
-                               )
+            build_dataset_dask(
+                s3_fs=s3_fs,
+                read_path=read_path,
+                write_path=write_path,
+                dataset_name=dataset_name,
+            )
     elif not dask_client:
         if not keep_instances_alive:
             try:
                 with EC2Cluster(
-                        key_name=ec2_keypair_name,
-                        security=False,
-                        docker_image="jhurdle/divina:latest",
-                        debug=debug,
-                        env_vars={
-                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                        }
-
+                    key_name=ec2_keypair_name,
+                    security=False,
+                    docker_image="jhurdle/divina:latest",
+                    debug=debug,
+                    env_vars={
+                        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                    },
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
-                        build_dataset_dask(s3_fs=s3_fs,
-                                           read_path=read_path, write_path=write_path, dataset_name=dataset_name
-                                           )
+                        build_dataset_dask(
+                            s3_fs=s3_fs,
+                            read_path=read_path,
+                            write_path=write_path,
+                            dataset_name=dataset_name,
+                        )
             except NoRegionError:
                 sys.stderr.write(
                     "No AWS region configured. Please set AWS_DEFAULT_REGION environment variable."
@@ -73,33 +78,39 @@ def cli_build_dataset(
                 env_vars={
                     "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                }
+                },
             )
             cluster.adapt(minimum=0, maximum=10)
             with Client(cluster):
-                build_dataset_dask(s3_fs=s3_fs,
-                                   read_path=read_path, write_path=write_path, dataset_name=dataset_name
-                                   )
+                build_dataset_dask(
+                    s3_fs=s3_fs,
+                    read_path=read_path,
+                    write_path=write_path,
+                    dataset_name=dataset_name,
+                )
 
     else:
         try:
-            build_dataset_dask(s3_fs=s3_fs,
-                                   read_path=read_path, write_path=write_path, dataset_name=dataset_name
-                                   )
+            build_dataset_dask(
+                s3_fs=s3_fs,
+                read_path=read_path,
+                write_path=write_path,
+                dataset_name=dataset_name,
+            )
         except:
             pass
 
 
 def cli_train_vision(
-        s3_fs,
-        vision_definition,
-        write_path,
-        vision_name,
-        ec2_keypair_name=None,
-        keep_instances_alive=False,
-        local=False,
-        debug=False,
-        dask_client=None,
+    s3_fs,
+    vision_definition,
+    write_path,
+    vision_name,
+    ec2_keypair_name=None,
+    keep_instances_alive=False,
+    local=False,
+    debug=False,
+    dask_client=None,
 ):
     dask_model = LinearRegression
     if local:
@@ -115,14 +126,14 @@ def cli_train_vision(
         if not keep_instances_alive:
             try:
                 with EC2Cluster(
-                        key_name=ec2_keypair_name,
-                        security=False,
-                        docker_image="jhurdle/divina:latest",
-                        debug=debug,
-                        env_vars={
-                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                        }
+                    key_name=ec2_keypair_name,
+                    security=False,
+                    docker_image="jhurdle/divina:latest",
+                    debug=debug,
+                    env_vars={
+                        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                    },
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
@@ -149,7 +160,7 @@ def cli_train_vision(
                 env_vars={
                     "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                }
+                },
             )
             cluster.adapt(minimum=0, maximum=10)
             with Client(cluster):
@@ -172,16 +183,16 @@ def cli_train_vision(
 
 
 def cli_predict_vision(
-        s3_fs,
-        vision_definition,
-        write_path,
-        read_path,
-        vision_name,
-        ec2_keypair_name=None,
-        keep_instances_alive=False,
-        local=False,
-        debug=False,
-        dask_client=None,
+    s3_fs,
+    vision_definition,
+    write_path,
+    read_path,
+    vision_name,
+    ec2_keypair_name=None,
+    keep_instances_alive=False,
+    local=False,
+    debug=False,
+    dask_client=None,
 ):
     if local:
         with Client():
@@ -196,14 +207,14 @@ def cli_predict_vision(
         if not keep_instances_alive:
             try:
                 with EC2Cluster(
-                        key_name=ec2_keypair_name,
-                        security=False,
-                        docker_image="jhurdle/divina:latest",
-                        debug=debug,
-                        env_vars={
-                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                        }
+                    key_name=ec2_keypair_name,
+                    security=False,
+                    docker_image="jhurdle/divina:latest",
+                    debug=debug,
+                    env_vars={
+                        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                    },
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
@@ -230,7 +241,7 @@ def cli_predict_vision(
                 env_vars={
                     "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                }
+                },
             )
             cluster.adapt(minimum=0, maximum=10)
             with Client(cluster):
@@ -244,25 +255,25 @@ def cli_predict_vision(
 
     else:
         dask_predict(
-                s3_fs=s3_fs,
-                vision_definition=vision_definition,
-                write_path=write_path,
-                read_path=read_path,
-                vision_id=vision_name,
+            s3_fs=s3_fs,
+            vision_definition=vision_definition,
+            write_path=write_path,
+            read_path=read_path,
+            vision_id=vision_name,
         )
 
 
 def cli_validate_vision(
-        s3_fs,
-        vision_definition,
-        write_path,
-        read_path,
-        vision_name,
-        ec2_keypair_name=None,
-        keep_instances_alive=False,
-        local=False,
-        debug=False,
-        dask_client=None,
+    s3_fs,
+    vision_definition,
+    write_path,
+    read_path,
+    vision_name,
+    ec2_keypair_name=None,
+    keep_instances_alive=False,
+    local=False,
+    debug=False,
+    dask_client=None,
 ):
     if local:
         with Client():
@@ -277,14 +288,14 @@ def cli_validate_vision(
         if not keep_instances_alive:
             try:
                 with EC2Cluster(
-                        key_name=ec2_keypair_name,
-                        security=False,
-                        docker_image="jhurdle/divina:latest",
-                        debug=debug,
-                        env_vars={
-                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                        }
+                    key_name=ec2_keypair_name,
+                    security=False,
+                    docker_image="jhurdle/divina:latest",
+                    debug=debug,
+                    env_vars={
+                        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                    },
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
@@ -311,7 +322,7 @@ def cli_validate_vision(
                 env_vars={
                     "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                }
+                },
             )
             cluster.adapt(minimum=0, maximum=10)
             with Client(cluster):
@@ -325,11 +336,11 @@ def cli_validate_vision(
 
     else:
         dask_validate(
-                s3_fs=s3_fs,
-                vision_definition=vision_definition,
-                write_path=write_path,
-                read_path=read_path,
-                vision_id=vision_name,
+            s3_fs=s3_fs,
+            vision_definition=vision_definition,
+            write_path=write_path,
+            read_path=read_path,
+            vision_id=vision_name,
         )
 
 
@@ -356,12 +367,12 @@ def vision():
 @click.option("-l", "--local", is_flag=True)
 @dataset.command()
 def build(
-        dataset_name,
-        write_path,
-        read_path,
-        ec2_keypair_name,
-        keep_instances_alive,
-        local,
+    dataset_name,
+    write_path,
+    read_path,
+    ec2_keypair_name,
+    keep_instances_alive,
+    local,
 ):
     if not read_path[:5] == "s3://" and write_path[:5] == "s3://":
         raise Exception("both read_path and write_path must begin with 's3://'")
@@ -385,13 +396,13 @@ def build(
 @click.option("-d", "--debug", is_flag=True)
 @vision.command()
 def train(
-        vision_definition,
-        vision_name,
-        keep_instances_alive,
-        ec2_keypair_name,
-        write_path,
-        local,
-        debug,
+    vision_definition,
+    vision_name,
+    keep_instances_alive,
+    ec2_keypair_name,
+    write_path,
+    local,
+    debug,
 ):
     cli_train_vision(
         s3_fs=s3fs.S3FileSystem(),
@@ -401,7 +412,7 @@ def train(
         ec2_keypair_name=ec2_keypair_name,
         keep_instances_alive=keep_instances_alive,
         local=local,
-        debug=debug
+        debug=debug,
     )
 
 
@@ -415,14 +426,14 @@ def train(
 @click.option("-d", "--debug", is_flag=True)
 @vision.command()
 def predict(
-        vision_definition,
-        vision_name,
-        keep_instances_alive,
-        ec2_keypair_name,
-        write_path,
-        read_path,
-        local,
-        debug,
+    vision_definition,
+    vision_name,
+    keep_instances_alive,
+    ec2_keypair_name,
+    write_path,
+    read_path,
+    local,
+    debug,
 ):
     cli_predict_vision(
         s3_fs=s3fs.S3FileSystem(),
@@ -433,7 +444,7 @@ def predict(
         ec2_keypair_name=ec2_keypair_name,
         keep_instances_alive=keep_instances_alive,
         local=local,
-        debug=debug
+        debug=debug,
     )
 
 
@@ -447,14 +458,14 @@ def predict(
 @click.option("-d", "--debug", is_flag=True)
 @vision.command()
 def validate(
-        vision_definition,
-        vision_name,
-        keep_instances_alive,
-        ec2_keypair_name,
-        write_path,
-        read_path,
-        local,
-        debug,
+    vision_definition,
+    vision_name,
+    keep_instances_alive,
+    ec2_keypair_name,
+    write_path,
+    read_path,
+    local,
+    debug,
 ):
     cli_validate_vision(
         s3_fs=s3fs.S3FileSystem(),
@@ -465,5 +476,5 @@ def validate(
         ec2_keypair_name=ec2_keypair_name,
         keep_instances_alive=keep_instances_alive,
         local=local,
-        debug=debug
+        debug=debug,
     )
