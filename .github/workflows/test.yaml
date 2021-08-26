@@ -6,6 +6,7 @@ on:
       - test
       - main
 jobs:
+  environment: test
   container:
     runs-on: ubuntu-latest
     container: jhurdle/divina:latest
