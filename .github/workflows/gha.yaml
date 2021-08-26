@@ -1,6 +1,9 @@
 name: divina pull requests tests
 
-on: pull_request
+on: push
+  branches:
+    - test
+    - master
 
 jobs:
   container:
