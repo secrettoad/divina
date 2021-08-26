@@ -3,8 +3,7 @@ name: divina pull requests tests
 on: push
   branches:
     - test
-    - master
-
+    - main
 jobs:
   container:
     runs-on: ubuntu-latest
