@@ -13,8 +13,6 @@ from dask_ml.linear_model import LinearRegression
 import dask.dataframe as ddf
 import boto3
 from dask_cloudprovider.aws import EC2Cluster
-import sys
-import logging
 import fsspec
 
 
