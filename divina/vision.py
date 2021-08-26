@@ -3,7 +3,7 @@ import os
 import datetime
 import sys
 import json
-from divina.divina.aws import aws_backoff
+from .aws import aws_backoff
 from .errors import InvalidDataDefinitionException
 import pathlib
 from .aws.utils import (
@@ -56,9 +56,7 @@ def create_vision(
     region="us-east-2",
     ec2_keypair_name=None,
     vision_definition=None,
-    keep_instances_alive=False,
-    verbosity=0,
-    commit="main",
+    keep_instances_alive=False
 ):
     os.environ["VISION_ID"] = str(round(datetime.datetime.now().timestamp()))
     os.environ["DIVINA_BUCKET"] = "coysu-divina-prototype-visions"
