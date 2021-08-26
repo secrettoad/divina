@@ -16,8 +16,8 @@ from dask_cloudprovider.aws import EC2Cluster
 import fsspec
 
 
-@pytest.fixture(autouse=True)
-def run_before_and_after_tests(s3_fs):
+@pytest.fixture(autouse=True, scope='session')
+def setup_teardown_test_bucket(s3_fs):
     try:
         s3_fs.mkdir(
             os.environ["TEST_BUCKET"],
@@ -48,6 +48,42 @@ def run_before_and_after_tests(s3_fs):
         pass
 
 
+@pytest.fixture(autouse=True)
+def setup_teardown_test_bucket_contents(s3_fs, request):
+    test_path = '{}/{}'.format(os.environ['TEST_BUCKET'], request.node.originalname)
+    try:
+        s3_fs.mkdir(
+            test_path,
+            region_name=os.environ["AWS_DEFAULT_REGION"],
+            acl="private",
+        )
+    except FileExistsError:
+        s3_fs.rm(test_path, recursive=True)
+        s3_fs.mkdir(
+            test_path,
+            region_name=os.environ["AWS_DEFAULT_REGION"],
+            acl="private",
+        )
+    try:
+        os.mkdir("divina-test")
+    except FileExistsError:
+        shutil.rmtree("divina-test")
+        os.mkdir("divina-test")
+    fsspec.filesystem("s3").invalidate_cache()
+    yield
+    try:
+        s3_fs.rm(test_path, recursive=True)
+    except FileNotFoundError:
+        pass
+    try:
+        shutil.rmtree("divina-test")
+    except FileNotFoundError:
+        pass
+
+
+
+
+
 @patch.dict(os.environ, {"AWS_SHARED_CREDENTIALS_FILE": "~/.aws/credentials"})
 @pytest.fixture()
 def divina_session():
@@ -64,7 +100,7 @@ def reset_local_filesystem():
     pass
 
 
-@pytest.fixture()
+@pytest.fixture(scope='session')
 def s3_fs():
     return s3fs.S3FileSystem()
 
