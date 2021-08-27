@@ -19,7 +19,7 @@ from ..validate import dask_validate
 @patch.dict(os.environ, {"DATA_BUCKET": "{}/data".format(os.environ["TEST_BUCKET"])})
 def test_build_dataset(s3_fs, test_df_1):
     test_df_1.to_csv(
-        os.path.join(os.environ["DATA_BUCKET"], "test_df_1.csv"), index=False
+        '{}/{}'.format(os.environ["DATA_BUCKET"], "test_df_1.csv"), index=False
     )
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join("stubs", os.environ["DATASET_ID"], "data")
