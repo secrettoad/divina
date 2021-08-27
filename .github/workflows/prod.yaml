@@ -3,11 +3,10 @@ name: divina pull requests tests
 on:
   push:
     branches:
-      - test
       - main
 jobs:
   container:
-    environment: test
+    environment: prod
     runs-on: ubuntu-latest
     container: jhurdle/divina:latest
     strategy:
