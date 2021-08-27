@@ -38,7 +38,7 @@ jobs:
           AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
           ACCOUNT_NUMBER: '${{ secrets.ACCOUNT_NUMBER }}'
       - name: Build package
-          run: python3 setup.py sdist bdist_wheel
+        run: python3 setup.py sdist bdist_wheel
       - name: Publish package
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
         uses: pypa/gh-action-pypi-publish@release/v1
