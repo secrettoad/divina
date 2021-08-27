@@ -16,7 +16,7 @@ from dask_cloudprovider.aws import EC2Cluster
 import fsspec
 
 
-'''@pytest.fixture(autouse=True, scope='session')
+@pytest.fixture(autouse=True, scope='session')
 def setup_teardown_test_bucket(s3_fs):
     try:
         s3_fs.mkdir(
@@ -45,7 +45,7 @@ def setup_teardown_test_bucket(s3_fs):
     try:
         shutil.rmtree("divina-test")
     except FileNotFoundError:
-        pass'''
+        pass
 
 
 @pytest.fixture(autouse=True)
