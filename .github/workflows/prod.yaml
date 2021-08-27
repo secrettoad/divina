@@ -1,4 +1,4 @@
-name: divina pull requests tests
+name: divina prod
 
 on:
   push:
