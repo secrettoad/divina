@@ -1,1 +1,1 @@
-[![Tests](https://github.com/secrettoad/divina/actions/workflows/prod.yaml/badge.svg?branch=main)](https://github.com/secrettoad/divina/actions/workflows/prod.yaml?branch=main)
+[![Tests](https://github.com/secrettoad/divina/actions/workflows/prod.yaml/badge.svg)](https://github.com/secrettoad/divina/actions/workflows/prod.yaml)
