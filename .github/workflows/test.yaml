@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8
+          pip install flake8 wheel
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
@@ -37,3 +37,12 @@ jobs:
           AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
           AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
           ACCOUNT_NUMBER: '${{ secrets.ACCOUNT_NUMBER }}'
+      - name: Build package
+          run: python3 setup.py sdist bdist_wheel
+            - name: Publish package
+              if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+              uses: pypa/gh-action-pypi-publish@release/v1
+              with:
+                user: coysu
+                password: ${{ secrets.PYPI_API_TOKEN }}
+                repository_url: https://test.pypi.org/legacy/
