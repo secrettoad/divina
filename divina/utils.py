@@ -4,11 +4,11 @@ from sklearn.pipeline import Pipeline
 
 def compare_sk_models(model1, model2):
     if not isinstance(model1, Pipeline):
-        steps1 = [('step1', model1)]
+        steps1 = [("step1", model1)]
     else:
         steps1 = model1.steps
     if not isinstance(model2, Pipeline):
-        steps2 = [('step1', model2)]
+        steps2 = [("step1", model2)]
     else:
         steps2 = model2.steps
     for s, o in zip(steps1, steps2):
