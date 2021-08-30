@@ -1,24 +1,85 @@
 CHANGES
 =======
 
+* add pbr
+* WIP: add repo secrets
+
+2021.8.1
+--------
+
+* WIP: add repo secrets
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* rebase on main
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: cleanup
+* WIP: add repo secrets
+* WIP: add repo secrets
+* WIP: add repo secrets
+* WIP: cleanup
+* WIP: cleanup
+* move models to seperate repo
+* formatting
+* adjust gha.yaml
+* adjust gha.yaml
+* add CI
+* tests passing and backoff implemented for intermittent access denied s3 errors
+* all initial tests pass
+* all tests pass with exception of dataset build remote
+* WIP: first CLI tests implemented
+* testing e2e docker setup
+* clean up requirements.txt
+* clean up gitignore
+* clean up requirements.txt
+* cleaning up repo
+* cleaning up repo
+* clean up commits
 * WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
-* WIP
+* add cli
 * WIP
 * wip e2e tests
 * base integration tests implemented
@@ -27,52 +88,6 @@ CHANGES
 * datasets abstracted to filepaths and profiles added
 * datasets implmemented
 * dask implemented in unit tests
-* WIP: switching to dask
-* WIP: train test
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: before convert run emr script to bash with cli
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP: dataset
-* WIP dataset
-* testing build\_publish\_dev
-* WIP starting cli
-* WIP starting cli
-* WIP starting cli
-* WIP starting cli
-* WIP starting cli
 * WIP:packaging
 * incremental unit testing
 * first moto test passing
