@@ -5,7 +5,7 @@ on:
     types: [published]
 
 jobs:
-  container:
+  build-test-publish:
     environment: prod
     runs-on: ubuntu-latest
     container: jhurdle/divina:latest

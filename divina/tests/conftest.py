@@ -49,9 +49,6 @@ def setup_teardown_test_bucket_contents(s3_fs, request):
         pass
 
 
-
-
-
 @patch.dict(os.environ, {"AWS_SHARED_CREDENTIALS_FILE": "~/.aws/credentials"})
 @pytest.fixture()
 def divina_session():
