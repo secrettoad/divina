@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip install flake8 wheel pytest
+          python3 -m pip install flake8 wheel pytest
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
