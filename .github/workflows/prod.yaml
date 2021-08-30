@@ -3,8 +3,8 @@ name: divina prod
 on:
   release:
     types: [published]
-  branches:
-    - main
+    branches:
+      - main
 
 jobs:
   build-test-publish:
