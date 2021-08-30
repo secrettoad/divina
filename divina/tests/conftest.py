@@ -13,7 +13,6 @@ from dask_ml.linear_model import LinearRegression
 import dask.dataframe as ddf
 import boto3
 from dask_cloudprovider.aws import EC2Cluster
-import fsspec
 
 
 @pytest.fixture(autouse=True)
@@ -37,7 +36,6 @@ def setup_teardown_test_bucket_contents(s3_fs, request):
     except FileExistsError:
         shutil.rmtree("divina-test")
         os.mkdir("divina-test")
-    fsspec.filesystem("s3").invalidate_cache()
     yield
     try:
         s3_fs.rm(test_path, recursive=True)
