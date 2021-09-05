@@ -9,6 +9,7 @@ click==8.0.1
 cloudpickle==1.6.0
 dask[distributed]==2021.7.2
 fsspec==2021.7.0
+flake8==3.9.2
 idna==3.2
 importlib-metadata==4.6.4
 jmespath==0.10.0
