@@ -10,115 +10,86 @@ from ..train import dask_train
 import joblib
 from ..predict import dask_predict
 from ..validate import dask_validate
+import sys
+import pytest
 
 
-@patch.dict(
-    os.environ, {"DATASET_BUCKET": "{}/dataset".format(os.environ["TEST_BUCKET"])}
-)
-@patch.dict(os.environ, {"DATASET_ID": "test1"})
-@patch.dict(os.environ, {"DATA_BUCKET": "{}/data".format(os.environ["TEST_BUCKET"])})
-def test_build_dataset(s3_fs, test_df_1):
+@pytest.fixture(autouse=True)
+def setup_teardown(setup_teardown_test_bucket_contents):
+    pass
+
+
+def test_build_dataset(s3_fs, test_df_1, test_bucket):
+    dataset_path = "{}/dataset/test1".format(test_bucket)
+    data_path = "{}/data".format(test_bucket)
     test_df_1.to_csv(
-        os.path.join(os.environ["DATA_BUCKET"], "test_df_1.csv"), index=False
+        os.path.join(data_path, "test_df_1.csv"), index=False
     )
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join("stubs", os.environ["DATASET_ID"], "data")
-    )
-    ddf.from_pandas(test_df_1, chunksize=10000).describe().to_parquet(
-        os.path.join("stubs", os.environ["DATASET_ID"], "profile")
+        os.path.join(test_bucket, "test1", "data")
     )
     build_dataset_dask(
         s3_fs=s3_fs,
-        dataset_name=os.environ["DATASET_ID"],
-        write_path=os.environ["DATASET_BUCKET"],
-        read_path=os.environ["DATA_BUCKET"],
+        write_path=dataset_path,
+        read_path=data_path,
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
-            os.path.join(os.environ["DATASET_BUCKET"], os.environ["DATASET_ID"], "data")
+            "{}/data".format(dataset_path)
         ).compute(),
         ddf.read_parquet(
-            os.path.join("stubs", os.environ["DATASET_ID"], "data")
-        ).compute(),
-    )
-    pd.testing.assert_frame_equal(
-        ddf.read_parquet(
-            os.path.join(
-                os.environ["DATASET_BUCKET"], os.environ["DATASET_ID"], "profile"
-            )
-        ).compute(),
-        ddf.read_parquet(
-            os.path.join("stubs", os.environ["DATASET_ID"], "profile")
+            "{}/test1/data".format(test_bucket)
         ).compute(),
     )
 
 
-@patch.dict(
-    os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ["TEST_BUCKET"])}
-)
-@patch.dict(os.environ, {"VISION_ID": "test1"})
-def test_train(s3_fs, test_df_1, test_vd_1, dask_client, test_model_1):
+def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_bucket):
+    vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
-            test_vd_1["vision_definition"]["dataset_directory"],
-            test_vd_1["vision_definition"]["dataset_id"],
+            test_fd_1["forecast_definition"]["dataset_directory"],
             "data",
         )
     )
-    ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(
-        os.path.join(
-            test_vd_1["vision_definition"]["dataset_directory"],
-            test_vd_1["vision_definition"]["dataset_id"],
-            "profile",
-        )
-    )
     with open(
-        os.path.join(
-            test_vd_1["vision_definition"]["dataset_directory"],
-            test_vd_1["vision_definition"]["dataset_id"],
-            "vision_definition.json",
-        ),
-        "w+",
+            os.path.join(
+                test_fd_1["forecast_definition"]["dataset_directory"],
+                "forecast_definition.json",
+            ),
+            "w+",
     ) as f:
-        json.dump(test_vd_1, f)
+        json.dump(test_fd_1, f)
     dask_train(
         s3_fs=s3_fs,
         dask_model=LinearRegression,
-        vision_definition=test_vd_1["vision_definition"],
-        vision_id=os.environ["VISION_ID"],
-        write_path=os.environ["VISION_BUCKET"],
+        forecast_definition=test_fd_1["forecast_definition"],
+        write_path=vision_path,
     )
 
     with s3_fs.open(
-        os.path.join(
-            os.environ["VISION_BUCKET"],
-            os.environ["VISION_ID"],
-            "models",
-            "s-19700101-000008_h-1",
-        ),
-        "rb",
+            os.path.join(
+                vision_path,
+                "models",
+                "s-19700101-000008_h-1",
+            ),
+            "rb",
     ) as f:
         assert compare_sk_models(joblib.load(f), test_model_1)
 
 
-@patch.dict(os.environ, {"VISION_ID": "test1"})
-@patch.dict(
-    os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ["TEST_BUCKET"])}
-)
 def test_predict(
-    s3_fs, dask_client, test_df_1, test_vd_1, test_predictions_1, test_model_1
+        s3_fs, dask_client, test_df_1, test_fd_1, test_predictions_1, test_model_1, test_bucket
 ):
+    vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
-            test_vd_1["vision_definition"]["dataset_directory"],
-            test_vd_1["vision_definition"]["dataset_id"],
+            test_fd_1["forecast_definition"]["dataset_directory"],
             "data",
         )
     )
     ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(
         os.path.join(
-            test_vd_1["vision_definition"]["dataset_directory"],
-            test_vd_1["vision_definition"]["dataset_id"],
+            test_fd_1["forecast_definition"]["dataset_directory"],
             "profile",
         )
     )
@@ -127,8 +98,7 @@ def test_predict(
     s3_fs.put(
         "s-19700101-000008_h-1",
         os.path.join(
-            os.environ["VISION_BUCKET"],
-            os.environ["VISION_ID"],
+            vision_path,
             "models",
             "s-19700101-000008_h-1",
         ),
@@ -138,17 +108,15 @@ def test_predict(
 
     dask_predict(
         s3_fs=s3_fs,
-        vision_definition=test_vd_1["vision_definition"],
-        vision_id=os.environ["VISION_ID"],
-        read_path=os.environ["VISION_BUCKET"],
-        write_path=os.environ["VISION_BUCKET"],
+        forecast_definition=test_fd_1["forecast_definition"],
+        read_path=vision_path,
+        write_path=vision_path,
     )
 
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
             os.path.join(
-                os.environ["VISION_BUCKET"],
-                os.environ["VISION_ID"],
+                vision_path,
                 "predictions",
                 "s-19700101-000008",
             )
@@ -157,32 +125,22 @@ def test_predict(
     )
 
 
-@patch.dict(os.environ, {"VISION_ID": "test1"})
 @patch.dict(
-    os.environ, {"VISION_BUCKET": "{}/vision".format(os.environ["TEST_BUCKET"])}
+    os.environ, {"VISION_PATH": "{}/vision/test1".format(os.environ["TEST_BUCKET"])}
 )
 def test_validate(
-    s3_fs, test_vd_1, test_df_1, test_metrics_1, test_predictions_1, dask_client
+        s3_fs, test_fd_1, test_df_1, test_metrics_1, test_predictions_1, dask_client, test_bucket
 ):
+    vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
-            test_vd_1["vision_definition"]["dataset_directory"],
-            test_vd_1["vision_definition"]["dataset_id"],
+            test_fd_1["forecast_definition"]["dataset_directory"],
             "data",
         )
     )
-    ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(
-        os.path.join(
-            test_vd_1["vision_definition"]["dataset_directory"],
-            test_vd_1["vision_definition"]["dataset_id"],
-            "profile",
-        )
-    )
-
     ddf.from_pandas(test_predictions_1, chunksize=10000).to_parquet(
         os.path.join(
-            os.environ["VISION_BUCKET"],
-            os.environ["VISION_ID"],
+            vision_path,
             "predictions",
             "s-19700101-000008",
         )
@@ -190,17 +148,16 @@ def test_validate(
 
     dask_validate(
         s3_fs=s3_fs,
-        vision_definition=test_vd_1["vision_definition"],
-        vision_id=os.environ["VISION_ID"],
-        read_path=os.environ["VISION_BUCKET"],
-        write_path=os.environ["VISION_BUCKET"],
+        forecast_definition=test_fd_1["forecast_definition"],
+        read_path=vision_path,
+        write_path=vision_path,
     )
 
     with s3_fs.open(
-        os.path.join(
-            os.environ["VISION_BUCKET"], os.environ["VISION_ID"], "metrics.json"
-        ),
-        "r",
+            os.path.join(
+                vision_path, "metrics.json"
+            ),
+            "r",
     ) as f:
         metrics = json.load(f)
 

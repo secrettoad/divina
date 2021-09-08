@@ -8,17 +8,17 @@ from botocore.exceptions import ClientError
 
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-def dask_validate(s3_fs, vision_definition, write_path, read_path, vision_id):
-    def get_metrics(vision_definition, df, s):
+def dask_validate(s3_fs, forecast_definition, write_path, read_path):
+    def get_metrics(forecast_definition, df, s):
         metrics = {"time_horizons": {}}
-        for h in vision_definition["time_horizons"]:
+        for h in forecast_definition["time_horizons"]:
             metrics["time_horizons"][h] = {}
             df["resid_h_{}".format(h)] = (
-                df[vision_definition["target"]].shift(-h)
-                - df["{}_h_{}_pred".format(vision_definition["target"], h)]
+                df[forecast_definition["target"]].shift(-h)
+                - df["{}_h_{}_pred".format(forecast_definition["target"], h)]
             )
             metrics["time_horizons"][h]["mae"] = (
-                df[dd.to_datetime(df[vision_definition["time_index"]], unit="s") > s][
+                df[dd.to_datetime(df[forecast_definition["time_index"]], unit="s") > s][
                     "resid_h_{}".format(h)
                 ]
                 .abs()
@@ -37,28 +37,28 @@ def dask_validate(s3_fs, vision_definition, write_path, read_path, vision_id):
             )
 
     metrics = {"splits": {}}
-    for s in vision_definition["time_validation_splits"]:
+    for s in forecast_definition["time_validation_splits"]:
 
         df_pred = dd.read_parquet(
-            "{}/{}/predictions/s-{}/*".format(
-                read_path, vision_id, pd.to_datetime(s).strftime("%Y%m%d-%H%M%S")
+            "{}/predictions/s-{}/*".format(
+                read_path, pd.to_datetime(s).strftime("%Y%m%d-%H%M%S")
             )
         )
 
-        df_base, profile_base = get_dataset(vision_definition)
+        df_base = get_dataset(forecast_definition)
         df_base = df_base[
-            [vision_definition["target"], vision_definition["time_index"]]
+            [forecast_definition["target"], forecast_definition["time_index"]]
         ]
 
-        if "signal_dimensions" in vision_definition:
+        if "signal_dimensions" in forecast_definition:
             df = df_pred.merge(
                 df_base,
-                on=[vision_definition["time_index"]]
-                + vision_definition["signal_dimensions"],
+                on=[forecast_definition["time_index"]]
+                + forecast_definition["signal_dimensions"],
             )
         else:
-            df = df_pred.merge(df_base, on=[vision_definition["time_index"]])
-        metrics["splits"][s] = get_metrics(vision_definition, df, s)
+            df = df_pred.merge(df_base, on=[forecast_definition["time_index"]])
+        metrics["splits"][s] = get_metrics(forecast_definition, df, s)
 
-        with s3_fs.open("{}/{}/metrics.json".format(write_path, vision_id), "w") as f:
+        with s3_fs.open("{}/metrics.json".format(write_path), "w") as f:
             json.dump(metrics, f)
