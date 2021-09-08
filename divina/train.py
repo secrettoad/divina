@@ -7,10 +7,11 @@ from .dataset import get_dataset
 import pathlib
 import backoff
 from botocore.exceptions import ClientError
+from sklearn.linear_model import LinearRegression
 
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-def dask_train(s3_fs, dask_model, vision_definition, write_path, vision_id):
+def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression):
     if write_path[:5] == "s3://":
         if not s3_fs.exists(write_path):
             s3_fs.mkdir(
@@ -20,42 +21,42 @@ def dask_train(s3_fs, dask_model, vision_definition, write_path, vision_id):
                 acl="private",
             )
     else:
-        pathlib.Path(os.path.join(write_path, vision_id), "models").mkdir(
+        pathlib.Path(os.path.join(write_path), "models").mkdir(
             parents=True, exist_ok=True
         )
-    df, profile = get_dataset(vision_definition)
+    df = get_dataset(forecast_definition)
 
     sys.stdout.write("Loading dataset\n")
 
-    df[vision_definition["time_index"]] = dd.to_datetime(
-        df[vision_definition["time_index"]], unit="s"
+    df[forecast_definition["time_index"]] = dd.to_datetime(
+        df[forecast_definition["time_index"]], unit="s"
     )
 
-    if "drop_features" in vision_definition:
-        df = df.drop(columns=vision_definition["drop_features"])
+    if "drop_features" in forecast_definition:
+        df = df.drop(columns=forecast_definition["drop_features"])
 
-    for h in vision_definition["time_horizons"]:
-        if "signal_dimension" in vision_definition:
-            df["{}_h_{}".format(vision_definition["target"], h)] = df.groupby(
-                vision_definition["signal_dimensions"]
-            )[vision_definition["target"]].shift(-h)
+    for h in forecast_definition["time_horizons"]:
+        if "signal_dimension" in forecast_definition:
+            df["{}_h_{}".format(forecast_definition["target"], h)] = df.groupby(
+                forecast_definition["signal_dimensions"]
+            )[forecast_definition["target"]].shift(-h)
         else:
-            df["{}_h_{}".format(vision_definition["target"], h)] = df[
-                vision_definition["target"]
+            df["{}_h_{}".format(forecast_definition["target"], h)] = df[
+                forecast_definition["target"]
             ].shift(-h)
 
     models = {}
 
     time_min, time_max = (
-        df[vision_definition["time_index"]].min().compute(),
-        df[vision_definition["time_index"]].max().compute(),
+        df[forecast_definition["time_index"]].min().compute(),
+        df[forecast_definition["time_index"]].max().compute(),
     )
 
-    for s in vision_definition["time_validation_splits"]:
+    for s in forecast_definition["time_validation_splits"]:
         if pd.to_datetime(str(s)) <= time_min or pd.to_datetime(str(s)) >= time_max:
             raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
-        df_train = df[df[vision_definition["time_index"]] < s]
-        for h in vision_definition["time_horizons"]:
+        df_train = df[df[forecast_definition["time_index"]] < s]
+        for h in forecast_definition["time_horizons"]:
 
             model = dask_model()
 
@@ -66,13 +67,13 @@ def dask_train(s3_fs, dask_model, vision_definition, write_path, vision_id):
                         for c in df_train.columns
                         if not c
                         in [
-                            "{}_h_{}".format(vision_definition["target"], h)
-                            for h in vision_definition["time_horizons"]
+                            "{}_h_{}".format(forecast_definition["target"], h)
+                            for h in forecast_definition["time_horizons"]
                         ]
-                        + [vision_definition["time_index"], vision_definition["target"]]
+                        + [forecast_definition["time_index"], forecast_definition["target"]]
                     ]
                 ].to_dask_array(lengths=True),
-                df_train["{}_h_{}".format(vision_definition["target"], h)],
+                df_train["{}_h_{}".format(forecast_definition["target"], h)],
             )
 
             sys.stdout.write("Pipeline fit for horizon {}\n".format(h))
@@ -82,9 +83,8 @@ def dask_train(s3_fs, dask_model, vision_definition, write_path, vision_id):
             ] = model
 
             with s3_fs.open(
-                "{}/{}/models/s-{}_h-{}".format(
+                "{}/models/s-{}_h-{}".format(
                     write_path,
-                    vision_id,
                     pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                     h,
                 ),
