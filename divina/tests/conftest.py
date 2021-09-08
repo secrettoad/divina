@@ -95,73 +95,77 @@ def dask_client_remote():
 
 
 @pytest.fixture()
-def vd_no_dataset_id():
+def fd_no_dataset_directory():
     return {
-        "vision_definition": {
+        "forecast_definition": {
             "target": "c",
-            "time_index": "test1",
-            "dataset_id": "test1",
-        }
-    }
-
-
-@pytest.fixture()
-def vd_no_dataset_directory():
-    return {
-        "vision_definition": {
-            "target": "c",
-            "time_index": "test1",
-            "dataset_directory": "divina-test/dataset",
-        }
-    }
-
-
-@pytest.fixture()
-def vd_no_time_index():
-    return {
-        "vision_definition": {
-            "target": "c",
-            "dataset_directory": "divina-test/dataset",
-            "dataset_id": "test1",
-        }
-    }
-
-
-@pytest.fixture()
-def vd_no_target():
-    return {
-        "vision_definition": {
             "time_index": "a",
-            "dataset_directory": "divina-test/dataset",
-            "dataset_id": "test1",
+            "time_validation_splits": ["1970-01-01 00:00:08"],
+            "time_horizons": [1]
         }
     }
 
 
 @pytest.fixture()
-def vd_time_validation_splits_not_list():
+def fd_invalid_model():
     return {
-        "vision_definition": {
+        "forecast_definition": {
+            "target": "c",
+            "time_index": "a",
+            "dataset_directory": "divina-test/dataset/test1",
+            "model": "scikitlearn.linear_models.linearRegression",
+            "time_validation_splits": ["1970-01-01 00:00:08"],
+            "time_horizons": [1],
+        }
+    }
+
+
+@pytest.fixture()
+def fd_no_time_index():
+    return {
+        "forecast_definition": {
+            "target": "c",
+            "dataset_directory": "divina-test/dataset/test1",
+            "time_validation_splits": ["1970-01-01 00:00:08"],
+            "time_horizons": [1],
+        }
+    }
+
+
+@pytest.fixture()
+def fd_no_target():
+    return {
+        "forecast_definition": {
+            "time_index": "a",
+            "dataset_directory": "divina-test/dataset/test1",
+            "time_validation_splits": ["1970-01-01 00:00:08"],
+            "time_horizons": [1],
+        }
+    }
+
+
+@pytest.fixture()
+def fd_time_validation_splits_not_list():
+    return {
+        "forecast_definition": {
             "time_index": "a",
             "target": "c",
             "time_validation_splits": "1970-01-01 00:00:08",
             "time_horizons": [1],
-            "dataset_directory": "divina-test/dataset",
-            "dataset_id": "test1",
+            "dataset_directory": "divina-test/dataset/test1"
         }
     }
 
 
 @pytest.fixture()
-def vd_time_horizons_not_list():
+def fd_time_horizons_not_list():
     return {
-        "vision_definition": {
+        "forecast_definition": {
             "time_index": "a",
             "target": "c",
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": 1,
-            "dataset_directory": "divina-test/dataset",
-            "dataset_id": "test1",
+            "dataset_directory": "divina-test/dataset/test1",
         }
     }
 
@@ -219,34 +223,33 @@ def test_predictions_1():
 
 
 @pytest.fixture()
-def test_vd_1():
+def test_fd_1():
     return {
-        "vision_definition": {
+        "forecast_definition": {
             "time_index": "a",
             "target": "c",
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": [1],
-            "dataset_directory": "divina-test/dataset",
-            "dataset_id": "test1",
+            "dataset_directory": "divina-test/dataset/test1",
+            "model": "LinearRegression"
         }
     }
 
 
 @pytest.fixture()
-def test_vd_2():
+def test_fd_2():
     return {
-        "vision_definition": {
+        "forecast_definition": {
             "time_index": "a",
             "target": "c",
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": [1],
-            "dataset_directory": "divina-test/dataset",
-            "dataset_id": "test1",
+            "dataset_directory": "divina-test/dataset/test1",
             "joins": [
                 {
-                    "dataset_directory": "dataset",
-                    "dataset_id": "test2",
-                    "join_on": ("a", "test2_a"),
+                    "dataset_directory": "dataset/test2",
+                    "join_on": ("a", "a"),
+                    "as": "test2"
                 }
             ],
         }
@@ -254,9 +257,9 @@ def test_vd_2():
 
 
 @pytest.fixture()
-def test_vd_3():
+def test_fd_3():
     return {
-        "vision_definition": {
+        "forecast_definition": {
             "time_index": "a",
             "target": "c",
             "time_validation_splits": ["1970-01-01 00:00:08"],
@@ -270,63 +273,17 @@ def test_vd_3():
 @pytest.fixture()
 def test_composite_dataset_1():
     df = pd.DataFrame(
-        [
-            [4.0, 5.0, 6.0, 4.0, np.NaN, 6.0],
-            [1.0, 2.0, 3.0, 1.0, 2.0, 3.0],
-            [6.0, 5.0, 6.0, np.NaN, np.NaN, np.NaN],
-            [4.0, 5.0, 6.0, 4.0, np.NaN, 6.0],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-            [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN],
-            [4.0, 5.0, 6.0, 4.0, np.NaN, 6.0],
-            [5.0, 5.0, 6.0, np.NaN, np.NaN, np.NaN],
-            [1.0, 2.0, 3.0, 1.0, 2.0, 3.0],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-            [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN],
-            [1.0, 2.0, 3.0, 1.0, 2.0, 3.0],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-            [1.0, 2.0, 3.0, 1.0, 2.0, 3.0],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-            [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-            [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN],
-            [5.0, 5.0, 6.0, np.NaN, np.NaN, np.NaN],
-            [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN],
-            [4.0, 5.0, 6.0, 4.0, np.NaN, 6.0],
-            [5.0, 5.0, 6.0, np.NaN, np.NaN, np.NaN],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN, np.NaN],
-            [7.0, 8.0, 9.0, 7.0, 8.0, np.NaN],
-        ]
+        [[4.0, 5.0, 6.0, np.NaN, 6.0], [1.0, 2.0, 3.0, 2.0, 3.0], [6.0, 5.0, 6.0, np.NaN, np.NaN],
+         [4.0, 5.0, 6.0, np.NaN, 6.0], [10.0, 11.0, 12.0, np.NaN, np.NaN], [7.0, 8.0, 9.0, 8.0, np.NaN],
+         [4.0, 5.0, 6.0, np.NaN, 6.0], [5.0, 5.0, 6.0, np.NaN, np.NaN], [1.0, 2.0, 3.0, 2.0, 3.0],
+         [10.0, 11.0, 12.0, np.NaN, np.NaN], [7.0, 8.0, 9.0, 8.0, np.NaN], [1.0, 2.0, 3.0, 2.0, 3.0],
+         [10.0, 11.0, 12.0, np.NaN, np.NaN], [1.0, 2.0, 3.0, 2.0, 3.0], [10.0, 11.0, 12.0, np.NaN, np.NaN],
+         [7.0, 8.0, 9.0, 8.0, np.NaN], [10.0, 11.0, 12.0, np.NaN, np.NaN], [7.0, 8.0, 9.0, 8.0, np.NaN],
+         [5.0, 5.0, 6.0, np.NaN, np.NaN], [7.0, 8.0, 9.0, 8.0, np.NaN], [4.0, 5.0, 6.0, np.NaN, 6.0],
+         [5.0, 5.0, 6.0, np.NaN, np.NaN], [10.0, 11.0, 12.0, np.NaN, np.NaN], [10.0, 11.0, 12.0, np.NaN, np.NaN],
+         [7.0, 8.0, 9.0, 8.0, np.NaN]]
     )
-    df.columns = ["a", "b", "c", "test2_a", "test2_e", "test2_f"]
-    return df
-
-
-@pytest.fixture()
-def test_composite_profile_1():
-    df = pd.DataFrame(
-        [
-            ["25%", 4.0, 5.0, 6.0, 2.5, 5.0, 4.5],
-            ["50%", 7.0, 8.0, 9.0, 4.0, 8.0, 6.0],
-            ["75%", 10.0, 11.0, 12.0, 5.5, 9.5, 9.0],
-            ["count", 25.0, 25.0, 25.0, 3.0, 3.0, 3.0],
-            ["max", 10.0, 11.0, 12.0, 7.0, 11.0, 12.0],
-            ["mean", 6.12, 6.92, 7.92, 4.0, 7.0, 7.0],
-            ["min", 1.0, 2.0, 3.0, 1.0, 2.0, 3.0],
-            [
-                "std",
-                3.1400636936215163,
-                3.2264531609803355,
-                3.2264531609803355,
-                3.0,
-                4.58257569495584,
-                4.58257569495584,
-            ],
-        ]
-    )
-    df.columns = ["statistic", "a", "b", "c", "test2_a", "test2_e", "test2_f"]
-    df.set_index("statistic", inplace=True)
-    df.index.name = None
+    df.columns = ["a", "b", "c", "e", "f"]
     return df
 
 
@@ -343,8 +300,8 @@ def test_df_1():
                 [10.0, 11.0, 12.0],
             ]
         )
-        .sample(25, replace=True, random_state=11)
-        .reset_index(drop=True)
+            .sample(25, replace=True, random_state=11)
+            .reset_index(drop=True)
     )
     df.columns = ["a", "b", "c"]
     return df

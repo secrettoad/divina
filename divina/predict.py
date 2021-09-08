@@ -9,11 +9,11 @@ import os
 
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-def dask_predict(s3_fs, vision_definition, vision_id, read_path, write_path):
-    df, profile = get_dataset(vision_definition)
+def dask_predict(s3_fs, forecast_definition, read_path, write_path):
+    df = get_dataset(forecast_definition)
 
-    if "drop_features" in vision_definition:
-        df = df.drop(columns=vision_definition["drop_features"])
+    if "drop_features" in forecast_definition:
+        df = df.drop(columns=forecast_definition["drop_features"])
 
     if write_path[:5] == "s3://":
         if not s3_fs.exists(write_path):
@@ -24,13 +24,12 @@ def dask_predict(s3_fs, vision_definition, vision_id, read_path, write_path):
                 acl="private",
             )
 
-    for s in vision_definition["time_validation_splits"]:
+    for s in forecast_definition["time_validation_splits"]:
 
-        for h in vision_definition["time_horizons"]:
+        for h in forecast_definition["time_horizons"]:
             with s3_fs.open(
-                "{}/{}/models/s-{}_h-{}".format(
+                "{}/models/s-{}_h-{}".format(
                     read_path,
-                    vision_id,
                     pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                     h,
                 ),
@@ -39,7 +38,7 @@ def dask_predict(s3_fs, vision_definition, vision_id, read_path, write_path):
                 fit_model = joblib.load(f)
 
             df[
-                "{}_h_{}_pred".format(vision_definition["target"], h)
+                "{}_h_{}_pred".format(forecast_definition["target"], h)
             ] = fit_model.predict(
                 df[
                     [
@@ -47,12 +46,12 @@ def dask_predict(s3_fs, vision_definition, vision_id, read_path, write_path):
                         for c in df.columns
                         if not c
                         in [
-                            vision_definition["time_index"],
-                            vision_definition["target"],
+                            forecast_definition["time_index"],
+                            forecast_definition["target"],
                         ]
                         + [
-                            "{}_h_{}".format(vision_definition["target"], h)
-                            for h in vision_definition["time_horizons"]
+                            "{}_h_{}".format(forecast_definition["target"], h)
+                            for h in forecast_definition["time_horizons"]
                         ]
                     ]
                 ].to_dask_array(lengths=True)
@@ -62,15 +61,14 @@ def dask_predict(s3_fs, vision_definition, vision_id, read_path, write_path):
 
         dd.to_parquet(
             df[
-                [vision_definition["time_index"]]
+                [forecast_definition["time_index"]]
                 + [
-                    "{}_h_{}_pred".format(vision_definition["target"], h)
-                    for h in vision_definition["time_horizons"]
+                    "{}_h_{}_pred".format(forecast_definition["target"], h)
+                    for h in forecast_definition["time_horizons"]
                 ]
             ],
-            "{}/{}/predictions/s-{}".format(
+            "{}/predictions/s-{}".format(
                 write_path,
-                vision_id,
                 pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
             ),
         )
