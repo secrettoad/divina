@@ -16,7 +16,7 @@ jobs:
         python-version: [3.6, 3.7, 3.8, 3.9]
     steps:
       - uses: actions/checkout@v2
-      - name: Set up ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
@@ -32,18 +32,4 @@ jobs:
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
-      - name: Build docs
-        uses: ammaraskar/sphinx-action@master
-        with:
-          docs-folder: "docs/"
-      - name: Commit docs
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git commit -am "Build docs"
-      - name: Run docs
-        uses: ad-m/github-push-action@master
-        with:
-          branch: main
-          directory: docs
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+

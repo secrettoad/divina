@@ -9,6 +9,9 @@ jobs:
     environment: test
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7, 3.8, 3.9]
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
@@ -40,6 +43,16 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
           repository_url: https://test.pypi.org/legacy/
       - name: Build docs
-        uses: ammaraskar/sphinx-action@master
-        with:
-          docs-folder: "docs/"
+        run: |
+          sphinx-build docs docs/build
+      - name: Commit docs
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git commit -am "Build docs"
+      - name: Push docs
+        uses: ad-m/github-push-action@master
+          with:
+            branch: main
+            directory: docs
+            github_token: ${{ secrets.GITHUB_TOKEN }}
