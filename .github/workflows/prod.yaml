@@ -29,3 +29,18 @@ jobs:
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Build docs
+        uses: ammaraskar/sphinx-action@master
+        with:
+          docs-folder: "docs/"
+      - name: Commit docs
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git commit -am "Build docs"
+      - name: Run docs
+        uses: ad-m/github-push-action@master
+        with:
+          branch: main
+          directory: docs
+          github_token: ${{ secrets.GITHUB_TOKEN }}
