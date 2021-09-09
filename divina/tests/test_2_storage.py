@@ -14,7 +14,7 @@ import sys
 
 
 @patch.dict(
-    os.environ, {"DATASET_PATH": "{}/dataset/test1".format(os.environ["TEST_BUCKET"])}
+    os.environ, {"DATASET_PATH": "{}dataset/test1".format(os.environ["TEST_BUCKET"])}
 )
 @patch.dict(os.environ, {"DATA_BUCKET": "{}/data".format(os.environ["TEST_BUCKET"])})
 def test_build_dataset(s3_fs, test_df_1):
