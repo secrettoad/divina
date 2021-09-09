@@ -15,7 +15,7 @@ import boto3
 from dask_cloudprovider.aws import EC2Cluster
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def test_bucket():
     return 's3://divina-test-2'
 
