@@ -25,6 +25,7 @@ jobs:
     environment: test
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
+    steps:
       - name: Test with pytest
         run: |
           python3 -m pytest
@@ -38,6 +39,7 @@ jobs:
     environment: test
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
+    steps:
       - name: Build package
         run: python3 setup.py sdist bdist_wheel
       - name: Publish package
@@ -51,6 +53,7 @@ jobs:
     environment: test
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
+    steps:
       - name: Build docs
         run: |
           sphinx-build docs docs/build
