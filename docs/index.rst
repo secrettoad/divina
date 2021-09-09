@@ -46,7 +46,7 @@ In a minimal example, divina can be used to create a weather forecast using the 
     divina forecast forecast_definition.json --local
 
 
-and will produce a local output structure as shown below
+and will produce a local output structure as shown below::
 
     divina-forecast
       |- models
