@@ -33,7 +33,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Test with pytest
         run: |
-          python3 -m pytest tests/test_1_unit.py
+          python3 -m pytest divina/tests/test_1_unit.py
   build_publish:
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
