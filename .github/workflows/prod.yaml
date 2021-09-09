@@ -33,7 +33,7 @@ jobs:
         uses: ammaraskar/sphinx-action@master
         with:
           docs-folder: "docs/"
-      -name: Commit and push docs
+      - name: Commit and push docs
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
