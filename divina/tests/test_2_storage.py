@@ -39,10 +39,8 @@ def test_build_dataset(s3_fs, test_df_1, test_bucket):
     )
 
 
-@patch.dict(
-    os.environ, {"VISION_PATH": "{}/vision/test1".format(os.environ["TEST_BUCKET"])}
-)
-def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1):
+def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_bucket):
+    vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
             test_fd_1["forecast_definition"]["dataset_directory"],
@@ -61,12 +59,12 @@ def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1):
         s3_fs=s3_fs,
         dask_model=LinearRegression,
         forecast_definition=test_fd_1["forecast_definition"],
-        write_path=os.environ["VISION_PATH"],
+        write_path=vision_path,
     )
 
     with s3_fs.open(
         os.path.join(
-            os.environ["VISION_PATH"],
+            vision_path,
             "models",
             "s-19700101-000008_h-1",
         ),
@@ -127,8 +125,9 @@ def test_predict(
     os.environ, {"VISION_PATH": "{}/vision/test1".format(os.environ["TEST_BUCKET"])}
 )
 def test_validate(
-    s3_fs, test_fd_1, test_df_1, test_metrics_1, test_predictions_1, dask_client
+    s3_fs, test_fd_1, test_df_1, test_metrics_1, test_predictions_1, dask_client, test_bucket
 ):
+    vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
             test_fd_1["forecast_definition"]["dataset_directory"],
@@ -137,7 +136,7 @@ def test_validate(
     )
     ddf.from_pandas(test_predictions_1, chunksize=10000).to_parquet(
         os.path.join(
-            os.environ["VISION_PATH"],
+            vision_path,
             "predictions",
             "s-19700101-000008",
         )
@@ -146,13 +145,13 @@ def test_validate(
     dask_validate(
         s3_fs=s3_fs,
         forecast_definition=test_fd_1["forecast_definition"],
-        read_path=os.environ["VISION_PATH"],
-        write_path=os.environ["VISION_PATH"],
+        read_path=vision_path,
+        write_path=vision_path,
     )
 
     with s3_fs.open(
         os.path.join(
-            os.environ["VISION_PATH"], "metrics.json"
+            vision_path, "metrics.json"
         ),
         "r",
     ) as f:
