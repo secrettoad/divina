@@ -13,30 +13,27 @@ from ..validate import dask_validate
 import sys
 
 
-@patch.dict(
-    os.environ, {"DATASET_PATH": "{}dataset/test1".format(os.environ["TEST_BUCKET"])}
-)
 @patch.dict(os.environ, {"DATA_BUCKET": "{}/data".format(os.environ["TEST_BUCKET"])})
 def test_build_dataset(s3_fs, test_df_1):
     test_df_1.to_csv(
         os.path.join(os.environ["DATA_BUCKET"], "test_df_1.csv"), index=False
     )
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join(os.environ['TEST_BUCKET'], "test1", "data")
+        os.path.join(os.environ['TEST_BUCKET'], "stub", "data")
     )
     build_dataset_dask(
         s3_fs=s3_fs,
         write_path=os.environ["DATASET_PATH"],
         read_path=os.environ["DATA_BUCKET"],
     )
-    sys.stdout.write(os.environ["DATASET_PATH"])
+    sys.stdout.write(os.environ["DATASET_PATH"] + '\n')
     sys.stdout.write("{}/data".format(os.environ["DATASET_PATH"]))
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
-            "{}/data".format(os.environ["DATASET_PATH"])
+            "{}/dataset/test1/data".format(os.environ["TEST_BUCKET"])
         ).compute(),
         ddf.read_parquet(
-            "{}/test1/data".format(os.environ["TEST_BUCKET"])
+            "{}/stub/data".format(os.environ["TEST_BUCKET"])
         ).compute(),
     )
 
