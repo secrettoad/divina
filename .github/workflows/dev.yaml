@@ -8,7 +8,6 @@ on:
       - '!test'
 jobs:
   lint:
-    environment: test
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
     steps:
@@ -23,8 +22,7 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-  test:
-    environment: unit test
+  unit test:
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
     steps:
@@ -37,7 +35,6 @@ jobs:
         run: |
           python3 -m pytest divina/divina/tests/test_1_unit.py
   build_publish:
-    environment: test
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
     steps:
@@ -56,7 +53,6 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
           repository_url: https://test.pypi.org/legacy/
   docs:
-    environment: test
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
     steps:
