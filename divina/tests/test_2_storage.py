@@ -11,6 +11,12 @@ import joblib
 from ..predict import dask_predict
 from ..validate import dask_validate
 import sys
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def setup_teardown(setup_teardown_test_bucket_contents):
+    pass
 
 
 def test_build_dataset(s3_fs, test_df_1, test_bucket):
@@ -27,8 +33,6 @@ def test_build_dataset(s3_fs, test_df_1, test_bucket):
         write_path=dataset_path,
         read_path=data_path,
     )
-    sys.stdout.write(dataset_path + '\n')
-    sys.stdout.write("{}/data".format(dataset_path))
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
             "{}/data".format(dataset_path)
@@ -48,11 +52,11 @@ def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_buck
         )
     )
     with open(
-        os.path.join(
-            test_fd_1["forecast_definition"]["dataset_directory"],
-            "forecast_definition.json",
-        ),
-        "w+",
+            os.path.join(
+                test_fd_1["forecast_definition"]["dataset_directory"],
+                "forecast_definition.json",
+            ),
+            "w+",
     ) as f:
         json.dump(test_fd_1, f)
     dask_train(
@@ -63,18 +67,18 @@ def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_buck
     )
 
     with s3_fs.open(
-        os.path.join(
-            vision_path,
-            "models",
-            "s-19700101-000008_h-1",
-        ),
-        "rb",
+            os.path.join(
+                vision_path,
+                "models",
+                "s-19700101-000008_h-1",
+            ),
+            "rb",
     ) as f:
         assert compare_sk_models(joblib.load(f), test_model_1)
 
 
 def test_predict(
-    s3_fs, dask_client, test_df_1, test_fd_1, test_predictions_1, test_model_1, test_bucket
+        s3_fs, dask_client, test_df_1, test_fd_1, test_predictions_1, test_model_1, test_bucket
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
@@ -125,7 +129,7 @@ def test_predict(
     os.environ, {"VISION_PATH": "{}/vision/test1".format(os.environ["TEST_BUCKET"])}
 )
 def test_validate(
-    s3_fs, test_fd_1, test_df_1, test_metrics_1, test_predictions_1, dask_client, test_bucket
+        s3_fs, test_fd_1, test_df_1, test_metrics_1, test_predictions_1, dask_client, test_bucket
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
@@ -150,10 +154,10 @@ def test_validate(
     )
 
     with s3_fs.open(
-        os.path.join(
-            vision_path, "metrics.json"
-        ),
-        "r",
+            os.path.join(
+                vision_path, "metrics.json"
+            ),
+            "r",
     ) as f:
         metrics = json.load(f)
 

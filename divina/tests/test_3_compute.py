@@ -11,6 +11,12 @@ import pandas as pd
 import joblib
 from ..utils import compare_sk_models
 import json
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def setup_teardown(setup_teardown_test_bucket_contents):
+    pass
 
 
 def test_build_dataset_small(s3_fs, test_df_1, dask_client_remote, test_bucket):
