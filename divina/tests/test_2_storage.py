@@ -28,7 +28,7 @@ def test_build_dataset(s3_fs, test_df_1):
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
-            "{}/dataset/test1/data".format(os.environ["TEST_BUCKET"])
+            "s3://divina-test-2/dataset/test1/data"
         ).compute(),
         ddf.read_parquet(
             "{}/stub/data".format(os.environ["TEST_BUCKET"])
