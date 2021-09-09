@@ -23,11 +23,9 @@ def test_build_dataset(s3_fs, test_df_1):
     )
     build_dataset_dask(
         s3_fs=s3_fs,
-        write_path=os.environ["DATASET_PATH"],
-        read_path=os.environ["DATA_BUCKET"],
+        write_path="{}/dataset/test1".format(os.environ["TEST_BUCKET"]),
+        read_path=os.environ["DATA_BUCKET"]
     )
-    sys.stdout.write(os.environ["DATASET_PATH"] + '\n')
-    sys.stdout.write("{}/data".format(os.environ["DATASET_PATH"]))
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
             "{}/dataset/test1/data".format(os.environ["TEST_BUCKET"])
