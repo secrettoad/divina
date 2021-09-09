@@ -14,24 +14,26 @@ import sys
 
 
 @patch.dict(os.environ, {"DATA_BUCKET": "{}/data".format(os.environ["TEST_BUCKET"])})
-def test_build_dataset(s3_fs, test_df_1):
+def test_build_dataset(s3_fs, test_df_1, test_bucket):
     test_df_1.to_csv(
         os.path.join(os.environ["DATA_BUCKET"], "test_df_1.csv"), index=False
     )
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join(os.environ['TEST_BUCKET'], "stub", "data")
+        os.path.join(os.environ['TEST_BUCKET'], "test1", "data")
     )
     build_dataset_dask(
         s3_fs=s3_fs,
-        write_path="{}/dataset/test1".format(os.environ["TEST_BUCKET"]),
-        read_path=os.environ["DATA_BUCKET"]
+        write_path="{}/dataset/test1".format(test_bucket),
+        read_path=os.environ["DATA_BUCKET"],
     )
+    sys.stdout.write("{}/dataset/test1".format(test_bucket) + '\n')
+    sys.stdout.write("{}/dataset/test1/data".format(test_bucket))
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
-            "s3://divina-test-2/dataset/test1/data"
+            "{}/dataset/test1/data".format(test_bucket)
         ).compute(),
         ddf.read_parquet(
-            "{}/stub/data".format(os.environ["TEST_BUCKET"])
+            "{}/test1/data".format(test_bucket)
         ).compute(),
     )
 
