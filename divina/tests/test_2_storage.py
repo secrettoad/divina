@@ -30,10 +30,10 @@ def test_build_dataset(s3_fs, test_df_1):
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
-            os.path.join(os.environ["DATASET_PATH"], "data")
+            "{}/data".format(os.environ["DATASET_PATH"])
         ).compute(),
         ddf.read_parquet(
-            os.path.join(os.environ['TEST_BUCKET'], "test1", "data")
+            "{}/test1/data".format(os.environ["TEST_BUCKET"])
         ).compute(),
     )
 
