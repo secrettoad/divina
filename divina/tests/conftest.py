@@ -16,8 +16,13 @@ from dask_cloudprovider.aws import EC2Cluster
 
 
 @pytest.fixture(autouse=True)
-def setup_teardown_test_bucket_contents(s3_fs, request):
-    test_path = '{}/{}'.format(os.environ['TEST_BUCKET'], request.node.originalname)
+def test_bucket():
+    return 's3://divina-test-2'
+
+
+@pytest.fixture(autouse=True)
+def setup_teardown_test_bucket_contents(s3_fs, request, test_bucket):
+    test_path = '{}/{}'.format(test_bucket, request.node.originalname)
     try:
         s3_fs.mkdir(
             test_path,
