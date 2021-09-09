@@ -73,6 +73,6 @@ jobs:
       - name: Push docs
         uses: ad-m/github-push-action@master
         with:
-          branch: ${{ github.head_ref }}
+          branch: ${{ github.ref }}
           directory: docs
           github_token: ${{ secrets.GITHUB_TOKEN }}
