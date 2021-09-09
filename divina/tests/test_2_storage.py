@@ -10,6 +10,7 @@ from ..train import dask_train
 import joblib
 from ..predict import dask_predict
 from ..validate import dask_validate
+import sys
 
 
 @patch.dict(
@@ -28,6 +29,8 @@ def test_build_dataset(s3_fs, test_df_1):
         write_path=os.environ["DATASET_PATH"],
         read_path=os.environ["DATA_BUCKET"],
     )
+    sys.stdout.write(os.environ["DATASET_PATH"])
+    sys.stdout.write("{}/data".format(os.environ["DATASET_PATH"]))
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
             "{}/data".format(os.environ["DATASET_PATH"])
