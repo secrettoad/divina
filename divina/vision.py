@@ -1,9 +1,8 @@
-
 from .errors import InvalidDataDefinitionException
 
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
-supported_models = ['LinearRegression']
+supported_models = ["LinearRegression"]
 
 
 def validate_forecast_definition(forecast_definition):
@@ -27,7 +26,9 @@ def validate_forecast_definition(forecast_definition):
                 "time_validation_splits must be a list of date-like strings"
             )
     else:
-        raise InvalidDataDefinitionException("required key 'time_validation_splits' missing from vision definition.")
+        raise InvalidDataDefinitionException(
+            "required key 'time_validation_splits' missing from vision definition."
+        )
     if "time_horizons" in forecast_definition:
         if not type(forecast_definition["time_horizons"]) == list:
             raise InvalidDataDefinitionException(
@@ -38,7 +39,11 @@ def validate_forecast_definition(forecast_definition):
                 "time_horizons must be a list of integers"
             )
     else:
-        raise InvalidDataDefinitionException("required key 'time_horizons' missing from vision definition.")
+        raise InvalidDataDefinitionException(
+            "required key 'time_horizons' missing from vision definition."
+        )
     if "model" in forecast_definition:
-        if not forecast_definition['model'] in supported_models:
-            raise InvalidDataDefinitionException("Model '{}' is not supported.".format(forecast_definition['model']))
+        if not forecast_definition["model"] in supported_models:
+            raise InvalidDataDefinitionException(
+                "Model '{}' is not supported.".format(forecast_definition["model"])
+            )
