@@ -8,6 +8,8 @@ CHANGES
 * update prod github action yaml
 * update prod github action yaml
 * update prod github action yaml
+* update prod github action yaml
+* Build docs
 * add sphinx build github action
 * add sphinx build github action
 * add sphinx build github action
@@ -38,6 +40,7 @@ CHANGES
 * add sphinx build github action
 * dataset and vision id's merged with paths, dataset profiles removed, documentation formatting
 * add docs
+* Set theme jekyll-theme-minimal
 * add docs
 * add docs
 * WIP: docker test image
