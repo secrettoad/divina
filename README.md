@@ -42,7 +42,7 @@ Binary installers for the latest released version are available at the [Python
 Package Index (PyPI)](https://pypi.org/project/divina)
 
 ```sh
-pip install pandas
+pip install divina
 ```
 
 ## Dependencies
