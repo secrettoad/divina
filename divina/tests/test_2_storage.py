@@ -91,7 +91,6 @@ def test_predict(
             "profile",
         )
     )
-    joblib.dump(test_model_1, "tmp")
     joblib.dump(test_model_1, "s-19700101-000008_h-1")
     s3_fs.put(
         "s-19700101-000008_h-1",
@@ -116,7 +115,6 @@ def test_predict(
             os.path.join(
                 vision_path,
                 "predictions",
-                "s-19700101-000008",
                 "s-19700101-000008",
             )
         ).compute(),
