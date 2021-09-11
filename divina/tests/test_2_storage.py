@@ -1,4 +1,3 @@
-from unittest.mock import patch
 import os
 from ..dataset import build_dataset_dask
 from dask import dataframe as ddf
@@ -10,7 +9,6 @@ from ..train import dask_train
 import joblib
 from ..predict import dask_predict
 from ..validate import dask_validate
-import sys
 import pytest
 
 
@@ -119,15 +117,13 @@ def test_predict(
                 vision_path,
                 "predictions",
                 "s-19700101-000008",
+                "s-19700101-000008",
             )
         ).compute(),
         test_predictions_1,
     )
 
 
-@patch.dict(
-    os.environ, {"VISION_PATH": "{}/vision/test1".format(os.environ["TEST_BUCKET"])}
-)
 def test_validate(
     s3_fs,
     test_fd_1,
