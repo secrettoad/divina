@@ -70,9 +70,3 @@ jobs:
           git config --local user.name "GitHub Action"
           git add docs/build
           git commit -am "Build docs"
-      - name: Push docs
-        uses: ad-m/github-push-action@master
-        with:
-          branch: ${{ github.ref }}
-          directory: docs
-          github_token: ${{ secrets.GITHUB_TOKEN }}
