@@ -17,12 +17,12 @@ from dask_cloudprovider.aws import EC2Cluster
 
 @pytest.fixture()
 def test_bucket():
-    return 's3://divina-test-2'
+    return "s3://divina-test-2"
 
 
 @pytest.fixture()
 def setup_teardown_test_bucket_contents(s3_fs, request, test_bucket):
-    test_path = '{}/{}'.format(test_bucket, request.node.originalname)
+    test_path = "{}/{}".format(test_bucket, request.node.originalname)
     try:
         s3_fs.mkdir(
             test_path,
@@ -73,7 +73,7 @@ def reset_local_filesystem():
     pass
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def s3_fs():
     return s3fs.S3FileSystem()
 
@@ -111,7 +111,7 @@ def fd_no_dataset_directory():
             "target": "c",
             "time_index": "a",
             "time_validation_splits": ["1970-01-01 00:00:08"],
-            "time_horizons": [1]
+            "time_horizons": [1],
         }
     }
 
@@ -162,7 +162,7 @@ def fd_time_validation_splits_not_list():
             "target": "c",
             "time_validation_splits": "1970-01-01 00:00:08",
             "time_horizons": [1],
-            "dataset_directory": "divina-test/dataset/test1"
+            "dataset_directory": "divina-test/dataset/test1",
         }
     }
 
@@ -241,7 +241,7 @@ def test_fd_1():
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": [1],
             "dataset_directory": "divina-test/dataset/test1",
-            "model": "LinearRegression"
+            "model": "LinearRegression",
         }
     }
 
@@ -259,7 +259,7 @@ def test_fd_2():
                 {
                     "dataset_directory": "dataset/test2",
                     "join_on": ("a", "a"),
-                    "as": "test2"
+                    "as": "test2",
                 }
             ],
         }
@@ -283,15 +283,33 @@ def test_fd_3(test_bucket):
 @pytest.fixture()
 def test_composite_dataset_1():
     df = pd.DataFrame(
-        [[4.0, 5.0, 6.0, np.NaN, 6.0], [1.0, 2.0, 3.0, 2.0, 3.0], [6.0, 5.0, 6.0, np.NaN, np.NaN],
-         [4.0, 5.0, 6.0, np.NaN, 6.0], [10.0, 11.0, 12.0, np.NaN, np.NaN], [7.0, 8.0, 9.0, 8.0, np.NaN],
-         [4.0, 5.0, 6.0, np.NaN, 6.0], [5.0, 5.0, 6.0, np.NaN, np.NaN], [1.0, 2.0, 3.0, 2.0, 3.0],
-         [10.0, 11.0, 12.0, np.NaN, np.NaN], [7.0, 8.0, 9.0, 8.0, np.NaN], [1.0, 2.0, 3.0, 2.0, 3.0],
-         [10.0, 11.0, 12.0, np.NaN, np.NaN], [1.0, 2.0, 3.0, 2.0, 3.0], [10.0, 11.0, 12.0, np.NaN, np.NaN],
-         [7.0, 8.0, 9.0, 8.0, np.NaN], [10.0, 11.0, 12.0, np.NaN, np.NaN], [7.0, 8.0, 9.0, 8.0, np.NaN],
-         [5.0, 5.0, 6.0, np.NaN, np.NaN], [7.0, 8.0, 9.0, 8.0, np.NaN], [4.0, 5.0, 6.0, np.NaN, 6.0],
-         [5.0, 5.0, 6.0, np.NaN, np.NaN], [10.0, 11.0, 12.0, np.NaN, np.NaN], [10.0, 11.0, 12.0, np.NaN, np.NaN],
-         [7.0, 8.0, 9.0, 8.0, np.NaN]]
+        [
+            [4.0, 5.0, 6.0, np.NaN, 6.0],
+            [1.0, 2.0, 3.0, 2.0, 3.0],
+            [6.0, 5.0, 6.0, np.NaN, np.NaN],
+            [4.0, 5.0, 6.0, np.NaN, 6.0],
+            [10.0, 11.0, 12.0, np.NaN, np.NaN],
+            [7.0, 8.0, 9.0, 8.0, np.NaN],
+            [4.0, 5.0, 6.0, np.NaN, 6.0],
+            [5.0, 5.0, 6.0, np.NaN, np.NaN],
+            [1.0, 2.0, 3.0, 2.0, 3.0],
+            [10.0, 11.0, 12.0, np.NaN, np.NaN],
+            [7.0, 8.0, 9.0, 8.0, np.NaN],
+            [1.0, 2.0, 3.0, 2.0, 3.0],
+            [10.0, 11.0, 12.0, np.NaN, np.NaN],
+            [1.0, 2.0, 3.0, 2.0, 3.0],
+            [10.0, 11.0, 12.0, np.NaN, np.NaN],
+            [7.0, 8.0, 9.0, 8.0, np.NaN],
+            [10.0, 11.0, 12.0, np.NaN, np.NaN],
+            [7.0, 8.0, 9.0, 8.0, np.NaN],
+            [5.0, 5.0, 6.0, np.NaN, np.NaN],
+            [7.0, 8.0, 9.0, 8.0, np.NaN],
+            [4.0, 5.0, 6.0, np.NaN, 6.0],
+            [5.0, 5.0, 6.0, np.NaN, np.NaN],
+            [10.0, 11.0, 12.0, np.NaN, np.NaN],
+            [10.0, 11.0, 12.0, np.NaN, np.NaN],
+            [7.0, 8.0, 9.0, 8.0, np.NaN],
+        ]
     )
     df.columns = ["a", "b", "c", "e", "f"]
     return df
@@ -310,8 +328,8 @@ def test_df_1():
                 [10.0, 11.0, 12.0],
             ]
         )
-            .sample(25, replace=True, random_state=11)
-            .reset_index(drop=True)
+        .sample(25, replace=True, random_state=11)
+        .reset_index(drop=True)
     )
     df.columns = ["a", "b", "c"]
     return df

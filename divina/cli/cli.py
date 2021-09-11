@@ -23,14 +23,14 @@ def upsert_divina_iam():
 
 
 def cli_build_dataset(
-        read_path,
-        write_path,
-        s3_fs,
-        ec2_keypair_name=None,
-        keep_instances_alive=False,
-        local=False,
-        debug=False,
-        dask_client=None,
+    read_path,
+    write_path,
+    s3_fs,
+    ec2_keypair_name=None,
+    keep_instances_alive=False,
+    local=False,
+    debug=False,
+    dask_client=None,
 ):
     if local:
         with Client():
@@ -43,14 +43,14 @@ def cli_build_dataset(
         if not keep_instances_alive:
             try:
                 with EC2Cluster(
-                        key_name=ec2_keypair_name,
-                        security=False,
-                        docker_image="jhurdle/divina:latest",
-                        debug=debug,
-                        env_vars={
-                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                        },
+                    key_name=ec2_keypair_name,
+                    security=False,
+                    docker_image="jhurdle/divina:latest",
+                    debug=debug,
+                    env_vars={
+                        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                    },
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
@@ -80,31 +80,25 @@ def cli_build_dataset(
             cluster.adapt(minimum=0, maximum=10)
             with Client(cluster):
                 build_dataset_dask(
-                    s3_fs=s3_fs,
-                    read_path=read_path,
-                    write_path=write_path
+                    s3_fs=s3_fs, read_path=read_path, write_path=write_path
                 )
 
     else:
         try:
-            build_dataset_dask(
-                s3_fs=s3_fs,
-                read_path=read_path,
-                write_path=write_path
-            )
+            build_dataset_dask(s3_fs=s3_fs, read_path=read_path, write_path=write_path)
         except:
             pass
 
 
 def cli_train_vision(
-        s3_fs,
-        forecast_definition,
-        write_path,
-        ec2_keypair_name=None,
-        keep_instances_alive=False,
-        local=False,
-        debug=False,
-        dask_client=None,
+    s3_fs,
+    forecast_definition,
+    write_path,
+    ec2_keypair_name=None,
+    keep_instances_alive=False,
+    local=False,
+    debug=False,
+    dask_client=None,
 ):
 
     dask_model = LinearRegression
@@ -120,14 +114,14 @@ def cli_train_vision(
         if not keep_instances_alive:
             try:
                 with EC2Cluster(
-                        key_name=ec2_keypair_name,
-                        security=False,
-                        docker_image="jhurdle/divina:latest",
-                        debug=debug,
-                        env_vars={
-                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                        },
+                    key_name=ec2_keypair_name,
+                    security=False,
+                    docker_image="jhurdle/divina:latest",
+                    debug=debug,
+                    env_vars={
+                        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                    },
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
@@ -135,7 +129,7 @@ def cli_train_vision(
                             s3_fs=s3_fs,
                             dask_model=dask_model,
                             forecast_definition=forecast_definition,
-                            write_path=write_path
+                            write_path=write_path,
                         )
             except NoRegionError:
                 sys.stderr.write(
@@ -161,7 +155,7 @@ def cli_train_vision(
                     s3_fs=s3_fs,
                     dask_model=dask_model,
                     forecast_definition=forecast_definition,
-                    write_path=write_path
+                    write_path=write_path,
                 )
 
     else:
@@ -169,20 +163,20 @@ def cli_train_vision(
             s3_fs=s3_fs,
             dask_model=dask_model,
             forecast_definition=forecast_definition,
-            write_path=write_path
+            write_path=write_path,
         )
 
 
 def cli_predict_vision(
-        s3_fs,
-        forecast_definition,
-        write_path,
-        read_path,
-        ec2_keypair_name=None,
-        keep_instances_alive=False,
-        local=False,
-        debug=False,
-        dask_client=None,
+    s3_fs,
+    forecast_definition,
+    write_path,
+    read_path,
+    ec2_keypair_name=None,
+    keep_instances_alive=False,
+    local=False,
+    debug=False,
+    dask_client=None,
 ):
     if local:
         with Client():
@@ -190,20 +184,20 @@ def cli_predict_vision(
                 s3_fs=s3_fs,
                 forecast_definition=forecast_definition,
                 write_path=write_path,
-                read_path=read_path
+                read_path=read_path,
             )
     elif not dask_client:
         if not keep_instances_alive:
             try:
                 with EC2Cluster(
-                        key_name=ec2_keypair_name,
-                        security=False,
-                        docker_image="jhurdle/divina:latest",
-                        debug=debug,
-                        env_vars={
-                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                        },
+                    key_name=ec2_keypair_name,
+                    security=False,
+                    docker_image="jhurdle/divina:latest",
+                    debug=debug,
+                    env_vars={
+                        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                    },
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
@@ -211,7 +205,7 @@ def cli_predict_vision(
                             s3_fs=s3_fs,
                             forecast_definition=forecast_definition,
                             write_path=write_path,
-                            read_path=read_path
+                            read_path=read_path,
                         )
             except NoRegionError:
                 sys.stderr.write(
@@ -237,7 +231,7 @@ def cli_predict_vision(
                     s3_fs=s3_fs,
                     forecast_definition=forecast_definition,
                     write_path=write_path,
-                    read_path=read_path
+                    read_path=read_path,
                 )
 
     else:
@@ -245,20 +239,20 @@ def cli_predict_vision(
             s3_fs=s3_fs,
             forecast_definition=forecast_definition,
             write_path=write_path,
-            read_path=read_path
+            read_path=read_path,
         )
 
 
 def cli_validate_vision(
-        s3_fs,
-        forecast_definition,
-        write_path,
-        read_path,
-        ec2_keypair_name=None,
-        keep_instances_alive=False,
-        local=False,
-        debug=False,
-        dask_client=None,
+    s3_fs,
+    forecast_definition,
+    write_path,
+    read_path,
+    ec2_keypair_name=None,
+    keep_instances_alive=False,
+    local=False,
+    debug=False,
+    dask_client=None,
 ):
     if local:
         with Client():
@@ -266,20 +260,20 @@ def cli_validate_vision(
                 s3_fs=s3_fs,
                 forecast_definition=forecast_definition,
                 write_path=write_path,
-                read_path=read_path
+                read_path=read_path,
             )
     elif not dask_client:
         if not keep_instances_alive:
             try:
                 with EC2Cluster(
-                        key_name=ec2_keypair_name,
-                        security=False,
-                        docker_image="jhurdle/divina:latest",
-                        debug=debug,
-                        env_vars={
-                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                        },
+                    key_name=ec2_keypair_name,
+                    security=False,
+                    docker_image="jhurdle/divina:latest",
+                    debug=debug,
+                    env_vars={
+                        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                    },
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
@@ -287,7 +281,7 @@ def cli_validate_vision(
                             s3_fs=s3_fs,
                             forecast_definition=forecast_definition,
                             write_path=write_path,
-                            read_path=read_path
+                            read_path=read_path,
                         )
             except NoRegionError:
                 sys.stderr.write(
@@ -313,7 +307,7 @@ def cli_validate_vision(
                     s3_fs=s3_fs,
                     forecast_definition=forecast_definition,
                     write_path=write_path,
-                    read_path=read_path
+                    read_path=read_path,
                 )
 
     else:
@@ -321,7 +315,7 @@ def cli_validate_vision(
             s3_fs=s3_fs,
             forecast_definition=forecast_definition,
             write_path=write_path,
-            read_path=read_path
+            read_path=read_path,
         )
 
 
@@ -330,28 +324,28 @@ def divina():
     pass
 
 
-@click.argument("ec2_key", default=None, required=False,)
+@click.argument(
+    "ec2_key",
+    default=None,
+    required=False,
+)
 @click.argument("keep_alive", default=False, required=False)
 @click.argument("vision_def", type=click.File("rb"))
-@click.argument("write_path", default='divina-forecast', required=False)
+@click.argument("write_path", default="divina-forecast", required=False)
 @click.option("-l", "--local", is_flag=True, help="flag to compute results locally")
-@click.option("-d", "--debug", is_flag=True, help="flag to increase verbosity of console output")
+@click.option(
+    "-d", "--debug", is_flag=True, help="flag to increase verbosity of console output"
+)
 @divina.command()
-def forecast(vision_def,
-        keep_alive,
-        ec2_key,
-        write_path,
-        local,
-        debug):
-    """ :WRITE_PATH: s3:// or local path to write results to
-        :FORECAST_DEF: path to vision definition JSON file
-        :VISION_NAME: name of vision. must be unique to the set of visions in write_path
-        :KEEP_ALIVE: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging.
-        :EC2_KEY: aws ec2 keypair name to provide access to dask cluster for debugging.
+def forecast(forecast_def, keep_alive, ec2_key, write_path, local, debug):
+    """:write_path: s3:// or local path to write results to
+    :forecast_def: path to vision definition JSON file
+    :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging.
+    :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
     cli_train_vision(
         s3_fs=s3fs.S3FileSystem(),
-        forecast_definition=json.load(vision_def),
+        forecast_definition=json.load(forecast_def),
         write_path=write_path,
         ec2_keypair_name=ec2_key,
         keep_instances_alive=keep_alive,
@@ -360,7 +354,7 @@ def forecast(vision_def,
     )
     cli_predict_vision(
         s3_fs=s3fs.S3FileSystem(),
-        forecast_definition=json.load(vision_def),
+        forecast_definition=json.load(forecast_def),
         write_path=write_path,
         read_path=write_path,
         ec2_keypair_name=ec2_key,
@@ -370,7 +364,7 @@ def forecast(vision_def,
     )
     cli_validate_vision(
         s3_fs=s3fs.S3FileSystem(),
-        forecast_definition=json.load(vision_def),
+        forecast_definition=json.load(forecast_def),
         write_path=write_path,
         read_path=write_path,
         ec2_keypair_name=ec2_key,
@@ -382,21 +376,21 @@ def forecast(vision_def,
 
 @click.argument("ec2_key", default=None, required=False)
 @click.argument("keep_alive", default=False, required=False)
-@click.argument("write_path", default='divina-forecast', required=False)
-@click.argument("read_path", default='divina-forecast', required=False)
+@click.argument("write_path", default="divina-forecast", required=False)
+@click.argument("read_path", default="divina-forecast", required=False)
 @click.option("-l", "--local", is_flag=True, help="flag to compute results locally")
 @divina.command()
 def dataset(
-        write_path,
-        read_path,
-        ec2_key,
-        keep_alive,
-        local,
+    write_path,
+    read_path,
+    ec2_key,
+    keep_alive,
+    local,
 ):
-    """ :READ_PATH: s3:// or local path to read raw data from
-        :WRITE_PATH: s3:// or local path to write results to
-        :KEEP_ALIVE: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging
-        :EC2_KEY: aws ec2 keypair name to provide access to dask cluster for debugging
+    """:read_path: s3:// or local path to read raw data from
+    :write_path: s3:// or local path to write results to
+    :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging
+    :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging
     """
     if not read_path[:5] == "s3://" and write_path[:5] == "s3://":
         raise Exception("both read_path and write_path must begin with 's3://'")
@@ -413,29 +407,31 @@ def dataset(
 @click.argument("ec2_keypair_name", default=None, required=False)
 @click.argument("keep_instances_alive", default=False, required=False)
 @click.argument("forecast_definition", type=click.File("rb"))
-@click.argument("write_path", default='divina-forecast', required=False)
+@click.argument("write_path", default="divina-forecast", required=False)
 @click.option("-l", "--local", is_flag=True, help="flag to compute results locally")
-@click.option("-d", "--debug", is_flag=True, help="flag to increase verbosity of console output")
+@click.option(
+    "-d", "--debug", is_flag=True, help="flag to increase verbosity of console output"
+)
 @divina.command()
 def train(
-        forecast_definition,
-        keep_instances_alive,
-        ec2_keypair_name,
-        write_path,
-        local,
-        debug,
+    forecast_def,
+    keep_alive,
+    ec2_key,
+    write_path,
+    local,
+    debug,
 ):
-    """ :WRITE_PATH: s3:// or local path to write trained model to
-        :FORECAST_DEF: path to vision definition JSON file
-        :KEEP_ALIVE: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging
-        :EC2_KEY: aws ec2 keypair name to provide access to dask cluster for debugging
+    """:write_path: s3:// or local path to write trained model to
+    :forecast_def: path to vision definition JSON file
+    :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging
+    :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging
     """
     cli_train_vision(
         s3_fs=s3fs.S3FileSystem(),
-        forecast_definition=json.load(forecast_definition),
+        forecast_definition=json.load(forecast_def),
         write_path=write_path,
-        ec2_keypair_name=ec2_keypair_name,
-        keep_instances_alive=keep_instances_alive,
+        ec2_keypair_name=ec2_key,
+        keep_instances_alive=keep_alive,
         local=local,
         debug=debug,
     )
@@ -444,29 +440,31 @@ def train(
 @click.argument("ec2_key", default=None, required=False)
 @click.argument("keep_alive", default=False, required=False)
 @click.argument("vision_def", type=click.File("rb"))
-@click.argument("write_path", default='divina-forecast', required=False)
-@click.argument("read_path", default='divina-forecast', required=False)
+@click.argument("write_path", default="divina-forecast", required=False)
+@click.argument("read_path", default="divina-forecast", required=False)
 @click.option("-l", "--local", is_flag=True, help="flag to compute results locally")
-@click.option("-d", "--debug", is_flag=True, help="flag to increase verbosity of console output")
+@click.option(
+    "-d", "--debug", is_flag=True, help="flag to increase verbosity of console output"
+)
 @divina.command()
 def predict(
-        vision_def,
-        keep_alive,
-        ec2_key,
-        write_path,
-        read_path,
-        local,
-        debug,
+    forecast_def,
+    keep_alive,
+    ec2_key,
+    write_path,
+    read_path,
+    local,
+    debug,
 ):
-    """ :READ_PATH: s3:// or local path to read trained model fromn
-        :WRITE_PATH: s3:// or local path to write results to
-        :FORECAST_DEF: path to vision definition JSON file
-        :KEEP_ALIVE: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging
-        :EC2_KEY: aws ec2 keypair name to provide access to dask cluster for debugging
+    """:read_path: s3:// or local path to read trained model fromn
+    :write_path: s3:// or local path to write results to
+    :forecast_def: path to vision definition JSON file
+    :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging
+    :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging
     """
     cli_predict_vision(
         s3_fs=s3fs.S3FileSystem(),
-        forecast_definition=json.load(vision_def),
+        forecast_definition=json.load(forecast_def),
         write_path=write_path,
         read_path=read_path,
         ec2_keypair_name=ec2_key,
@@ -476,32 +474,38 @@ def predict(
     )
 
 
-@click.argument("ec2_key", default=None, required=False,)
+@click.argument(
+    "ec2_key",
+    default=None,
+    required=False,
+)
 @click.argument("keep_alive", default=False, required=False)
 @click.argument("vision_def", type=click.File("rb"))
-@click.argument("write_path", default='divina-forecast', required=False)
-@click.argument("read_path", default='divina-forecast', required=False)
+@click.argument("write_path", default="divina-forecast", required=False)
+@click.argument("read_path", default="divina-forecast", required=False)
 @click.option("-l", "--local", is_flag=True, help="flag to compute results locally")
-@click.option("-d", "--debug", is_flag=True, help="flag to increase verbosity of console output")
+@click.option(
+    "-d", "--debug", is_flag=True, help="flag to increase verbosity of console output"
+)
 @divina.command()
 def validate(
-        vision_def,
-        keep_alive,
-        ec2_key,
-        write_path,
-        read_path,
-        local,
-        debug,
+    forecast_def,
+    keep_alive,
+    ec2_key,
+    write_path,
+    read_path,
+    local,
+    debug,
 ):
-    """ :READ_PATH: s3:// or local path to read predictions from
-        :WRITE_PATH: s3:// or local path to write results to
-        :FORECAST_DEF: path to vision definition JSON file
-        :KEEP_ALIVE: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging
-        :EC2_KEY: aws ec2 keypair name to provide access to dask cluster for debugging
+    """:read_path: s3:// or local path to read predictions from
+    :write_path: s3:// or local path to write results to
+    :forecast_def: path to vision definition JSON file
+    :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging
+    :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging
     """
     cli_validate_vision(
         s3_fs=s3fs.S3FileSystem(),
-        forecast_definition=json.load(vision_def),
+        forecast_definition=json.load(forecast_def),
         write_path=write_path,
         read_path=read_path,
         ec2_keypair_name=ec2_key,
