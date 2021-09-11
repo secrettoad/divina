@@ -63,7 +63,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Build docs
         run: |
-          sphinx-build docs docs/build
+          sphinx-build docs/source docs
       - name: Commit docs
         run: |
           git config --local user.email "action@github.com"
