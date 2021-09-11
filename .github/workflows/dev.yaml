@@ -59,10 +59,11 @@ jobs:
           directory: docs
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-  twine:
+  pypi:
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
     steps:
+      - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
@@ -70,4 +71,4 @@ jobs:
       - name: Test pypi
         run: |
           python3 setup.py sdist bsdist_wheel
-          twin check dist/*
+          twine check dist/*
