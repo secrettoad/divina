@@ -59,27 +59,3 @@ jobs:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
           repository_url: https://test.pypi.org/legacy/
-  docs:
-    runs-on: ubuntu-latest
-    container: jhurdle/divina:test
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Build docs
-        run: |
-          sphinx-build docs/source docs/build
-      - name: Commit docs
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add docs/build
-          git commit -am "Build docs"
-      - name: Push docs
-        uses: ad-m/github-push-action@master
-        with:
-          branch: ${{ github.ref }}
-          directory: docs
-          github_token: ${{ secrets.GITHUB_TOKEN }}
