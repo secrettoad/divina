@@ -44,7 +44,7 @@ def setup_teardown_test_bucket_contents(s3_fs, request, test_bucket):
 
 
 @pytest.fixture(autouse=True)
-def setup_teardown_test_directory(s3_fs, request, test_bucket):
+def setup_teardown_test_directory(s3_fs, test_bucket):
     try:
         os.mkdir("divina-test")
     except FileExistsError:
@@ -267,14 +267,14 @@ def test_fd_2():
 
 
 @pytest.fixture()
-def test_fd_3():
+def test_fd_3(test_bucket):
     return {
         "forecast_definition": {
             "time_index": "a",
             "target": "c",
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": [1],
-            "dataset_directory": "{}/dataset".format(os.environ["TEST_BUCKET"]),
+            "dataset_directory": "{}/dataset".format(test_bucket),
             "dataset_id": "test1",
         }
     }
