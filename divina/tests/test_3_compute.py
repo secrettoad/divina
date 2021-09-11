@@ -22,9 +22,7 @@ def setup_teardown(setup_teardown_test_bucket_contents):
 def test_build_dataset_small(s3_fs, test_df_1, dask_client_remote, test_bucket):
     dataset_path = "{}/dataset/test1".format(test_bucket)
     data_path = "{}/data".format(test_bucket)
-    test_df_1.to_csv(
-        os.path.join(data_path, "test_df_1.csv"), index=False
-    )
+    test_df_1.to_csv(os.path.join(data_path, "test_df_1.csv"), index=False)
     cli_build_dataset(
         s3_fs=s3_fs,
         write_path=dataset_path,
@@ -33,14 +31,14 @@ def test_build_dataset_small(s3_fs, test_df_1, dask_client_remote, test_bucket):
         dask_client=dask_client_remote,
     )
     pd.testing.assert_frame_equal(
-        ddf.read_parquet(
-            os.path.join(dataset_path, "data")
-        ).compute(),
+        ddf.read_parquet(os.path.join(dataset_path, "data")).compute(),
         test_df_1,
     )
 
 
-def test_train_small(s3_fs, test_df_1, test_model_1, test_fd_3, dask_client_remote, test_bucket):
+def test_train_small(
+    s3_fs, test_df_1, test_model_1, test_fd_3, dask_client_remote, test_bucket
+):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
@@ -69,7 +67,13 @@ def test_train_small(s3_fs, test_df_1, test_model_1, test_fd_3, dask_client_remo
 
 
 def test_predict_small(
-    s3_fs, test_df_1, test_model_1, test_predictions_1, test_fd_3, dask_client_remote, test_bucket
+    s3_fs,
+    test_df_1,
+    test_model_1,
+    test_predictions_1,
+    test_fd_3,
+    dask_client_remote,
+    test_bucket,
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
@@ -110,15 +114,19 @@ def test_predict_small(
     )
 
 
-
 def test_validate_small(
-    s3_fs, test_fd_3, test_df_1, test_metrics_1, test_predictions_1, dask_client_remote, test_bucket
+    s3_fs,
+    test_fd_3,
+    test_df_1,
+    test_metrics_1,
+    test_predictions_1,
+    dask_client_remote,
+    test_bucket,
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
             test_fd_3["forecast_definition"]["dataset_directory"],
-
             "data",
         )
     )
@@ -143,9 +151,7 @@ def test_validate_small(
     )
 
     with s3_fs.open(
-        os.path.join(
-            vision_path, "metrics.json"
-        ),
+        os.path.join(vision_path, "metrics.json"),
         "r",
     ) as f:
         metrics = json.load(f)

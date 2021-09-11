@@ -70,7 +70,10 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                             "{}_h_{}".format(forecast_definition["target"], h)
                             for h in forecast_definition["time_horizons"]
                         ]
-                        + [forecast_definition["time_index"], forecast_definition["target"]]
+                        + [
+                            forecast_definition["time_index"],
+                            forecast_definition["target"],
+                        ]
                     ]
                 ].to_dask_array(lengths=True),
                 df_train["{}_h_{}".format(forecast_definition["target"], h)],
