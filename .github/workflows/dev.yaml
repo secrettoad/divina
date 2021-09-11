@@ -1,12 +1,13 @@
-name: divina test
+name: divina dev
 
 on:
   push:
     branches:
-      - test
+      - '*'
+      - '!main'
+      - '!test'
 jobs:
   lint:
-    environment: test
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
     steps:
@@ -21,8 +22,7 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-  test:
-    environment: test
+  unit_test:
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
     steps:
@@ -33,15 +33,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Test with pytest
         run: |
-          python3 -m pytest
-        env:
-          TEST_BUCKET: '${{ secrets.TEST_BUCKET }}/${{ matrix.python-version }}'
-          AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
-          AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
-          AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
-          ACCOUNT_NUMBER: '${{ secrets.ACCOUNT_NUMBER }}'
+          python3 -m pytest divina/tests/test_1_unit.py
   build_publish:
-    environment: test
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
     steps:
@@ -59,3 +52,27 @@ jobs:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
           repository_url: https://test.pypi.org/legacy/
+  docs:
+    runs-on: ubuntu-latest
+    container: jhurdle/divina:test
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build docs
+        run: |
+          sphinx-build docs/source docs/build
+      - name: Commit docs
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/build
+          git commit -am "Build docs"
+      - name: Push docs
+        uses: ad-m/github-push-action@master
+        with:
+          branch: ${{ github.ref }}
+          directory: docs
+          github_token: ${{ secrets.GITHUB_TOKEN }}

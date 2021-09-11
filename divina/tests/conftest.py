@@ -15,12 +15,12 @@ import boto3
 from dask_cloudprovider.aws import EC2Cluster
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def test_bucket():
     return 's3://divina-test-2'
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def setup_teardown_test_bucket_contents(s3_fs, request, test_bucket):
     test_path = '{}/{}'.format(test_bucket, request.node.originalname)
     try:
@@ -36,16 +36,21 @@ def setup_teardown_test_bucket_contents(s3_fs, request, test_bucket):
             region_name=os.environ["AWS_DEFAULT_REGION"],
             acl="private",
         )
+    yield
+    try:
+        s3_fs.rm(test_path, recursive=True)
+    except FileNotFoundError:
+        pass
+
+
+@pytest.fixture(autouse=True)
+def setup_teardown_test_directory(s3_fs, request, test_bucket):
     try:
         os.mkdir("divina-test")
     except FileExistsError:
         shutil.rmtree("divina-test")
         os.mkdir("divina-test")
     yield
-    try:
-        s3_fs.rm(test_path, recursive=True)
-    except FileNotFoundError:
-        pass
     try:
         shutil.rmtree("divina-test")
     except FileNotFoundError:
