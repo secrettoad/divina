@@ -45,12 +45,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Build docs
         run: |
-          sphinx-build docs docs/build
+          sphinx-build docs_src docs
       - name: Commit docs
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add docs/build -f
+          git add docs/* -f
           git commit -am "Build docs"
       - name: Push docs
         uses: ad-m/github-push-action@master
