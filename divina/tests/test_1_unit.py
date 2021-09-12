@@ -21,7 +21,7 @@ def test_validate_forecast_definition(
     fd_time_validation_splits_not_list,
     fd_no_time_index,
     fd_no_dataset_directory,
-    fd_invalid_model
+    fd_invalid_model,
 ):
     for dd in [
         fd_no_target,
@@ -29,7 +29,7 @@ def test_validate_forecast_definition(
         fd_time_validation_splits_not_list,
         fd_time_horizons_not_list,
         fd_no_dataset_directory,
-        fd_invalid_model
+        fd_invalid_model,
     ]:
         try:
             validate_forecast_definition(dd)
@@ -48,9 +48,7 @@ def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
     test_df_1.to_csv(
         os.path.join(os.environ["DATA_BUCKET"], "test_df_1.csv"), index=False
     )
-    pathlib.Path(os.environ["DATASET_PATH"]).mkdir(
-        parents=True, exist_ok=True
-    )
+    pathlib.Path(os.environ["DATASET_PATH"]).mkdir(parents=True, exist_ok=True)
     build_dataset_dask(
         s3_fs=s3_fs,
         read_path=os.environ["DATA_BUCKET"],
@@ -59,11 +57,7 @@ def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
     )
 
     pd.testing.assert_frame_equal(
-        ddf.read_parquet(
-            os.path.join(
-                os.environ["DATASET_PATH"], "data/*"
-            )
-        ).compute(),
+        ddf.read_parquet(os.path.join(os.environ["DATASET_PATH"], "data/*")).compute(),
         test_df_1,
     )
 
@@ -157,9 +151,9 @@ def test_dask_predict(
             "data",
         )
     ).mkdir(parents=True, exist_ok=True)
-    pathlib.Path(
-        os.path.join(os.environ["VISION_PATH"], "models")
-    ).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(os.path.join(os.environ["VISION_PATH"], "models")).mkdir(
+        parents=True, exist_ok=True
+    )
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
             test_fd_1["forecast_definition"]["dataset_directory"],
@@ -229,9 +223,7 @@ def test_dask_validate(
     )
 
     with open(
-        os.path.join(
-            os.environ["VISION_PATH"], "metrics.json"
-        ),
+        os.path.join(os.environ["VISION_PATH"], "metrics.json"),
         "r",
     ) as f:
         metrics = json.load(f)

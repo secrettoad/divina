@@ -45,12 +45,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Build docs
         run: |
-          sphinx-build docs/source docs/build
+          sphinx-build docs docs/build
       - name: Commit docs
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add docs/build
+          git add docs/build -f
           git commit -am "Build docs"
       - name: Push docs
         uses: ad-m/github-push-action@master
@@ -58,3 +58,17 @@ jobs:
           branch: ${{ github.ref }}
           directory: docs
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  pypi:
+    runs-on: ubuntu-latest
+    container: jhurdle/divina:test
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Test pypi
+        run: |
+          python3 setup.py sdist bdist_wheel
+          twine check dist/*
