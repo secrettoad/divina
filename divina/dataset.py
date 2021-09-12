@@ -7,29 +7,21 @@ from botocore.exceptions import ClientError
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def get_dataset(forecast_definition):
 
-    df = dd.read_parquet(
-        "{}/data/*".format(
-            forecast_definition["dataset_directory"]
-        )
-    )
+    df = dd.read_parquet("{}/data/*".format(forecast_definition["dataset_directory"]))
     if "joins" in forecast_definition:
         for i, join in enumerate(forecast_definition["joins"]):
-            join_df = dd.read_parquet(
-                "{}/data/*".format(join["dataset_directory"])
-            )
+            join_df = dd.read_parquet("{}/data/*".format(join["dataset_directory"]))
             df = df.merge(
                 join_df,
                 how="left",
                 left_on=join["join_on"][0],
                 right_on=join["join_on"][1],
-                suffixes=("", "{}_".format(join['as']))
+                suffixes=("", "{}_".format(join["as"])),
             )
     return df
 
 
-def build_dataset_dask(
-    s3_fs, read_path, write_path, partition_dimensions=None
-):
+def build_dataset_dask(s3_fs, read_path, write_path, partition_dimensions=None):
     if write_path[:5] == "s3://":
         if not s3_fs.exists(write_path):
             s3_fs.mkdir(

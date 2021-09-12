@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  lint:
+  release:
     environment: prod
     runs-on: ubuntu-latest
     container: jhurdle/divina:latest
@@ -23,41 +23,21 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-  test:
-    environment: prod
-    runs-on: ubuntu-latest
-    container: jhurdle/divina:latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
       - name: Test with pytest
         run: |
           python3 -m pytest
         env:
-          TEST_BUCKET: '${{ secrets.TEST_BUCKET }}/${{ matrix.python-version }}'
           AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
           AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
           AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
           ACCOUNT_NUMBER: '${{ secrets.ACCOUNT_NUMBER }}'
-  build_publish:
-    environment: prod
-    runs-on: ubuntu-latest
-    container: jhurdle/divina:latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
+      - name: Get latest tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
       - name: Build package
+        env:
+          PBR_VERSION: ${{ steps.previoustag.outputs.tag }}
         run: python3 setup.py sdist bdist_wheel
       - name: Publish package
-        if: startsWith(github.ref, 'refs/tags')
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
-
+        if: success()
+        run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
