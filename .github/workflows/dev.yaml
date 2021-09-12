@@ -50,7 +50,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add docs/build
+          git add docs
           git commit -am "Build docs"
       - name: Push docs
         uses: ad-m/github-push-action@master
