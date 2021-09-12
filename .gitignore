@@ -5,5 +5,3 @@ build/*
 dist/*
 WIP/*
 docs/*
-!docs/source
-!docs/_static
