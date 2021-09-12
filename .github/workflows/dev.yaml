@@ -46,6 +46,7 @@ jobs:
       - name: Build docs
         run: |
           sphinx-build docs_src docs
+          touch docs/.nojekyll
       - name: Commit docs
         run: |
           git config --local user.email "action@github.com"
