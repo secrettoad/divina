@@ -107,7 +107,7 @@ def test_predict_small(
             os.path.join(
                 vision_path,
                 "predictions",
-                "s-19700101-000008",
+                "s-19700101-000006",
             )
         ).compute(),
         test_predictions_1,

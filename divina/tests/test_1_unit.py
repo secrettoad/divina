@@ -22,6 +22,7 @@ def test_validate_forecast_definition(
     fd_no_time_index,
     fd_no_dataset_directory,
     fd_invalid_model,
+    fd_time_horizons_range_not_tuple
 ):
     for dd in [
         fd_no_target,
@@ -30,6 +31,7 @@ def test_validate_forecast_definition(
         fd_time_horizons_not_list,
         fd_no_dataset_directory,
         fd_invalid_model,
+        fd_time_horizons_range_not_tuple
     ]:
         try:
             validate_forecast_definition(dd)
@@ -91,7 +93,7 @@ def test_dask_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client):
                 os.path.join(
                     os.environ["VISION_PATH"],
                     "models",
-                    "s-19700101-000008_h-1",
+                    "s-19700101-000006_h-1",
                 )
             )
         ),
@@ -165,7 +167,7 @@ def test_dask_predict(
         os.path.join(
             os.environ["VISION_PATH"],
             "models",
-            "s-19700101-000008_h-1",
+            "s-19700101-000006_h-1",
         ),
     )
     with open(
@@ -189,9 +191,9 @@ def test_dask_predict(
             os.path.join(
                 os.environ["VISION_PATH"],
                 "predictions",
-                "s-19700101-000008",
+                "s-19700101-000006",
             )
-        ).compute(),
+        ).compute().reset_index(drop=True),
         test_predictions_1,
     )
 
@@ -206,7 +208,7 @@ def test_dask_validate(
         os.path.join(
             os.environ["VISION_PATH"],
             "predictions",
-            "s-19700101-000008",
+            "s-19700101-000006",
         )
     )
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(

@@ -1,8 +1,7 @@
 name: divina prod
 
 on:
-  release:
-    types: [published]
+  push:
     branches:
       - main
 
@@ -31,13 +30,3 @@ jobs:
           AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
           AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
           ACCOUNT_NUMBER: '${{ secrets.ACCOUNT_NUMBER }}'
-      - name: Get latest tag
-        id: previoustag
-        uses: WyriHaximus/github-action-get-previous-tag@v1
-      - name: Build package
-        env:
-          PBR_VERSION: ${{ steps.previoustag.outputs.tag }}
-        run: python3 setup.py sdist bdist_wheel
-      - name: Publish package
-        if: success()
-        run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
