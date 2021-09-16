@@ -31,8 +31,9 @@ The aim of :mod:`divina` is twofold:
             "time_index": "index",
             "target": "passengers",
             "time_validation_splits": ["1957-01-01"],
-            "time_validation_horizons": [1],
-            "dataset_directory": "s3://divina-public/dataset/airline_sales",
+            "time_horizons": [1],
+            "dataset_directory": "s3://divina-public/dataset",
+            "dataset_id": "airline_sales"
         }
     }
 
@@ -68,7 +69,6 @@ In a more advanced configuration, divina can be used with the following command 
 
 to produce an s3 hosted output structure as shown below
 
-###TODO - illustrate use of start date, end date and horizon to deliver "best information" forecast
 ###TODO visualization and interpretation interface
 
 .. click:: divina.cli.cli:divina
