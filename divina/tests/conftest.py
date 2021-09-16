@@ -14,6 +14,7 @@ import dask.dataframe as ddf
 import boto3
 from dask_cloudprovider.aws import EC2Cluster
 from pandas import Timestamp
+import fsspec
 
 
 @pytest.fixture()
@@ -23,6 +24,7 @@ def test_bucket():
 
 @pytest.fixture()
 def setup_teardown_test_bucket_contents(s3_fs, request, test_bucket):
+    fsspec.filesystem('s3').invalidate_cache()
     test_path = "{}/{}".format(test_bucket, request.node.originalname)
     try:
         s3_fs.mkdir(
@@ -265,7 +267,11 @@ def test_fd_3(test_bucket):
         "forecast_definition": {
             "time_index": "a",
             "target": "c",
-            "time_validation_splits": ["1970-01-01 00:00:08"],
+            "time_validation_splits": ["1970-01-01 00:00:06"],
+            "train_val_cutoff": "1970-01-01 00:00:08",
+            "forecast_start": "1970-01-01 00:00:05",
+            "forecast_end": "1970-01-01 00:00:10",
+            "scenarios": {'b': {'values': [(0, 5)], 'start': "1970-01-01 00:00:09", 'end': "1970-01-01 00:00:10"}},
             "time_horizons": [1],
             "dataset_directory": "{}/dataset".format(test_bucket),
             "dataset_id": "test1",
