@@ -34,7 +34,7 @@
             
   <span class="target" id="module-divina"></span><div class="section" id="divina-documentation">
 <h1>divina documentation<a class="headerlink" href="#divina-documentation" title="Permalink to this headline">¶</a></h1>
-<p><strong>Date</strong>: Sep 12, 2021 <strong>Version</strong>: </p>
+<p><strong>Date</strong>: Sep 16, 2021 <strong>Version</strong>: </p>
 <p><strong>Useful links</strong>:
 <a class="reference external" href="https://pypi.org/project/divina">Binary Installers</a> |
 <a class="reference external" href="https://github.com/secrettoad/divina">Source Repository</a> |
@@ -52,9 +52,8 @@ programming language.</p>
         <span class="nt">&quot;time_index&quot;</span><span class="p">:</span> <span class="s2">&quot;index&quot;</span><span class="p">,</span>
         <span class="nt">&quot;target&quot;</span><span class="p">:</span> <span class="s2">&quot;passengers&quot;</span><span class="p">,</span>
         <span class="nt">&quot;time_validation_splits&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;1957-01-01&quot;</span><span class="p">],</span>
-        <span class="nt">&quot;time_horizons&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span>
-        <span class="nt">&quot;dataset_directory&quot;</span><span class="p">:</span> <span class="s2">&quot;s3://divina-public/dataset&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;dataset_id&quot;</span><span class="p">:</span> <span class="s2">&quot;airline_sales&quot;</span>
+        <span class="nt">&quot;time_validation_horizons&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+        <span class="nt">&quot;dataset_directory&quot;</span><span class="p">:</span> <span class="s2">&quot;s3://divina-public/dataset/airline_sales&quot;</span><span class="p">,</span>
     <span class="p">}</span>
 <span class="p">}</span>
 </pre></div>
@@ -87,6 +86,7 @@ programming language.</p>
 </div>
 <p>In a more advanced configuration, divina can be used with the following command and forecast definition</p>
 <p>to produce an s3 hosted output structure as shown below</p>
+<p>###TODO - illustrate use of start date, end date and horizon to deliver “best information” forecast</p>
 <p>###TODO visualization and interpretation interface</p>
 </div>
 

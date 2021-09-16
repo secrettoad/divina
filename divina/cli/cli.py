@@ -51,6 +51,7 @@ def cli_build_dataset(
                         "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                         "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                     },
+                    auto_shutdown=True,
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
@@ -122,6 +123,7 @@ def cli_train_vision(
                         "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                         "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                     },
+                    auto_shutdown=True,
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
@@ -198,6 +200,7 @@ def cli_predict_vision(
                         "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                         "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                     },
+                    auto_shutdown=True,
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
@@ -274,6 +277,7 @@ def cli_validate_vision(
                         "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                         "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                     },
+                    auto_shutdown=True,
                 ) as cluster:
                     cluster.adapt(minimum=0, maximum=10)
                     with Client(cluster):
