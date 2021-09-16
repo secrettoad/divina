@@ -59,7 +59,7 @@ def test_train_small(
         os.path.join(
             vision_path,
             "models",
-            "s-19700101-000008_h-1",
+            "s-19700101-000006_h-1",
         ),
         "rb",
     ) as f:
@@ -82,17 +82,17 @@ def test_predict_small(
             "data",
         )
     )
-    joblib.dump(test_model_1, "s-19700101-000008_h-1")
+    joblib.dump(test_model_1, "s-19700101-000006_h-1")
     s3_fs.put(
-        "s-19700101-000008_h-1",
+        "s-19700101-000006_h-1",
         os.path.join(
             vision_path,
             "models",
-            "s-19700101-000008_h-1",
+            "s-19700101-000006_h-1",
         ),
         recursive=True,
     )
-    os.remove("s-19700101-000008_h-1")
+    os.remove("s-19700101-000006_h-1")
     forecast_definition = test_fd_3["forecast_definition"]
     cli_predict_vision(
         s3_fs=s3_fs,
@@ -107,9 +107,9 @@ def test_predict_small(
             os.path.join(
                 vision_path,
                 "predictions",
-                "s-19700101-000008",
+                "s-19700101-000006",
             )
-        ).compute(),
+        ).compute().reset_index(drop=True),
         test_predictions_1,
     )
 
@@ -135,7 +135,7 @@ def test_validate_small(
         os.path.join(
             vision_path,
             "predictions",
-            "s-19700101-000008",
+            "s-19700101-000006",
         )
     )
 

@@ -13,6 +13,8 @@ from dask_ml.linear_model import LinearRegression
 import dask.dataframe as ddf
 import boto3
 from dask_cloudprovider.aws import EC2Cluster
+from pandas import Timestamp
+import fsspec
 
 
 @pytest.fixture()
@@ -22,6 +24,7 @@ def test_bucket():
 
 @pytest.fixture()
 def setup_teardown_test_bucket_contents(s3_fs, request, test_bucket):
+    fsspec.filesystem('s3').invalidate_cache()
     test_path = "{}/{}".format(test_bucket, request.node.originalname)
     try:
         s3_fs.mkdir(
@@ -97,11 +100,12 @@ def dask_client_remote():
             "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
             "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
         },
+        auto_shutdown=True,
     )
     cluster.adapt(minimum=1, maximum=10)
     client = Client(cluster)
     yield client
-    client.close()
+    client.shutdown()
 
 
 @pytest.fixture()
@@ -181,6 +185,19 @@ def fd_time_horizons_not_list():
 
 
 @pytest.fixture()
+def fd_time_horizons_range_not_tuple():
+    return {
+        "forecast_definition": {
+            "time_index": "a",
+            "target": "c",
+            "time_validation_splits": ["1970-01-01 00:00:08"],
+            "time_horizons": [[1, 60]],
+            "dataset_directory": "divina-test/dataset/test1",
+        }
+    }
+
+
+@pytest.fixture()
 def test_model_1(test_df_1):
     return LinearRegression().fit(
         ddf.from_pandas(test_df_1, chunksize=10000)[["b"]].to_dask_array(lengths=True),
@@ -190,43 +207,17 @@ def test_model_1(test_df_1):
 
 @pytest.fixture()
 def test_metrics_1():
-    return {
-        "splits": {
-            "1970-01-01 00:00:08": {"time_horizons": {"1": {"mae": 0.3750750300119954}}}
-        }
-    }
+    return {'splits': {'1970-01-01 00:00:06': {'time_horizons': {'1': {'mae': 73.62418300653593}}}}}
 
 
 @pytest.fixture()
 def test_predictions_1():
     df = pd.DataFrame(
-        [
-            [4.0, 5.836397058823538],
-            [1.0, 2.9181985294117725],
-            [6.0, 5.836397058823538],
-            [4.0, 5.836397058823538],
-            [10.0, 11.672794117647069],
-            [7.0, 8.754595588235304],
-            [4.0, 5.836397058823538],
-            [5.0, 5.836397058823538],
-            [1.0, 2.9181985294117725],
-            [10.0, 11.672794117647069],
-            [7.0, 8.754595588235304],
-            [1.0, 2.9181985294117725],
-            [10.0, 11.672794117647069],
-            [1.0, 2.9181985294117725],
-            [10.0, 11.672794117647069],
-            [7.0, 8.754595588235304],
-            [10.0, 11.672794117647069],
-            [7.0, 8.754595588235304],
-            [5.0, 5.836397058823538],
-            [7.0, 8.754595588235304],
-            [4.0, 5.836397058823538],
-            [5.0, 5.836397058823538],
-            [10.0, 11.672794117647069],
-            [10.0, 11.672794117647069],
-            [7.0, 8.754595588235304],
-        ]
+        [[Timestamp('1970-01-01 00:00:05'), 15.56372549019609], [Timestamp('1970-01-01 00:00:06'), 5.836397058823538],
+         [Timestamp('1970-01-01 00:00:07'), 47.66390931372551], [Timestamp('1970-01-01 00:00:10'), 0.9727328431372619],
+         [Timestamp('1970-01-01 00:00:10'), 1.9454656862745172], [Timestamp('1970-01-01 00:00:10'), 2.9181985294117725],
+         [Timestamp('1970-01-01 00:00:10'), 3.8909313725490273], [Timestamp('1970-01-01 00:00:10'), 4.863664215686283],
+         [Timestamp('1970-01-01 00:00:10'), 5.836397058823538]]
     )
     df.columns = ["a", "c_h_1_pred"]
     return df
@@ -238,7 +229,11 @@ def test_fd_1():
         "forecast_definition": {
             "time_index": "a",
             "target": "c",
-            "time_validation_splits": ["1970-01-01 00:00:08"],
+            "time_validation_splits": ["1970-01-01 00:00:06"],
+            "train_val_cutoff": "1970-01-01 00:00:08",
+            "forecast_start": "1970-01-01 00:00:05",
+            "forecast_end": "1970-01-01 00:00:10",
+            "scenarios": {'b': {'values': [(0, 5)], 'start': "1970-01-01 00:00:09", 'end': "1970-01-01 00:00:10"}},
             "time_horizons": [1],
             "dataset_directory": "divina-test/dataset/test1",
             "model": "LinearRegression",
@@ -272,7 +267,11 @@ def test_fd_3(test_bucket):
         "forecast_definition": {
             "time_index": "a",
             "target": "c",
-            "time_validation_splits": ["1970-01-01 00:00:08"],
+            "time_validation_splits": ["1970-01-01 00:00:06"],
+            "train_val_cutoff": "1970-01-01 00:00:08",
+            "forecast_start": "1970-01-01 00:00:05",
+            "forecast_end": "1970-01-01 00:00:10",
+            "scenarios": {'b': {'values': [(0, 5)], 'start': "1970-01-01 00:00:09", 'end': "1970-01-01 00:00:10"}},
             "time_horizons": [1],
             "dataset_directory": "{}/dataset".format(test_bucket),
             "dataset_id": "test1",
@@ -328,8 +327,8 @@ def test_df_1():
                 [10.0, 11.0, 12.0],
             ]
         )
-        .sample(25, replace=True, random_state=11)
-        .reset_index(drop=True)
+            .sample(25, replace=True, random_state=11)
+            .reset_index(drop=True)
     )
     df.columns = ["a", "b", "c"]
     return df
