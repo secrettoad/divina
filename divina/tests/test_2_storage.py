@@ -62,7 +62,7 @@ def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_buck
         os.path.join(
             vision_path,
             "models",
-            "s-19700101-000008_h-1",
+            "s-19700101-000006_h-1",
         ),
         "rb",
     ) as f:
@@ -91,17 +91,17 @@ def test_predict(
             "profile",
         )
     )
-    joblib.dump(test_model_1, "s-19700101-000008_h-1")
+    joblib.dump(test_model_1, "s-19700101-000006_h-1")
     s3_fs.put(
-        "s-19700101-000008_h-1",
+        "s-19700101-000006_h-1",
         os.path.join(
             vision_path,
             "models",
-            "s-19700101-000008_h-1",
+            "s-19700101-000006_h-1",
         ),
         recursive=True,
     )
-    os.remove("s-19700101-000008_h-1")
+    os.remove("s-19700101-000006_h-1")
 
     dask_predict(
         s3_fs=s3_fs,
@@ -115,9 +115,9 @@ def test_predict(
             os.path.join(
                 vision_path,
                 "predictions",
-                "s-19700101-000008",
+                "s-19700101-000006",
             )
-        ).compute(),
+        ).compute().reset_index(drop=True),
         test_predictions_1,
     )
 
@@ -142,7 +142,7 @@ def test_validate(
         os.path.join(
             vision_path,
             "predictions",
-            "s-19700101-000008",
+            "s-19700101-000006",
         )
     )
 
