@@ -1,5 +1,7 @@
 from .errors import InvalidDataDefinitionException
 import pandas as pd
+import joblib
+import json
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
 supported_models = ["LinearRegression"]
@@ -76,3 +78,30 @@ def validate_forecast_definition(forecast_definition):
             raise InvalidDataDefinitionException(
                 "Model '{}' is not supported.".format(forecast_definition["model"])
             )
+
+
+def get_parameters(s3_fs, read_path):
+    with s3_fs.open(
+            '{}_params'.format(read_path),
+            "rb"
+    ) as f:
+        params = json.load(f)
+        return params
+
+
+def set_parameters(s3_fs, read_path, params):
+    with s3_fs.open(
+            '{}_params'.format(read_path),
+            "rb"
+    ) as f:
+        parameters = json.load(f)['params']
+    if not params.keys() <= parameters.keys():
+        raise Exception('Parameters {} not found in trained model. Cannot set new values for these parameters'.format(
+            ', '.join(list(set(params.keys()) - set(parameters.keys())))))
+    else:
+        parameters.update(params)
+        with s3_fs.open(
+                '{}_params'.format(read_path),
+                "w"
+        ) as f:
+            json.dump({'params': parameters}, f)
