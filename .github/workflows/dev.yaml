@@ -40,6 +40,11 @@ jobs:
           git config --local user.name "GitHub Action"
           git add .
           git commit -am "Add coverage"
+      - name: Push coverage
+          uses: ad-m/github-push-action@master
+          with:
+            branch: ${{ github.ref }}
+            github_token: ${{ secrets.GITHUB_TOKEN }}
   docs:
     needs: [unit_test]
     runs-on: ubuntu-latest
