@@ -38,7 +38,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add coverage.html
+          git add .
           git commit -am "Add coverage"
       - name: Push docs
         uses: ad-m/github-push-action@master
