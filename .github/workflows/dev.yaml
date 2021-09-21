@@ -74,3 +74,11 @@ jobs:
         run: |
           python3 setup.py sdist bdist_wheel
           twine check dist/*
+  coverage:
+    runs-on: ubuntu-latest
+    container: jhurdle/divina:test
+    steps:
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          fail_ci_if_error: true
