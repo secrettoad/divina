@@ -2,6 +2,7 @@ import click
 from ..dataset import build_dataset_dask
 from ..train import dask_train
 from ..predict import dask_predict
+from ..vision import get_parameters, set_parameters
 from ..validate import dask_validate
 from ..aws.utils import create_divina_role
 from dask_cloudprovider.aws import EC2Cluster
@@ -20,6 +21,21 @@ def upsert_divina_iam():
     divina_session = boto3.session.Session()
     role, instance_profile = create_divina_role(divina_session)
     return role, instance_profile
+
+
+def cli_get_params(
+        model_path,
+        s3_fs
+):
+    return get_parameters(s3_fs=s3_fs, model_path=model_path)
+
+
+def cli_set_params(
+        model_path,
+        s3_fs,
+        params
+):
+    return set_parameters(s3_fs=s3_fs, model_path=model_path, params=params)
 
 
 def cli_build_dataset(
@@ -517,3 +533,33 @@ def validate(
         local=local,
         debug=debug,
     )
+
+
+@click.argument("model_path", required=True)
+@divina.command()
+def get_params(
+    model_path
+):
+    """:model_path: s3:// or local path to model to get parameters from
+    """
+    cli_get_params(
+        s3_fs=s3fs.S3FileSystem(),
+        model_path=model_path
+    )
+
+
+@click.argument("model_path", required=True)
+@divina.command()
+def set_params(
+    model_path,
+    params
+):
+    """:model_path: s3:// or local path to model to get parameters from
+    :params: dictionary of trained model parameters to update
+    """
+    cli_set_params(
+        s3_fs=s3fs.S3FileSystem(),
+        model_path=model_path,
+        params=params
+    )
+

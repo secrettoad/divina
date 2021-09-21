@@ -256,7 +256,7 @@ def test_get_params(
             "s-19700101-000007_h-1_params",
     ), 'w+') as f:
         json.dump({"params": {feature: coef for feature, coef in zip(["b"], test_model_1._coef)}}, f)
-    params = get_parameters(s3_fs=s3_fs, read_path=os.path.join(
+    params = get_parameters(s3_fs=s3_fs, model_path=os.path.join(
         os.environ["VISION_PATH"],
         "models",
         "s-19700101-000007_h-1",
@@ -288,7 +288,7 @@ def test_set_params(
             "s-19700101-000007_h-1_params",
     ), 'w+') as f:
         json.dump(test_params_1, f)
-    set_parameters(s3_fs=s3_fs, read_path=os.path.join(
+    set_parameters(s3_fs=s3_fs, model_path=os.path.join(
         os.environ["VISION_PATH"],
         "models",
         "s-19700101-000007_h-1",
