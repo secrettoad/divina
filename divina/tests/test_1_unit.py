@@ -1,7 +1,7 @@
 import os
 import json
 from unittest.mock import patch
-from ..vision import validate_forecast_definition
+from ..vision import validate_forecast_definition, get_parameters, set_parameters
 from ..train import dask_train
 from ..predict import dask_predict
 from ..dataset import get_dataset, build_dataset_dask
@@ -16,13 +16,13 @@ import dask.dataframe as ddf
 
 
 def test_validate_forecast_definition(
-    fd_no_target,
-    fd_time_horizons_not_list,
-    fd_time_validation_splits_not_list,
-    fd_no_time_index,
-    fd_no_dataset_directory,
-    fd_invalid_model,
-    fd_time_horizons_range_not_tuple
+        fd_no_target,
+        fd_time_horizons_not_list,
+        fd_time_validation_splits_not_list,
+        fd_no_time_index,
+        fd_no_dataset_directory,
+        fd_invalid_model,
+        fd_time_horizons_range_not_tuple
 ):
     for dd in [
         fd_no_target,
@@ -60,7 +60,7 @@ def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
 
     pd.testing.assert_frame_equal(
         ddf.read_parquet(os.path.join(os.environ["DATASET_PATH"], "data/*")).compute(),
-        test_df_1,
+        ddf.read_csv(os.path.join(os.environ["DATA_BUCKET"], "test_df_1.csv")).compute(),
     )
 
 
@@ -93,7 +93,7 @@ def test_dask_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client):
                 os.path.join(
                     os.environ["VISION_PATH"],
                     "models",
-                    "s-19700101-000006_h-1",
+                    "s-19700101-000007_h-1",
                 )
             )
         ),
@@ -104,11 +104,11 @@ def test_dask_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client):
 @patch("s3fs.S3FileSystem.open", open)
 @patch("s3fs.S3FileSystem.ls", os.listdir)
 def test_get_composite_dataset(
-    test_df_1,
-    test_df_2,
-    test_fd_2,
-    test_composite_dataset_1,
-    dask_client,
+        test_df_1,
+        test_df_2,
+        test_fd_2,
+        test_composite_dataset_1,
+        dask_client,
 ):
     for path in ["data"]:
         for dataset in test_fd_2["forecast_definition"]["joins"]:
@@ -145,7 +145,7 @@ def test_get_composite_dataset(
 @patch("s3fs.S3FileSystem.ls", os.listdir)
 @patch.dict(os.environ, {"VISION_PATH": "divina-test/vision/test1"})
 def test_dask_predict(
-    s3_fs, dask_client, test_df_1, test_fd_1, test_model_1, test_predictions_1
+        s3_fs, dask_client, test_df_1, test_fd_1, test_model_1, test_predictions_1
 ):
     pathlib.Path(
         os.path.join(
@@ -167,15 +167,15 @@ def test_dask_predict(
         os.path.join(
             os.environ["VISION_PATH"],
             "models",
-            "s-19700101-000006_h-1",
+            "s-19700101-000007_h-1",
         ),
     )
     with open(
-        os.path.join(
-            os.environ["VISION_PATH"],
-            "forecast_definition.json",
-        ),
-        "w+",
+            os.path.join(
+                os.environ["VISION_PATH"],
+                "forecast_definition.json",
+            ),
+            "w+",
     ) as f:
         json.dump(test_fd_1, f)
 
@@ -191,7 +191,7 @@ def test_dask_predict(
             os.path.join(
                 os.environ["VISION_PATH"],
                 "predictions",
-                "s-19700101-000006",
+                "s-19700101-000007",
             )
         ).compute().reset_index(drop=True),
         test_predictions_1,
@@ -202,13 +202,13 @@ def test_dask_predict(
 @patch("s3fs.S3FileSystem.ls", os.listdir)
 @patch.dict(os.environ, {"VISION_PATH": "divina-test/vision/test1"})
 def test_dask_validate(
-    s3_fs, test_fd_1, test_df_1, test_metrics_1, test_predictions_1, dask_client
+        s3_fs, test_fd_1, test_df_1, test_metrics_1, test_predictions_1, dask_client
 ):
     ddf.from_pandas(test_predictions_1, chunksize=10000).to_parquet(
         os.path.join(
             os.environ["VISION_PATH"],
             "predictions",
-            "s-19700101-000006",
+            "s-19700101-000007",
         )
     )
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
@@ -225,9 +225,80 @@ def test_dask_validate(
     )
 
     with open(
-        os.path.join(os.environ["VISION_PATH"], "metrics.json"),
-        "r",
+            os.path.join(os.environ["VISION_PATH"], "metrics.json"),
+            "r",
     ) as f:
         metrics = json.load(f)
 
     assert metrics == test_metrics_1
+
+
+@patch("s3fs.S3FileSystem.open", open)
+@patch("s3fs.S3FileSystem.ls", os.listdir)
+@patch.dict(os.environ, {"VISION_PATH": "divina-test/vision/test1"})
+def test_get_params(
+        s3_fs, test_model_1, test_params_1
+):
+    pathlib.Path(os.path.join(os.environ["VISION_PATH"], "models")).mkdir(
+        parents=True, exist_ok=True
+    )
+    joblib.dump(
+        test_model_1,
+        os.path.join(
+            os.environ["VISION_PATH"],
+            "models",
+            "s-19700101-000007_h-1",
+        ),
+    )
+    with open(os.path.join(
+            os.environ["VISION_PATH"],
+            "models",
+            "s-19700101-000007_h-1_params",
+    ), 'w+') as f:
+        json.dump({"params": {feature: coef for feature, coef in zip(["b"], test_model_1._coef)}}, f)
+    params = get_parameters(s3_fs=s3_fs, model_path=os.path.join(
+        os.environ["VISION_PATH"],
+        "models",
+        "s-19700101-000007_h-1",
+    ))
+
+    assert params == test_params_1
+
+
+@patch("s3fs.S3FileSystem.open", open)
+@patch("s3fs.S3FileSystem.ls", os.listdir)
+@patch.dict(os.environ, {"VISION_PATH": "divina-test/vision/test1"})
+def test_set_params(
+        s3_fs, test_model_1, test_params_1, test_params_2
+):
+    pathlib.Path(os.path.join(os.environ["VISION_PATH"], "models")).mkdir(
+        parents=True, exist_ok=True
+    )
+    joblib.dump(
+        test_model_1,
+        os.path.join(
+            os.environ["VISION_PATH"],
+            "models",
+            "s-19700101-000007_h-1",
+        ),
+    )
+    with open(os.path.join(
+            os.environ["VISION_PATH"],
+            "models",
+            "s-19700101-000007_h-1_params",
+    ), 'w+') as f:
+        json.dump(test_params_1, f)
+    set_parameters(s3_fs=s3_fs, model_path=os.path.join(
+        os.environ["VISION_PATH"],
+        "models",
+        "s-19700101-000007_h-1",
+    ), params=test_params_2['params'])
+
+    with open(os.path.join(
+            os.environ["VISION_PATH"],
+            "models",
+            "s-19700101-000007_h-1_params",
+    ), 'rb') as f:
+        params = json.load(f)
+
+    assert params == test_params_2

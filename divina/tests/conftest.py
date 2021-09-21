@@ -206,8 +206,18 @@ def test_model_1(test_df_1):
 
 
 @pytest.fixture()
+def test_params_1(test_model_1):
+    return {'params': {'b': test_model_1._coef[0]}}
+
+
+@pytest.fixture()
+def test_params_2(test_model_1):
+    return {'params': {'b': test_model_1._coef[0] + 1}}
+
+
+@pytest.fixture()
 def test_metrics_1():
-    return {'splits': {'1970-01-01 00:00:06': {'time_horizons': {'1': {'mae': 73.62418300653593}}}}}
+    return {'splits': {'1970-01-01 00:00:07': {'time_horizons': {'1': {'mae': 80.62968620546809}}}}}
 
 
 @pytest.fixture()
@@ -215,9 +225,24 @@ def test_predictions_1():
     df = pd.DataFrame(
         [[Timestamp('1970-01-01 00:00:05'), 15.56372549019609], [Timestamp('1970-01-01 00:00:06'), 5.836397058823538],
          [Timestamp('1970-01-01 00:00:07'), 47.66390931372551], [Timestamp('1970-01-01 00:00:10'), 0.9727328431372619],
-         [Timestamp('1970-01-01 00:00:10'), 1.9454656862745172], [Timestamp('1970-01-01 00:00:10'), 2.9181985294117725],
-         [Timestamp('1970-01-01 00:00:10'), 3.8909313725490273], [Timestamp('1970-01-01 00:00:10'), 4.863664215686283],
-         [Timestamp('1970-01-01 00:00:10'), 5.836397058823538]]
+         [Timestamp('1970-01-01 00:00:10'), 0.9727328431372619], [Timestamp('1970-01-01 00:00:11'), 0.9727328431372619],
+         [Timestamp('1970-01-01 00:00:12'), 0.9727328431372619], [Timestamp('1970-01-01 00:00:13'), 0.9727328431372619],
+         [Timestamp('1970-01-01 00:00:14'), 0.9727328431372619], [Timestamp('1970-01-01 00:00:10'), 1.9454656862745172],
+         [Timestamp('1970-01-01 00:00:10'), 1.9454656862745172], [Timestamp('1970-01-01 00:00:11'), 1.9454656862745172],
+         [Timestamp('1970-01-01 00:00:12'), 1.9454656862745172], [Timestamp('1970-01-01 00:00:13'), 1.9454656862745172],
+         [Timestamp('1970-01-01 00:00:14'), 1.9454656862745172], [Timestamp('1970-01-01 00:00:10'), 2.9181985294117725],
+         [Timestamp('1970-01-01 00:00:10'), 2.9181985294117725], [Timestamp('1970-01-01 00:00:11'), 2.9181985294117725],
+         [Timestamp('1970-01-01 00:00:12'), 2.9181985294117725], [Timestamp('1970-01-01 00:00:13'), 2.9181985294117725],
+         [Timestamp('1970-01-01 00:00:14'), 2.9181985294117725], [Timestamp('1970-01-01 00:00:10'), 3.8909313725490273],
+         [Timestamp('1970-01-01 00:00:10'), 3.8909313725490273], [Timestamp('1970-01-01 00:00:11'), 3.8909313725490273],
+         [Timestamp('1970-01-01 00:00:12'), 3.8909313725490273], [Timestamp('1970-01-01 00:00:13'), 3.8909313725490273],
+         [Timestamp('1970-01-01 00:00:14'), 3.8909313725490273], [Timestamp('1970-01-01 00:00:10'), 4.863664215686283],
+         [Timestamp('1970-01-01 00:00:10'), 4.863664215686283], [Timestamp('1970-01-01 00:00:11'), 4.863664215686283],
+         [Timestamp('1970-01-01 00:00:12'), 4.863664215686283], [Timestamp('1970-01-01 00:00:13'), 4.863664215686283],
+         [Timestamp('1970-01-01 00:00:14'), 4.863664215686283], [Timestamp('1970-01-01 00:00:10'), 5.836397058823538],
+         [Timestamp('1970-01-01 00:00:10'), 5.836397058823538], [Timestamp('1970-01-01 00:00:11'), 5.836397058823538],
+         [Timestamp('1970-01-01 00:00:12'), 5.836397058823538], [Timestamp('1970-01-01 00:00:13'), 5.836397058823538],
+         [Timestamp('1970-01-01 00:00:14'), 5.836397058823538]]
     )
     df.columns = ["a", "c_h_1_pred"]
     return df
@@ -229,11 +254,12 @@ def test_fd_1():
         "forecast_definition": {
             "time_index": "a",
             "target": "c",
-            "time_validation_splits": ["1970-01-01 00:00:06"],
+            "time_validation_splits": ["1970-01-01 00:00:07"],
             "train_val_cutoff": "1970-01-01 00:00:08",
             "forecast_start": "1970-01-01 00:00:05",
-            "forecast_end": "1970-01-01 00:00:10",
-            "scenarios": {'b': {'values': [(0, 5)], 'start': "1970-01-01 00:00:09", 'end': "1970-01-01 00:00:10"}},
+            "forecast_end": "1970-01-01 00:00:14",
+            "forecast_freq": 'S',
+            "scenarios": {'b': {'values': [(0, 5)], 'start': "1970-01-01 00:00:09", 'end': "1970-01-01 00:00:14"}},
             "time_horizons": [1],
             "dataset_directory": "divina-test/dataset/test1",
             "model": "LinearRegression",
@@ -262,53 +288,21 @@ def test_fd_2():
 
 
 @pytest.fixture()
-def test_fd_3(test_bucket):
-    return {
-        "forecast_definition": {
-            "time_index": "a",
-            "target": "c",
-            "time_validation_splits": ["1970-01-01 00:00:06"],
-            "train_val_cutoff": "1970-01-01 00:00:08",
-            "forecast_start": "1970-01-01 00:00:05",
-            "forecast_end": "1970-01-01 00:00:10",
-            "scenarios": {'b': {'values': [(0, 5)], 'start': "1970-01-01 00:00:09", 'end': "1970-01-01 00:00:10"}},
-            "time_horizons": [1],
-            "dataset_directory": "{}/dataset".format(test_bucket),
-            "dataset_id": "test1",
-        }
-    }
+def test_fd_3(test_bucket, test_fd_1):
+    test_fd = test_fd_1
+    test_fd["forecast_definition"].update({"dataset_directory": "{}/dataset/test1".format(test_bucket)})
+    return test_fd
 
 
 @pytest.fixture()
 def test_composite_dataset_1():
     df = pd.DataFrame(
-        [
-            [4.0, 5.0, 6.0, np.NaN, 6.0],
-            [1.0, 2.0, 3.0, 2.0, 3.0],
-            [6.0, 5.0, 6.0, np.NaN, np.NaN],
-            [4.0, 5.0, 6.0, np.NaN, 6.0],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN],
-            [7.0, 8.0, 9.0, 8.0, np.NaN],
-            [4.0, 5.0, 6.0, np.NaN, 6.0],
-            [5.0, 5.0, 6.0, np.NaN, np.NaN],
-            [1.0, 2.0, 3.0, 2.0, 3.0],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN],
-            [7.0, 8.0, 9.0, 8.0, np.NaN],
-            [1.0, 2.0, 3.0, 2.0, 3.0],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN],
-            [1.0, 2.0, 3.0, 2.0, 3.0],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN],
-            [7.0, 8.0, 9.0, 8.0, np.NaN],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN],
-            [7.0, 8.0, 9.0, 8.0, np.NaN],
-            [5.0, 5.0, 6.0, np.NaN, np.NaN],
-            [7.0, 8.0, 9.0, 8.0, np.NaN],
-            [4.0, 5.0, 6.0, np.NaN, 6.0],
-            [5.0, 5.0, 6.0, np.NaN, np.NaN],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN],
-            [10.0, 11.0, 12.0, np.NaN, np.NaN],
-            [7.0, 8.0, 9.0, 8.0, np.NaN],
-        ]
+        [[Timestamp('1970-01-01 00:00:01'), 8.0, 12.0, 2.0, 3.0],
+         [Timestamp('1970-01-01 00:00:04'), 20.0, 24.0, np.NaN, 6.0],
+         [Timestamp('1970-01-01 00:00:05'), 15.0, 18.0, np.NaN, np.NaN],
+         [Timestamp('1970-01-01 00:00:06'), 5.0, 6.0, np.NaN, np.NaN],
+         [Timestamp('1970-01-01 00:00:07'), 48.0, 54.0, 8.0, np.NaN],
+         [Timestamp('1970-01-01 00:00:10'), 77.0, 84.0, np.NaN, np.NaN]]
     )
     df.columns = ["a", "b", "c", "e", "f"]
     return df
@@ -319,12 +313,12 @@ def test_df_1():
     df = (
         pd.DataFrame(
             [
-                [1.0, 2.0, 3.0],
-                [4.0, 5.0, 6.0],
-                [5.0, 5.0, 6.0],
-                [6.0, 5.0, 6.0],
-                [7.0, 8.0, 9],
-                [10.0, 11.0, 12.0],
+                [Timestamp('1970-01-01 00:00:01'), 2.0, 3.0],
+                [Timestamp('1970-01-01 00:00:04'), 5.0, 6.0],
+                [Timestamp('1970-01-01 00:00:05'), 5.0, 6.0],
+                [Timestamp('1970-01-01 00:00:06'), 5.0, 6.0],
+                [Timestamp('1970-01-01 00:00:07'), 8.0, 9],
+                [Timestamp('1970-01-01 00:00:10'), 11.0, 12.0],
             ]
         )
             .sample(25, replace=True, random_state=11)
@@ -337,7 +331,8 @@ def test_df_1():
 @pytest.fixture()
 def test_df_2():
     df = pd.DataFrame(
-        [[1, 2.0, 3.0], [4, np.NaN, 6.0], [7, 8.0, np.NaN], [np.NaN, 11.0, 12.0]]
+        [[Timestamp('1970-01-01 00:00:01'), 2.0, 3.0], [Timestamp('1970-01-01 00:00:04'), np.NaN, 6.0],
+         [Timestamp('1970-01-01 00:00:07'), 8.0, np.NaN], [np.NaN, 11.0, 12.0]]
     )
     df.columns = ["a", "e", "f"]
     return df

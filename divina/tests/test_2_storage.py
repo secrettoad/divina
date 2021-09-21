@@ -9,6 +9,7 @@ from ..train import dask_train
 import joblib
 from ..predict import dask_predict
 from ..validate import dask_validate
+from ..vision import set_parameters, get_parameters
 import pytest
 
 
@@ -31,7 +32,7 @@ def test_build_dataset(s3_fs, test_df_1, test_bucket):
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet("{}/data".format(dataset_path)).compute(),
-        ddf.read_parquet("{}/test1/data".format(test_bucket)).compute(),
+        ddf.read_csv("{}/test_df_1.csv".format(data_path)).compute(),
     )
 
 
@@ -62,7 +63,7 @@ def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_buck
         os.path.join(
             vision_path,
             "models",
-            "s-19700101-000006_h-1",
+            "s-19700101-000007_h-1",
         ),
         "rb",
     ) as f:
@@ -91,17 +92,17 @@ def test_predict(
             "profile",
         )
     )
-    joblib.dump(test_model_1, "s-19700101-000006_h-1")
+    joblib.dump(test_model_1, "s-19700101-000007_h-1")
     s3_fs.put(
-        "s-19700101-000006_h-1",
+        "s-19700101-000007_h-1",
         os.path.join(
             vision_path,
             "models",
-            "s-19700101-000006_h-1",
+            "s-19700101-000007_h-1",
         ),
         recursive=True,
     )
-    os.remove("s-19700101-000006_h-1")
+    os.remove("s-19700101-000007_h-1")
 
     dask_predict(
         s3_fs=s3_fs,
@@ -115,7 +116,7 @@ def test_predict(
             os.path.join(
                 vision_path,
                 "predictions",
-                "s-19700101-000006",
+                "s-19700101-000007",
             )
         ).compute().reset_index(drop=True),
         test_predictions_1,
@@ -142,7 +143,7 @@ def test_validate(
         os.path.join(
             vision_path,
             "predictions",
-            "s-19700101-000006",
+            "s-19700101-000007",
         )
     )
 
@@ -160,3 +161,70 @@ def test_validate(
         metrics = json.load(f)
 
     assert metrics == test_metrics_1
+
+
+def test_get_params(
+        s3_fs, test_model_1, test_params_1, test_bucket
+):
+    vision_path = "{}/vision/test1".format(test_bucket)
+    joblib.dump(test_model_1, "s-19700101-000007_h-1")
+    s3_fs.put(
+        "s-19700101-000007_h-1",
+        os.path.join(
+            vision_path,
+            "models",
+            "s-19700101-000007_h-1",
+        ),
+        recursive=True,
+    )
+    os.remove("s-19700101-000007_h-1")
+    with s3_fs.open(os.path.join(
+            vision_path,
+            "models",
+            "s-19700101-000007_h-1_params",
+    ), 'w') as f:
+        json.dump({"params": {feature: coef for feature, coef in zip(["b"], test_model_1._coef)}}, f)
+    params = get_parameters(s3_fs=s3_fs, model_path=os.path.join(
+        vision_path,
+        "models",
+        "s-19700101-000007_h-1",
+    ))
+
+    assert params == test_params_1
+
+
+def test_set_params(
+        s3_fs, test_model_1, test_params_1, test_params_2, test_bucket
+):
+    vision_path = "{}/vision/test1".format(test_bucket)
+    joblib.dump(test_model_1, "s-19700101-000007_h-1")
+    s3_fs.put(
+        "s-19700101-000007_h-1",
+        os.path.join(
+            vision_path,
+            "models",
+            "s-19700101-000007_h-1",
+        ),
+        recursive=True,
+    )
+    os.remove("s-19700101-000007_h-1")
+    with s3_fs.open(os.path.join(
+            vision_path,
+            "models",
+            "s-19700101-000007_h-1_params",
+    ), 'w') as f:
+        json.dump(test_params_1, f)
+    set_parameters(s3_fs=s3_fs, model_path=os.path.join(
+        vision_path,
+        "models",
+        "s-19700101-000007_h-1",
+    ), params=test_params_2['params'])
+
+    with s3_fs.open(os.path.join(
+            vision_path,
+            "models",
+            "s-19700101-000007_h-1_params",
+    ), 'rb') as f:
+        params = json.load(f)
+
+    assert params == test_params_2

@@ -36,6 +36,8 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
                 acl="private",
             )
 
+    df = get_dataset(forecast_definition)
+
     metrics = {"splits": {}}
 
     horizon_ranges = [x for x in forecast_definition["time_horizons"] if type(x) == tuple]
@@ -44,21 +46,9 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
         for x in horizon_ranges:
             forecast_definition["time_horizons"] = set(forecast_definition["time_horizons"] + list(range(x[0], x[1])))
 
-    df = get_dataset(forecast_definition)
-
-    if "signal_dimensions" in forecast_definition:
-        df = df.groupby([forecast_definition["time_index"]] + forecast_definition["signal_dimensions"]).agg(
-            "sum").reset_index()
-    else:
-        df = df.groupby(forecast_definition["time_index"]).agg("sum").reset_index()
-
     df = df[
         [forecast_definition["target"], forecast_definition["time_index"]]
     ]
-
-    df[forecast_definition["time_index"]] = dd.to_datetime(
-        df[forecast_definition["time_index"]], unit="s"
-    )
 
     time_min, time_max = (
         df[forecast_definition["time_index"]].min().compute(),

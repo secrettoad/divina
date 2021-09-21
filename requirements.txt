@@ -44,4 +44,5 @@ dask-cloudprovider==2021.6.0
 dask-ml==1.9.0
 pygit2==1.6.1
 pytest==6.2.4
+pytest-cov==2.12.1
 pyarrow==5.0.0
