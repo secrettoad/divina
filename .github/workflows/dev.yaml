@@ -33,7 +33,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Test with pytest
         run: |
-          python3 -m pytest divina/tests/test_1_unit.py
+          python3 -m pytest divina/tests/test_1_unit.py --cov-report term --cov-report html --cov ./
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          files: htmlcov/*
+          fail_ci_if_error: true
   docs:
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
