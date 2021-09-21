@@ -7,7 +7,6 @@ backoff==1.11.1
 chardet==4.0.0
 click==8.0.1
 cloudpickle==1.6.0
-coverage<5
 dask[distributed]==2021.7.2
 fsspec==2021.7.0
 flake8==3.9.2
