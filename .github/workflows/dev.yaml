@@ -33,7 +33,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Test with pytest
         run: |
-          python3 -m pytest divina/tests/test_1_unit.py
+          python3 -m pytest divina/tests/test_1_unit.py --cov-report term --cov-report html:coverage.html
   docs:
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
@@ -74,11 +74,3 @@ jobs:
         run: |
           python3 setup.py sdist bdist_wheel
           twine check dist/*
-  coverage:
-    runs-on: ubuntu-latest
-    container: jhurdle/divina:test
-    steps:
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2
-        with:
-          fail_ci_if_error: true
