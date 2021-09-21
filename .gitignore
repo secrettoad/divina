@@ -5,3 +5,5 @@ build/*
 dist/*
 WIP/*
 docs/*
+coverage.html
+.coverage
