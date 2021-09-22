@@ -37,7 +37,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
-          files: htmlcov/index.html
+          files: htmlcov/*
           fail_ci_if_error: true
   docs:
     runs-on: ubuntu-latest
