@@ -145,7 +145,7 @@ def test_get_composite_dataset(
 @patch("s3fs.S3FileSystem.ls", os.listdir)
 @patch.dict(os.environ, {"VISION_PATH": "divina-test/vision/test1"})
 def test_dask_predict(
-        s3_fs, dask_client, test_df_1, test_fd_1, test_model_1, test_predictions_1
+        s3_fs, dask_client, test_df_1, test_fd_1, test_model_1, test_val_predictions_1
 ):
     pathlib.Path(
         os.path.join(
@@ -194,7 +194,17 @@ def test_dask_predict(
                 "s-19700101-000007",
             )
         ).compute().reset_index(drop=True),
-        test_predictions_1,
+        test_val_predictions_1,
+    )
+    pd.testing.assert_frame_equal(
+        ddf.read_parquet(
+            os.path.join(
+                os.environ["VISION_PATH"],
+                "predictions",
+                "s-19700101-000007_forecast",
+            )
+        ).compute().reset_index(drop=True),
+        test_forecast_1,
     )
 
 
@@ -202,9 +212,9 @@ def test_dask_predict(
 @patch("s3fs.S3FileSystem.ls", os.listdir)
 @patch.dict(os.environ, {"VISION_PATH": "divina-test/vision/test1"})
 def test_dask_validate(
-        s3_fs, test_fd_1, test_df_1, test_metrics_1, test_predictions_1, dask_client
+        s3_fs, test_fd_1, test_df_1, test_metrics_1, test_val_predictions_1, dask_client
 ):
-    ddf.from_pandas(test_predictions_1, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_val_predictions_1, chunksize=10000).to_parquet(
         os.path.join(
             os.environ["VISION_PATH"],
             "predictions",

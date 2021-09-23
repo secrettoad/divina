@@ -75,7 +75,7 @@ def test_predict(
     dask_client,
     test_df_1,
     test_fd_1,
-    test_predictions_1,
+    test_val_predictions_1,
     test_model_1,
     test_bucket,
 ):
@@ -119,7 +119,7 @@ def test_predict(
                 "s-19700101-000007",
             )
         ).compute().reset_index(drop=True),
-        test_predictions_1,
+        test_val_predictions_1,
     )
 
 
@@ -128,7 +128,7 @@ def test_validate(
     test_fd_1,
     test_df_1,
     test_metrics_1,
-    test_predictions_1,
+    test_val_predictions_1,
     dask_client,
     test_bucket,
 ):
@@ -139,7 +139,7 @@ def test_validate(
             "data",
         )
     )
-    ddf.from_pandas(test_predictions_1, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_val_predictions_1, chunksize=10000).to_parquet(
         os.path.join(
             vision_path,
             "predictions",

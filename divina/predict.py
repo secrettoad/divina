@@ -6,12 +6,15 @@ from .dataset import get_dataset
 import backoff
 from botocore.exceptions import ClientError
 import os
-from .utils import cull_empty_partitions
 
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def dask_predict(s3_fs, forecast_definition, read_path, write_path):
-    df = get_dataset(forecast_definition)
+    forecast_kwargs = {}
+    for k in ['forecast_start', 'forecast_end']:
+        if k in forecast_definition:
+            forecast_kwargs.update({k.split('_')[1]: forecast_definition[k]})
+    forecast_df = get_dataset(forecast_definition, pad=True, **forecast_kwargs)
 
     horizon_ranges = [x for x in forecast_definition["time_horizons"] if type(x) == tuple]
     if len(horizon_ranges) > 0:
@@ -30,6 +33,21 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
 
     for s in forecast_definition["time_validation_splits"]:
 
+        validate_kwargs = {}
+        if 'validate_start' in forecast_definition:
+            if pd.to_datetime(str(s)) < forecast_definition["validate_start"]:
+                validate_kwargs["start"] = pd.to_datetime(str(s))
+            else:
+                validate_kwargs["start"] = forecast_definition["validate_start"]
+            if pd.to_datetime(str(s)) > forecast_definition["validate_end"]:
+                raise Exception(
+                    "Bad End: {} | Check Dataset Time Range".format(forecast_definition['forecast_start']))
+            else:
+                validate_kwargs["end"] = forecast_definition[pd.to_datetime(str(s))]
+            if k in forecast_definition:
+                validate_kwargs.update({k.split('_')[1]: forecast_definition[k]})
+        validate_df = get_dataset(forecast_definition, pad=True, **validate_kwargs)
+
         for h in forecast_definition["time_horizons"]:
             with s3_fs.open(
                     "{}/models/s-{}_h-{}".format(
@@ -41,30 +59,46 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
             ) as f:
                 fit_model = joblib.load(f)
 
-            df[
+            if "drop_features" in forecast_definition:
+                features = [
+                    c
+                    for c in validate_df.columns
+                    if not c
+                           in [
+                               "{}_h_{}".format(forecast_definition["target"], h)
+                               for h in forecast_definition["time_horizons"]
+                           ]
+                           + [
+                               forecast_definition["time_index"],
+                               forecast_definition["target"],
+                           ]
+                           + forecast_definition["drop_features"]
+                ]
+            else:
+                features = [
+                    c
+                    for c in validate_df.columns
+                    if not c
+                           in [
+                               "{}_h_{}".format(forecast_definition["target"], h)
+                               for h in forecast_definition["time_horizons"]
+                           ]
+                           + [
+                               forecast_definition["time_index"],
+                               forecast_definition["target"],
+                           ]
+                ]
+            validate_df[
                 "{}_h_{}_pred".format(forecast_definition["target"], h)
-            ] = fit_model.predict(
-                df[
-                    [
-                        c
-                        for c in df.columns
-                        if not c
-                               in [
-                                   forecast_definition["time_index"],
-                                   forecast_definition["target"],
-                               ]
-                               + [
-                                   "{}_h_{}".format(forecast_definition["target"], h)
-                                   for h in forecast_definition["time_horizons"]
-                               ]
-                    ]
-                ].to_dask_array(lengths=True)
-            )
+            ] = fit_model.predict(validate_df[features].to_dask_array(lengths=True))
+            forecast_df[
+                "{}_h_{}_pred".format(forecast_definition["target"], h)
+            ] = fit_model.predict(forecast_df[features].to_dask_array(lengths=True))
 
-            sys.stdout.write("Predictions made for horizon {}\n".format(h))
+            sys.stdout.write("Validation predictions made for split {}\n".format(s))
 
         dd.to_parquet(
-            df[
+            validate_df[
                 [forecast_definition["time_index"]]
                 + [
                     "{}_h_{}_pred".format(forecast_definition["target"], h)
@@ -76,3 +110,17 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
                 pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
             )
         )
+        dd.to_parquet(
+            forecast_df[
+                [forecast_definition["time_index"]]
+                + [
+                    "{}_h_{}_pred".format(forecast_definition["target"], h)
+                    for h in forecast_definition["time_horizons"]
+                ]
+                ],
+            "{}/predictions/s-{}_forecast".format(
+                write_path,
+                pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
+            )
+        )
+        sys.stdout.write("Blind predictions made for split {}\n".format(s))

@@ -18,7 +18,7 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
                 - df["{}_h_{}_pred".format(forecast_definition["target"], h)]
             )
             metrics["time_horizons"][h]["mae"] = (
-                df[dd.to_datetime(df[forecast_definition["time_index"]], unit="s") > s][
+                df[df[forecast_definition["time_index"]] > s][
                     "resid_h_{}".format(h)
                 ]
                 .abs()
@@ -35,6 +35,11 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
                 region_name=os.environ["AWS_DEFAULT_REGION"],
                 acl="private",
             )
+
+    dataset_kwargs = {}
+    for k in ['validate_start', 'validate_end']:
+        if k in forecast_definition:
+            dataset_kwargs.update({k.split('_')[1]:forecast_definition[k]})
 
     df = get_dataset(forecast_definition)
 
@@ -55,16 +60,9 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
         df[forecast_definition["time_index"]].max().compute(),
     )
 
-    if "train_validation_cutoff" in forecast_definition:
-        if pd.to_datetime(str(forecast_definition["train_end"])) > time_max:
-            raise Exception("Bad Train End: {} | Check Dataset Time Range".format(forecast_definition['train_end']))
-        else:
-            df = df[df[forecast_definition["time_index"]] <= forecast_definition["train_end"]]
-            time_max = pd.to_datetime(str(forecast_definition["train_end"]))
-
     for s in forecast_definition["time_validation_splits"]:
 
-        if not time_min < pd.to_datetime(str(s)) < time_max:
+        if not pd.to_datetime(str(time_min)) < pd.to_datetime(str(s)) < pd.to_datetime(str(time_max)):
             raise Exception("Bad Validation Split: {} | Check Dataset Time Range".format(s))
 
         df_pred = dd.read_parquet(
@@ -74,14 +72,14 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
         )
 
         if "signal_dimensions" in forecast_definition:
-            df = df_pred.merge(
+            validate_df = df_pred.merge(
                 df,
                 on=[forecast_definition["time_index"]]
                 + forecast_definition["signal_dimensions"],
             )
         else:
-            df = df_pred.merge(df, on=[forecast_definition["time_index"]])
-        metrics["splits"][s] = get_metrics(forecast_definition, df, s)
+            validate_df = df_pred.merge(df, on=[forecast_definition["time_index"]])
+        metrics["splits"][s] = get_metrics(forecast_definition, validate_df, s)
 
         with s3_fs.open("{}/metrics.json".format(write_path), "w") as f:
             json.dump(metrics, f)

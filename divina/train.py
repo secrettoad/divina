@@ -27,6 +27,11 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
 
     sys.stdout.write("Loading dataset\n")
 
+    dataset_kwargs = {}
+    for k in ['train_start', 'train_end']:
+        if k in forecast_definition:
+            dataset_kwargs.update({k.split('_')[1]: forecast_definition[k]})
+
     df = get_dataset(forecast_definition)
 
     for h in forecast_definition["time_horizons"]:
@@ -42,8 +47,8 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
     models = {}
 
     time_min, time_max = (
-        df[forecast_definition["time_index"]].min().compute(),
-        df[forecast_definition["time_index"]].max().compute(),
+        pd.to_datetime(str(df[forecast_definition["time_index"]].min().compute())),
+        pd.to_datetime(str(df[forecast_definition["time_index"]].max().compute())),
     )
 
     if "train_val_cutoff" in forecast_definition:
@@ -61,19 +66,35 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
         for h in forecast_definition["time_horizons"]:
             model = dask_model()
 
-            features = [
-                c
-                for c in df_train.columns
-                if not c
-                       in [
-                           "{}_h_{}".format(forecast_definition["target"], h)
-                           for h in forecast_definition["time_horizons"]
-                       ]
-                       + [
-                           forecast_definition["time_index"],
-                           forecast_definition["target"],
-                       ]
-            ]
+            if "drop_features" in forecast_definition:
+                features = [
+                    c
+                    for c in df_train.columns
+                    if not c
+                           in [
+                               "{}_h_{}".format(forecast_definition["target"], h)
+                               for h in forecast_definition["time_horizons"]
+                           ]
+                           + [
+                               forecast_definition["time_index"],
+                               forecast_definition["target"],
+                           ]
+                            + forecast_definition["drop_features"]
+                ]
+            else:
+                features = [
+                    c
+                    for c in df_train.columns
+                    if not c
+                           in [
+                               "{}_h_{}".format(forecast_definition["target"], h)
+                               for h in forecast_definition["time_horizons"]
+                           ]
+                           + [
+                               forecast_definition["time_index"],
+                               forecast_definition["target"],
+                           ]
+                ]
 
             model.fit(
                 df_train[features].to_dask_array(lengths=True),
@@ -97,7 +118,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                 joblib.dump(model, f)
 
             with s3_fs.open(
-                    "{}/models/s-{}_h-{}_params".format(
+                    "{}/models/s-{}_h-{}_params.json".format(
                         write_path,
                         pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                         h,
