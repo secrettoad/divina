@@ -5,11 +5,12 @@ from .dataset import get_dataset
 import os
 import backoff
 from botocore.exceptions import ClientError
+from .utils import cull_empty_partitions
 
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def dask_validate(s3_fs, forecast_definition, write_path, read_path):
-    def get_metrics(forecast_definition, df, s):
+    def get_metrics(forecast_definition, df):
         metrics = {"time_horizons": {}}
         for h in forecast_definition["time_horizons"]:
             metrics["time_horizons"][h] = {}
@@ -18,7 +19,7 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
                 - df["{}_h_{}_pred".format(forecast_definition["target"], h)]
             )
             metrics["time_horizons"][h]["mae"] = (
-                df[df[forecast_definition["time_index"]] > s][
+                df[
                     "resid_h_{}".format(h)
                 ]
                 .abs()
@@ -79,7 +80,8 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
             )
         else:
             validate_df = df_pred.merge(df, on=[forecast_definition["time_index"]])
-        metrics["splits"][s] = get_metrics(forecast_definition, validate_df, s)
+        validate_df = cull_empty_partitions(validate_df)
+        metrics["splits"][s] = get_metrics(forecast_definition, validate_df)
 
         with s3_fs.open("{}/metrics.json".format(write_path), "w") as f:
             json.dump(metrics, f)
