@@ -217,11 +217,22 @@ def test_params_2(test_model_1):
 
 @pytest.fixture()
 def test_metrics_1():
-    return {'splits': {'1970-01-01 00:00:07': {'time_horizons': {'1': {'mae': 80.62968620546809}}}}}
+    return {'splits': {'1970-01-01 00:00:07': {'time_horizons': {'1': {'mae': 18.850030637254903}}}}}
 
 
 @pytest.fixture()
-def test_predictions_1():
+def test_val_predictions_1():
+    df = pd.DataFrame(
+        [[Timestamp('1970-01-01 00:00:01'), 8.754595588235304], [Timestamp('1970-01-01 00:00:04'), 20.427389705882366],
+         [Timestamp('1970-01-01 00:00:05'), 15.56372549019609], [Timestamp('1970-01-01 00:00:06'), 5.836397058823538],
+         [Timestamp('1970-01-01 00:00:07'), 47.66390931372551]]
+    )
+    df.columns = ["a", "c_h_1_pred"]
+    return df
+
+
+@pytest.fixture()
+def test_forecast_1():
     df = pd.DataFrame(
         [[Timestamp('1970-01-01 00:00:05'), 15.56372549019609], [Timestamp('1970-01-01 00:00:06'), 5.836397058823538],
          [Timestamp('1970-01-01 00:00:07'), 47.66390931372551], [Timestamp('1970-01-01 00:00:10'), 0.9727328431372619],
@@ -255,7 +266,8 @@ def test_fd_1():
             "time_index": "a",
             "target": "c",
             "time_validation_splits": ["1970-01-01 00:00:07"],
-            "train_val_cutoff": "1970-01-01 00:00:08",
+            "validate_start": "1970-01-01 00:00:01",
+            "validate_end": "1970-01-01 00:00:09",
             "forecast_start": "1970-01-01 00:00:05",
             "forecast_end": "1970-01-01 00:00:14",
             "forecast_freq": 'S',

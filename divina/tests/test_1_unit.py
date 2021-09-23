@@ -145,7 +145,7 @@ def test_get_composite_dataset(
 @patch("s3fs.S3FileSystem.ls", os.listdir)
 @patch.dict(os.environ, {"VISION_PATH": "divina-test/vision/test1"})
 def test_dask_predict(
-        s3_fs, dask_client, test_df_1, test_fd_1, test_model_1, test_val_predictions_1
+        s3_fs, dask_client, test_df_1, test_fd_1, test_model_1, test_val_predictions_1, test_forecast_1
 ):
     pathlib.Path(
         os.path.join(

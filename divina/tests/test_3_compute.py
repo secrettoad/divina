@@ -74,6 +74,7 @@ def test_predict_small(
     test_fd_3,
     dask_client_remote,
     test_bucket,
+    test_forecast_1
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
@@ -107,10 +108,20 @@ def test_predict_small(
             os.path.join(
                 vision_path,
                 "predictions",
-                "s-19700101-000006",
+                "s-19700101-000007",
             )
         ).compute().reset_index(drop=True),
         test_val_predictions_1,
+    )
+    pd.testing.assert_frame_equal(
+        ddf.read_parquet(
+            os.path.join(
+                vision_path,
+                "predictions",
+                "s-19700101-000007_forecast",
+            )
+        ).compute().reset_index(drop=True),
+        test_forecast_1,
     )
 
 

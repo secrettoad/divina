@@ -4,7 +4,8 @@ import backoff
 from botocore.exceptions import ClientError
 import pandas as pd
 from .utils import cull_empty_partitions
-
+from dask_ml.preprocessing import Categorizer, DummyEncoder, PolynomialFeatures
+from sklearn.pipeline import make_pipeline
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def get_dataset(forecast_definition, start=None, end=None, pad=False):
@@ -26,7 +27,7 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
             raise Exception(
                 "Bad Start: {} | Check Dataset Time Range".format(start))
         else:
-            df = df[df[forecast_definition["time_index"]] >= start]
+            df = df[dd.to_datetime(df[forecast_definition["time_index"]]) >= start]
             time_min = pd.to_datetime(str(start))
 
     if end:
@@ -45,7 +46,7 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
                 raise Exception(
                     "Bad End: {} | Check Dataset Time Range".format(end))
         else:
-            df = df[df[forecast_definition["time_index"]] <= end]
+            df = df[dd.to_datetime(df[forecast_definition["time_index"]]) <= end]
         time_max = pd.to_datetime(str(end))
 
     if "joins" in forecast_definition:
@@ -84,6 +85,34 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
             for v in forecast_definition["scenarios"][x]["values"]:
                 df_scenario[x] = v
                 df = df.append(df_scenario)
+
+    if "encode_features" in forecast_definition:
+        for c in forecast_definition["encode_features"] :
+            df['dummy_{}'.format(c)] = df[c]
+
+        pipe = make_pipeline(
+            Categorizer(columns=forecast_definition["encode_features"]), DummyEncoder(columns=forecast_definition["encode_features"]))
+
+        pipe.fit(df)
+
+        df = pipe.transform(df)
+
+        df = df.drop(columns=['dummy_{}'.format(c) for c in forecast_definition["encode_features"]])
+
+    if "interaction_terms" in forecast_definition:
+        for t in forecast_definition["interaction_terms"]:
+            poly = PolynomialFeatures(len(t), preserve_dataframe=True, interaction_only=True)
+            if '*' in t:
+                drop_features = [forecast_definition['target'], forecast_definition['time_index']]
+                if "drop_features" in forecast_definition:
+                    drop_features += forecast_definition["drop_features"]
+                interaction_features = [c for c in df.columns if not c in drop_features]
+            else:
+                interaction_features = list(t)
+            df_interaction = poly.fit_transform(df[interaction_features])
+            for c in df_interaction.drop(columns=['1']).columns:
+                df[c] = df_interaction[c]
+            #df = df.drop(columns=interaction_features).merge(df_interaction.drop(columns='1'), how='left')
 
     df = cull_empty_partitions(df)
     df = df.reset_index(drop=True)

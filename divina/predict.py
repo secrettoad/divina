@@ -35,17 +35,18 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
 
         validate_kwargs = {}
         if 'validate_start' in forecast_definition:
-            if pd.to_datetime(str(s)) < forecast_definition["validate_start"]:
+            if pd.to_datetime(str(s)) < pd.to_datetime(str(forecast_definition["validate_start"])):
                 validate_kwargs["start"] = pd.to_datetime(str(s))
             else:
-                validate_kwargs["start"] = forecast_definition["validate_start"]
-            if pd.to_datetime(str(s)) > forecast_definition["validate_end"]:
+                validate_kwargs["start"] = pd.to_datetime(str(forecast_definition["validate_start"]))
+        else:
+            validate_kwargs["start"] = pd.to_datetime(str(s))
+        if 'validate_end' in forecast_definition:
+            if pd.to_datetime(str(s)) > pd.to_datetime(str(forecast_definition["validate_end"])):
                 raise Exception(
-                    "Bad End: {} | Check Dataset Time Range".format(forecast_definition['forecast_start']))
+                    "Bad End: {} | Check Dataset Time Range".format(pd.to_datetime(str(forecast_definition['forecast_start']))))
             else:
-                validate_kwargs["end"] = forecast_definition[pd.to_datetime(str(s))]
-            if k in forecast_definition:
-                validate_kwargs.update({k.split('_')[1]: forecast_definition[k]})
+                validate_kwargs["end"] = pd.to_datetime(str(s))
         validate_df = get_dataset(forecast_definition, pad=True, **validate_kwargs)
 
         for h in forecast_definition["time_horizons"]:

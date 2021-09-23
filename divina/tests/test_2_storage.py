@@ -77,6 +77,7 @@ def test_predict(
     test_fd_1,
     test_val_predictions_1,
     test_model_1,
+    test_forecast_1,
     test_bucket,
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
@@ -120,6 +121,16 @@ def test_predict(
             )
         ).compute().reset_index(drop=True),
         test_val_predictions_1,
+    )
+    pd.testing.assert_frame_equal(
+        ddf.read_parquet(
+            os.path.join(
+                vision_path,
+                "predictions",
+                "s-19700101-000007_forecast",
+            )
+        ).compute().reset_index(drop=True),
+        test_forecast_1,
     )
 
 

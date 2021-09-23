@@ -96,6 +96,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                            ]
                 ]
 
+            df_train = df_train[~df_train["{}_h_{}".format(forecast_definition["target"], h)].isnull()]
             model.fit(
                 df_train[features].to_dask_array(lengths=True),
                 df_train["{}_h_{}".format(forecast_definition["target"], h)],
