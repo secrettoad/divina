@@ -66,8 +66,8 @@ def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
 
 @patch("s3fs.S3FileSystem.open", open)
 @patch("s3fs.S3FileSystem.ls", os.listdir)
-@patch.dict(os.environ, {"VISION_PATH": "divina-test/vision/test1"})
-def test_dask_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client):
+def test_dask_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_params_1_10, test_params_1_90):
+    vision_path = "divina-test/vision/test1"
     pathlib.Path(
         os.path.join(
             test_fd_1["forecast_definition"]["dataset_directory"],
@@ -84,16 +84,43 @@ def test_dask_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client):
         s3_fs=s3_fs,
         dask_model=LinearRegression,
         forecast_definition=test_fd_1["forecast_definition"],
-        write_path=os.environ["VISION_PATH"],
+        write_path=vision_path,
+        random_seed=11,
     )
 
     assert compare_sk_models(
         joblib.load(
             os.path.abspath(
                 os.path.join(
-                    os.environ["VISION_PATH"],
+                    vision_path,
                     "models",
                     "s-19700101-000007_h-1",
+                )
+            )
+        ),
+        test_model_1,
+    )
+    test_model_1.coef_ = test_params_1_10['params'].values()
+    assert compare_sk_models(
+        joblib.load(
+            os.path.abspath(
+                os.path.join(
+                    vision_path,
+                    "models",
+                    "s-19700101-000007_h-1_c-10",
+                )
+            )
+        ),
+        test_model_1,
+    )
+    test_model_1.coef_ = test_params_1_90['params'].values()
+    assert compare_sk_models(
+        joblib.load(
+            os.path.abspath(
+                os.path.join(
+                    vision_path,
+                    "models",
+                    "s-19700101-000007_h-1_c-90",
                 )
             )
         ),
@@ -145,7 +172,7 @@ def test_get_composite_dataset(
 @patch("s3fs.S3FileSystem.ls", os.listdir)
 @patch.dict(os.environ, {"VISION_PATH": "divina-test/vision/test1"})
 def test_dask_predict(
-        s3_fs, dask_client, test_df_1, test_fd_1, test_model_1, test_val_predictions_1, test_forecast_1
+        s3_fs, dask_client, test_df_1, test_fd_1, test_model_1, test_val_predictions_1, test_forecast_1, test_params_1_10, test_params_1_90
 ):
     pathlib.Path(
         os.path.join(
@@ -168,6 +195,24 @@ def test_dask_predict(
             os.environ["VISION_PATH"],
             "models",
             "s-19700101-000007_h-1",
+        ),
+    )
+    test_model_1.coef_ = list(test_params_1_10["params"].values())
+    joblib.dump(
+        test_model_1,
+        os.path.join(
+            os.environ["VISION_PATH"],
+            "models",
+            "s-19700101-000007_h-1_c-10",
+        ),
+    )
+    test_model_1.coef_ = list(test_params_1_90["params"].values())
+    joblib.dump(
+        test_model_1,
+        os.path.join(
+            os.environ["VISION_PATH"],
+            "models",
+            "s-19700101-000007_h-1_c-90",
         ),
     )
     with open(
