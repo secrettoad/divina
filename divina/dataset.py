@@ -112,7 +112,6 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
             df_interaction = poly.fit_transform(df[interaction_features])
             for c in df_interaction.drop(columns=['1']).columns:
                 df[c] = df_interaction[c]
-            #df = df.drop(columns=interaction_features).merge(df_interaction.drop(columns='1'), how='left')
 
     df = cull_empty_partitions(df)
     df = df.reset_index(drop=True)

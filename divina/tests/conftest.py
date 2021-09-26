@@ -89,11 +89,11 @@ def dask_client(request):
 
 
 @pytest.fixture(scope="session")
-def dask_client_remote():
+def dask_client_remote(request):
     cluster = EC2Cluster(
         key_name="divina2",
         security=False,
-        docker_image="jhurdle/divina:latest",
+        docker_image="jhurdle/divina:test",
         debug=False,
         env_vars={
             "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
@@ -104,6 +104,7 @@ def dask_client_remote():
     )
     cluster.adapt(minimum=1, maximum=10)
     client = Client(cluster)
+    request.addfinalizer(lambda: client.close())
     yield client
     client.shutdown()
 
@@ -209,6 +210,14 @@ def test_model_1(test_df_1):
 def test_params_1(test_model_1):
     return {'params': {'b': test_model_1._coef[0]}}
 
+@pytest.fixture()
+def test_params_1_10(test_model_1):
+    return {'params': {'b': test_model_1._coef[0]}}
+
+@pytest.fixture()
+def test_params_1_90(test_model_1):
+    return {'params': {'b': test_model_1._coef[0]}}
+
 
 @pytest.fixture()
 def test_params_2(test_model_1):
@@ -271,6 +280,7 @@ def test_fd_1():
             "forecast_start": "1970-01-01 00:00:05",
             "forecast_end": "1970-01-01 00:00:14",
             "forecast_freq": 'S',
+            "confidence_intervals": [10, 90],
             "scenarios": {'b': {'values': [(0, 5)], 'start': "1970-01-01 00:00:09", 'end': "1970-01-01 00:00:14"}},
             "time_horizons": [1],
             "dataset_directory": "divina-test/dataset/test1",

@@ -8,10 +8,12 @@ import backoff
 from botocore.exceptions import ClientError
 from dask_ml.linear_model import LinearRegression
 import json
-
+import dask.bag as db
+import copy
+import numpy as np
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression):
+def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, random_seed=None):
     if write_path[:5] == "s3://":
         if not s3_fs.exists(write_path):
             s3_fs.mkdir(
@@ -51,14 +53,6 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
         pd.to_datetime(str(df[forecast_definition["time_index"]].max().compute())),
     )
 
-    if "train_val_cutoff" in forecast_definition:
-        if pd.to_datetime(str(forecast_definition["train_val_cutoff"])) > time_max:
-            raise Exception("Bad Train Validation Cutoff: {} | Check Dataset Time Range".format(
-                forecast_definition["train_val_cutoff"]))
-        else:
-            df = df[df[forecast_definition["time_index"]] <= forecast_definition["train_val_cutoff"]]
-            time_max = pd.to_datetime(str(forecast_definition["train_val_cutoff"]))
-
     for s in forecast_definition["time_validation_splits"]:
         if pd.to_datetime(str(s)) <= time_min or pd.to_datetime(str(s)) >= time_max:
             raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
@@ -79,7 +73,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                                forecast_definition["time_index"],
                                forecast_definition["target"],
                            ]
-                            + forecast_definition["drop_features"]
+                           + forecast_definition["drop_features"]
                 ]
             else:
                 features = [
@@ -128,6 +122,52 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
             ) as f:
                 json.dump({"params": {feature: coef for feature, coef in zip(features, model.coef_)}}, f)
 
-            sys.stdout.write("Pipeline persisted for horizon {}\n".format(h))
+            if 'confidence_intervals' in forecast_definition:
+                from functools import partial
 
-    return models
+                def get_bootstrap_params(model, features, df, target, random_seed, frac):
+                    if random_seed:
+                        df_train_confidence = df.sample(replace=False, frac=frac, random_state=random_seed)
+                    else:
+                        df_train_confidence = df.sample(replace=False, frac=frac)
+                    model.fit(
+                        df_train_confidence[features].to_dask_array(lengths=True),
+                        df_train_confidence[target],
+                    )
+                    return model
+
+                sample_bag = db.from_sequence([.8 for x in range(0, 30)], npartitions=10)
+                bootstrap_models = sample_bag.map(
+                    partial(get_bootstrap_params, dask_model(), features, df_train,
+                            "{}_h_{}".format(forecast_definition["target"], h), random_seed)).compute()
+
+                for c, m in zip(forecast_definition['confidence_intervals'], bootstrap_models):
+                    confidence_params = np.array(pd.DataFrame([m.coef_]).quantile(c * .01))
+                    model.coef_ = confidence_params
+                    model.intercept_ = m.intercept_
+
+                    with s3_fs.open(
+                            "{}/models/s-{}_h-{}_c-{}".format(
+                                write_path,
+                                pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
+                                h,
+                                c
+                            ),
+                            "wb",
+                    ) as f:
+                        joblib.dump(model, f)
+
+                    with s3_fs.open(
+                            "{}/models/s-{}_h-{}_c-{}_params.json".format(
+                                write_path,
+                                pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
+                                h,
+                                c
+                            ),
+                            "w",
+                    ) as f:
+                        json.dump({"params": {feature: coef for feature, coef in zip(features, model.coef_)}}, f)
+
+                    sys.stdout.write("Pipeline persisted for horizon {} interval {}\n".format(h, c))
+
+            sys.stdout.write("Pipeline persisted for horizon {}\n".format(h))

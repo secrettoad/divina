@@ -6,6 +6,8 @@ from .dataset import get_dataset
 import backoff
 from botocore.exceptions import ClientError
 import os
+import dask.bag as db
+from functools import partial
 
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
@@ -92,12 +94,25 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
             validate_df[
                 "{}_h_{}_pred".format(forecast_definition["target"], h)
             ] = fit_model.predict(validate_df[features].to_dask_array(lengths=True))
+            sys.stdout.write("Validation predictions made for split {}\n".format(s))
             forecast_df[
                 "{}_h_{}_pred".format(forecast_definition["target"], h)
             ] = fit_model.predict(forecast_df[features].to_dask_array(lengths=True))
 
-            sys.stdout.write("Validation predictions made for split {}\n".format(s))
-
+            if "confidence_intervals" in forecast_definition:
+                for c in forecast_definition["confidence_intervals"]:
+                    with s3_fs.open(
+                            "{}/models/s-{}_h-{}_c-{}".format(
+                                read_path,
+                                pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
+                                h,
+                                c
+                            ),
+                            "rb",
+                    ) as f:
+                        fit_model = joblib.load(f)
+                    forecast_df["{}_h_{}_pred_c_{}".format(forecast_definition["target"], h, c)] = fit_model.predict(forecast_df[features].to_dask_array(lengths=True))
+            sys.stdout.write("Blind predictions made for split {}\n".format(s))
         dd.to_parquet(
             validate_df[
                 [forecast_definition["time_index"]]
@@ -124,4 +139,4 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
                 pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
             )
         )
-        sys.stdout.write("Blind predictions made for split {}\n".format(s))
+
