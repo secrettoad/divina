@@ -36,7 +36,7 @@ def test_build_dataset(s3_fs, test_df_1, test_bucket):
     )
 
 
-def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_bucket, test_params_1_10, test_params_1_90):
+def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_bucket, test_model_1_c_90):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
         os.path.join(
@@ -68,7 +68,6 @@ def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_buck
         "rb",
     ) as f:
         assert compare_sk_models(joblib.load(f), test_model_1)
-    test_model_1.coef_ = test_params_1_10['params'].values()
     with s3_fs.open(
         os.path.join(
             vision_path,
@@ -77,17 +76,7 @@ def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_buck
         ),
         "rb",
     ) as f:
-        assert compare_sk_models(joblib.load(f), test_model_1)
-    test_model_1.coef_ = test_params_1_90['params'].values()
-    with s3_fs.open(
-        os.path.join(
-            vision_path,
-            "models",
-            "s-19700101-000007_h-1_c-10",
-        ),
-        "rb",
-    ) as f:
-        assert compare_sk_models(joblib.load(f), test_model_1)
+        assert compare_sk_models(joblib.load(f), test_model_1_c_90)
 
 
 def test_predict(

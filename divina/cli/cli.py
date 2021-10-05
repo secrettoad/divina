@@ -359,35 +359,80 @@ def forecast(forecast_def, keep_alive, ec2_key, write_path, local, debug):
     :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
     forecast_def = json.load(forecast_def)['forecast_definition']
-    cli_train_vision(
-        s3_fs=s3fs.S3FileSystem(),
-        forecast_definition=forecast_def,
-        write_path=write_path,
-        ec2_keypair_name=ec2_key,
-        keep_instances_alive=keep_alive,
-        local=local,
-        debug=debug,
-    )
-    cli_predict_vision(
-        s3_fs=s3fs.S3FileSystem(),
-        forecast_definition=forecast_def,
-        write_path=write_path,
-        read_path=write_path,
-        ec2_keypair_name=ec2_key,
-        keep_instances_alive=keep_alive,
-        local=local,
-        debug=debug,
-    )
-    cli_validate_vision(
-        s3_fs=s3fs.S3FileSystem(),
-        forecast_definition=forecast_def,
-        write_path=write_path,
-        read_path=write_path,
-        ec2_keypair_name=ec2_key,
-        keep_instances_alive=keep_alive,
-        local=local,
-        debug=debug,
-    )
+    ###TODO create get_dask_client function that accepts ec2key and keep alive
+    if not local:
+        with EC2Cluster(
+                key_name=ec2_key,
+                security=False,
+                docker_image="jhurdle/divina:latest",
+                debug=debug,
+                env_vars={
+                    "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                    "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                },
+                auto_shutdown=True,
+        ) as cluster:
+            cluster.adapt(minimum=0, maximum=10)
+            with Client(cluster):
+                cli_train_vision(
+                    s3_fs=s3fs.S3FileSystem(),
+                    forecast_definition=forecast_def,
+                    write_path=write_path,
+                    ec2_keypair_name=ec2_key,
+                    keep_instances_alive=keep_alive,
+                    local=local,
+                    debug=debug,
+                )
+                cli_predict_vision(
+                    s3_fs=s3fs.S3FileSystem(),
+                    forecast_definition=forecast_def,
+                    write_path=write_path,
+                    read_path=write_path,
+                    ec2_keypair_name=ec2_key,
+                    keep_instances_alive=keep_alive,
+                    local=local,
+                    debug=debug,
+                )
+                cli_validate_vision(
+                    s3_fs=s3fs.S3FileSystem(),
+                    forecast_definition=forecast_def,
+                    write_path=write_path,
+                    read_path=write_path,
+                    ec2_keypair_name=ec2_key,
+                    keep_instances_alive=keep_alive,
+                    local=local,
+                    debug=debug,
+                )
+    else:
+        cli_train_vision(
+            s3_fs=s3fs.S3FileSystem(),
+            forecast_definition=forecast_def,
+            write_path=write_path,
+            ec2_keypair_name=ec2_key,
+            keep_instances_alive=keep_alive,
+            local=local,
+            debug=debug,
+        )
+        cli_predict_vision(
+            s3_fs=s3fs.S3FileSystem(),
+            forecast_definition=forecast_def,
+            write_path=write_path,
+            read_path=write_path,
+            ec2_keypair_name=ec2_key,
+            keep_instances_alive=keep_alive,
+            local=local,
+            debug=debug,
+        )
+        cli_validate_vision(
+            s3_fs=s3fs.S3FileSystem(),
+            forecast_definition=forecast_def,
+            write_path=write_path,
+            read_path=write_path,
+            ec2_keypair_name=ec2_key,
+            keep_instances_alive=keep_alive,
+            local=local,
+            debug=debug,
+        )
 
 
 @click.argument("ec2_key", default=None, required=False)
