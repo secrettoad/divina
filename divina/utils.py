@@ -1,6 +1,8 @@
 from sklearn.base import BaseEstimator
 from sklearn.pipeline import Pipeline
 import dask.dataframe as dd
+from dask_ml.linear_model import LinearRegression
+import numpy as np
 
 
 def compare_sk_models(model1, model2):
@@ -14,12 +16,13 @@ def compare_sk_models(model1, model2):
         steps2 = model2.steps
     for s, o in zip(steps1, steps2):
         for i, j in zip(s, o):
-            if not type(i) == type(j):
-                return False
+            assert type(i) == type(j)
             if isinstance(i, BaseEstimator):
-                if not set(i.get_params()) == set(j.get_params()):
-                    return False
-    return True
+                assert set(i.get_params()) == set(j.get_params())
+            if isinstance(i, LinearRegression):
+                assert i.coef_ == j.coef_
+                assert i.intercept_ == j.intercept_
+            return None
 
 
 def cull_empty_partitions(df):

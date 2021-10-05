@@ -9,23 +9,26 @@ from botocore.exceptions import ClientError
 from dask_ml.linear_model import LinearRegression
 import json
 import dask.bag as db
-import copy
 import numpy as np
+
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, random_seed=None):
     if write_path[:5] == "s3://":
         if not s3_fs.exists(write_path):
             s3_fs.mkdir(
-                "{}/{}".format(write_path, "models"),
+                "{}/{}".format(write_path, "models/bootstrap"),
                 create_parents=True,
                 region_name=os.environ["AWS_DEFAULT_REGION"],
                 acl="private",
             )
+        write_open = s3_fs.open
+
     else:
-        pathlib.Path(os.path.join(write_path), "models").mkdir(
+        pathlib.Path(os.path.join(write_path), "models/bootstrap").mkdir(
             parents=True, exist_ok=True
         )
+        write_open = open
 
     sys.stdout.write("Loading dataset\n")
 
@@ -45,8 +48,6 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
             df["{}_h_{}".format(forecast_definition["target"], h)] = df[
                 forecast_definition["target"]
             ].shift(-h)
-
-    models = {}
 
     time_min, time_max = (
         pd.to_datetime(str(df[forecast_definition["time_index"]].min().compute())),
@@ -98,11 +99,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
 
             sys.stdout.write("Pipeline fit for horizon {}\n".format(h))
 
-            models[
-                "s-{}_h-{}".format(pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"), h)
-            ] = model
-
-            with s3_fs.open(
+            with write_open(
                     "{}/models/s-{}_h-{}".format(
                         write_path,
                         pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
@@ -112,7 +109,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
             ) as f:
                 joblib.dump(model, f)
 
-            with s3_fs.open(
+            with write_open(
                     "{}/models/s-{}_h-{}_params.json".format(
                         write_path,
                         pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
@@ -125,49 +122,52 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
             if 'confidence_intervals' in forecast_definition:
                 from functools import partial
 
-                def get_bootstrap_params(model, features, df, target, random_seed, frac):
+                ###TODO start here - turn bag map function into train_bootstrap_model and persist them as {}/models/s-{}_h-{}_c-{}
+
+                def train_persist_bootstrap_model(features, df, target, random_seed):
                     if random_seed:
-                        df_train_confidence = df.sample(replace=False, frac=frac, random_state=random_seed)
+                        df_train_bootstrap = df.sample(replace=False, frac=.8, random_state=random_seed)
                     else:
-                        df_train_confidence = df.sample(replace=False, frac=frac)
-                    model.fit(
-                        df_train_confidence[features].to_dask_array(lengths=True),
-                        df_train_confidence[target],
+                        df_train_bootstrap = df.sample(replace=False, frac=.8)
+                    bootstrap_model = dask_model()
+                    bootstrap_model.fit(
+                        df_train_bootstrap[features].to_dask_array(lengths=True),
+                        df_train_bootstrap[target],
                     )
-                    return model
 
-                sample_bag = db.from_sequence([.8 for x in range(0, 30)], npartitions=10)
-                bootstrap_models = sample_bag.map(
-                    partial(get_bootstrap_params, dask_model(), features, df_train,
-                            "{}_h_{}".format(forecast_definition["target"], h), random_seed)).compute()
-
-                for c, m in zip(forecast_definition['confidence_intervals'], bootstrap_models):
-                    confidence_params = np.array(pd.DataFrame([m.coef_]).quantile(c * .01))
-                    model.coef_ = confidence_params
-                    model.intercept_ = m.intercept_
-
-                    with s3_fs.open(
-                            "{}/models/s-{}_h-{}_c-{}".format(
+                    with write_open(
+                            "{}/models/bootstrap/s-{}_h-{}_r-{}".format(
                                 write_path,
                                 pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                                 h,
-                                c
+                                random_seed
                             ),
                             "wb",
                     ) as f:
-                        joblib.dump(model, f)
+                        joblib.dump(bootstrap_model, f)
 
-                    with s3_fs.open(
-                            "{}/models/s-{}_h-{}_c-{}_params.json".format(
+                    with write_open(
+                            "{}/models/bootstrap/s-{}_h-{}_r-{}_params.json".format(
                                 write_path,
                                 pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                                 h,
-                                c
+                                random_seed
                             ),
                             "w",
                     ) as f:
-                        json.dump({"params": {feature: coef for feature, coef in zip(features, model.coef_)}}, f)
+                        json.dump(
+                            {"params": {feature: coef for feature, coef in zip(features, bootstrap_model.coef_)}}, f)
 
-                    sys.stdout.write("Pipeline persisted for horizon {} interval {}\n".format(h, c))
+                    sys.stdout.write("Pipeline persisted for horizon {} seed {}\n".format(h, random_seed))
+
+                    return bootstrap_model
+
+                if random_seed:
+                    sample_bag = db.from_sequence([x for x in range(random_seed, random_seed + 30)], npartitions=10)
+                else:
+                    sample_bag = db.from_sequence([x for x in np.random.randint(0, 10000, size=30)], npartitions=10)
+                sample_bag.map(
+                    partial(train_persist_bootstrap_model, features, df_train,
+                            "{}_h_{}".format(forecast_definition["target"], h))).compute()
 
             sys.stdout.write("Pipeline persisted for horizon {}\n".format(h))
