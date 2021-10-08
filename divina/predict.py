@@ -19,6 +19,9 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
             forecast_kwargs.update({k.split('_')[1]: forecast_definition[k]})
     forecast_df = get_dataset(forecast_definition, pad=True, **forecast_kwargs)
 
+    forecast_df['new_index'] = 1
+    forecast_df['new_index'] = forecast_df['new_index'].cumsum()
+
     horizon_ranges = [x for x in forecast_definition["time_horizons"] if type(x) == tuple]
     if len(horizon_ranges) > 0:
         forecast_definition["time_horizons"] = [x for x in forecast_definition["time_horizons"] if type(x) == int]
@@ -117,8 +120,6 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
                     bootstrap_df[
                         '{}_h_{}_pred_bootstrap'.format(forecast_definition["target"], h)] = bootstrap_model.predict(
                         bootstrap_df[features].to_dask_array(lengths=True))
-                    bootstrap_df['bootstrap_index'] = 1
-                    bootstrap_df['bootstrap_index'] = bootstrap_df['bootstrap_index'].cumsum()
                     return bootstrap_df
 
                 bootstrap_dfs = db.from_sequence(bootstrap_model_paths).map(
@@ -126,15 +127,20 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
                 bootstrap_df = ddf.concat(bootstrap_dfs)
 
                 for c in forecast_definition["confidence_intervals"]:
-                    confidence_forecast = bootstrap_df.groupby(
-                            'bootstrap_index')['{}_h_{}_pred_bootstrap'.format(forecast_definition["target"], h)].apply(
-                            lambda x: x.quantile(c * .01))
-                    confidence_forecast = confidence_forecast.repartition(npartitions=forecast_df.npartitions)
-                    confidence_forecast = confidence_forecast.reset_index(drop=True)
-                    ###TODO start here = figure out column is assigning weirdly
-                    forecast_df[
-                        "{}_h_{}_pred_c_{}".format(forecast_definition["target"], h, c)] = confidence_forecast
+                    confidence_forecast = bootstrap_df.reset_index().groupby(
+                        'new_index')['{}_h_{}_pred_bootstrap'.format(forecast_definition["target"], h)].apply(
+                        lambda x: x.quantile(c * .01)).repartition(
+                        npartitions=forecast_df.npartitions).reset_index().rename(
+                        columns={'{}_h_{}_pred_bootstrap'.format(forecast_definition["target"],
+                                                                 h): '{}_h_{}_pred_c_{}'.format(
+                            forecast_definition["target"], h, c)})
+                    confidence_forecast.divisions = forecast_df.divisions
+                    forecast_df = forecast_df.merge(confidence_forecast, left_on='new_index',
+                                                    right_on='new_index')
+                    # forecast_df[
+                    # "{}_h_{}_pred_c_{}".format(forecast_definition["target"], h, c)] = confidence_forecast
             sys.stdout.write("Blind predictions made for split {}\n".format(s))
+        forecast_df = forecast_df.set_index('new_index')
         dd.to_parquet(
             validate_df[
                 [forecast_definition["time_index"]]

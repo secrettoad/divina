@@ -225,7 +225,7 @@ def test_dask_predict(
                 "predictions",
                 "s-19700101-000007_forecast",
             )
-        ).compute().reset_index(drop=True),
+        ).compute(),
         test_forecast_1,
     )
 
@@ -238,7 +238,7 @@ def test_dask_validate(
     vision_path = "divina-test/vision/test1"
     ddf.from_pandas(test_val_predictions_1, chunksize=10000).to_parquet(
         os.path.join(
-            os.environ["VISION_PATH"],
+            vision_path,
             "predictions",
             "s-19700101-000007",
         )
@@ -271,7 +271,7 @@ def test_get_params(
         s3_fs, test_model_1, test_params_1
 ):
     vision_path = "divina-test/vision/test1"
-    pathlib.Path(os.path.join(os.environ["VISION_PATH"], "models")).mkdir(
+    pathlib.Path(os.path.join(vision_path, "models")).mkdir(
         parents=True, exist_ok=True
     )
     joblib.dump(
