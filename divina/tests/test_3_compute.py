@@ -37,7 +37,7 @@ def test_build_dataset_small(s3_fs, test_df_1, dask_client_remote, test_bucket):
 
 
 def test_train_small(
-    s3_fs, test_df_1, test_model_1, test_fd_3, dask_client_remote, test_bucket, test_params_1_10, test_params_1_90
+    s3_fs, test_df_1, test_model_1, test_fd_3, dask_client_remote, test_bucket, test_bootstrap_models, random_state
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
@@ -63,27 +63,17 @@ def test_train_small(
         ),
         "rb",
     ) as f:
-        assert compare_sk_models(joblib.load(f), test_model_1)
-    test_model_1.coef_ = test_params_1_10['params'].values()
-    with s3_fs.open(
-            os.path.join(
-                vision_path,
-                "models",
-                "s-19700101-000007_h-1_c-10",
-            ),
-            "rb",
-    ) as f:
-        assert compare_sk_models(joblib.load(f), test_model_1)
-    test_model_1.coef_ = test_params_1_90['params'].values()
-    with s3_fs.open(
-            os.path.join(
-                vision_path,
-                "models",
-                "s-19700101-000007_h-1_c-10",
-            ),
-            "rb",
-    ) as f:
-        assert compare_sk_models(joblib.load(f), test_model_1)
+        compare_sk_models(joblib.load(f), test_model_1)
+    for seed in test_bootstrap_models:
+        with s3_fs.open(
+                    os.path.join(
+                        vision_path,
+                        "models/bootstrap",
+                        "s-19700101-000007_h-1_r-{}".format(seed),
+                    ),
+                "rb",
+        ) as f:
+            compare_sk_models(joblib.load(f), test_bootstrap_models)
 
 
 def test_predict_small(
