@@ -7,7 +7,6 @@ import backoff
 from botocore.exceptions import ClientError
 import os
 import dask.bag as db
-import dask.dataframe as ddf
 from functools import partial
 
 
@@ -19,8 +18,10 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
             forecast_kwargs.update({k.split('_')[1]: forecast_definition[k]})
     forecast_df = get_dataset(forecast_definition, pad=True, **forecast_kwargs)
 
-    forecast_df['new_index'] = 1
-    forecast_df['new_index'] = forecast_df['new_index'].cumsum()
+    forecast_df['bootstrap_index'] = 1
+    forecast_df['bootstrap_index'] = forecast_df['bootstrap_index'].cumsum()
+    forecast_df = forecast_df.set_index('bootstrap_index')
+
 
     horizon_ranges = [x for x in forecast_definition["time_horizons"] if type(x) == tuple]
     if len(horizon_ranges) > 0:
@@ -111,36 +112,26 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
                     read_path
                 )) if '.' not in p]
 
-                def load_and_predict_bootstrap_model(bootstrap_df, features, path):
-                    with s3_fs.open(
-                            path,
-                            "rb",
-                    ) as f:
-                        bootstrap_model = joblib.load(f)
-                    bootstrap_df[
-                        '{}_h_{}_pred_bootstrap'.format(forecast_definition["target"], h)] = bootstrap_model.predict(
-                        bootstrap_df[features].to_dask_array(lengths=True))
-                    return bootstrap_df
+                def load_and_predict_bootstrap_model(features, paths, intervals, df):
+                    for i, path in enumerate(paths):
+                        with s3_fs.open(
+                                path,
+                                "rb",
+                        ) as f:
+                            bootstrap_model = joblib.load(f)
+                        df['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i)] = bootstrap_model.predict(
+                            dd.from_pandas(df[features], chunksize=10000).to_dask_array(lengths=True))
+                    df_agg = df[['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i) for i in
+                                 range(0, len(paths))]].T
+                    for i in intervals:
+                        df['{}_h_{}_pred_c_{}'.format(forecast_definition["target"], h, i)] = df_agg.quantile(i * .01).T
+                        return df
 
-                bootstrap_dfs = db.from_sequence(bootstrap_model_paths).map(
-                    partial(load_and_predict_bootstrap_model, forecast_df, features)).compute()
-                bootstrap_df = ddf.concat(bootstrap_dfs)
+                forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model, features,
+                                                    bootstrap_model_paths,
+                                                    forecast_definition['confidence_intervals']))
 
-                for c in forecast_definition["confidence_intervals"]:
-                    confidence_forecast = bootstrap_df.reset_index().groupby(
-                        'new_index')['{}_h_{}_pred_bootstrap'.format(forecast_definition["target"], h)].apply(
-                        lambda x: x.quantile(c * .01)).repartition(
-                        npartitions=forecast_df.npartitions).reset_index().rename(
-                        columns={'{}_h_{}_pred_bootstrap'.format(forecast_definition["target"],
-                                                                 h): '{}_h_{}_pred_c_{}'.format(
-                            forecast_definition["target"], h, c)})
-                    confidence_forecast.divisions = forecast_df.divisions
-                    forecast_df = forecast_df.merge(confidence_forecast, left_on='new_index',
-                                                    right_on='new_index')
-                    # forecast_df[
-                    # "{}_h_{}_pred_c_{}".format(forecast_definition["target"], h, c)] = confidence_forecast
             sys.stdout.write("Blind predictions made for split {}\n".format(s))
-        forecast_df = forecast_df.set_index('new_index')
         dd.to_parquet(
             validate_df[
                 [forecast_definition["time_index"]]

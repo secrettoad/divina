@@ -120,7 +120,7 @@ def test_predict_small(
                 "predictions",
                 "s-19700101-000007",
             )
-        ).compute().reset_index(drop=True),
+        ).compute(),
         test_val_predictions_1,
     )
     pd.testing.assert_frame_equal(
@@ -130,7 +130,7 @@ def test_predict_small(
                 "predictions",
                 "s-19700101-000007_forecast",
             )
-        ).compute().reset_index(drop=True),
+        ).compute(),
         test_forecast_1,
     )
 

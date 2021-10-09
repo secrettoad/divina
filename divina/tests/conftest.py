@@ -90,7 +90,8 @@ def s3_fs():
 def dask_client(request):
     client = Client()
     request.addfinalizer(lambda: client.close())
-    return client
+    yield client
+    client.shutdown()
 
 
 @pytest.fixture(scope="session")
@@ -107,7 +108,7 @@ def dask_client_remote(request):
         },
         auto_shutdown=True,
     )
-    cluster.adapt(minimum=1, maximum=10)
+    cluster.scale(5)
     client = Client(cluster)
     request.addfinalizer(lambda: client.close())
     yield client
@@ -264,7 +265,7 @@ def test_forecast_1():
     df = pd.DataFrame(
         [[Timestamp('1970-01-01 00:00:05'), 16.507699275362324, 20.89668367346938],
          [Timestamp('1970-01-01 00:00:06'), 36.44731280193237, 41.55038265306125],
-         [Timestamp('1970-01-01 00:00:07'), -49.293025362318815, -4.517509010484922],
+         [Timestamp('1970-01-01 00:00:07'), -49.293025362318815, -4.517509010484911],
          [Timestamp('1970-01-01 00:00:10'), 46.41711956521739, 58.77768987341773],
          [Timestamp('1970-01-01 00:00:10'), 46.41711956521739, 58.77768987341773],
          [Timestamp('1970-01-01 00:00:11'), 46.41711956521739, 58.77768987341773],
@@ -302,9 +303,9 @@ def test_forecast_1():
          [Timestamp('1970-01-01 00:00:13'), 36.44731280193237, 41.55038265306125],
          [Timestamp('1970-01-01 00:00:14'), 36.44731280193237, 41.55038265306125]]
     )
-    df.columns = ["a", "c_h_1_pred", "c_h_1_pred_c_90"]
     df.index = list(df.index + 1)
-    df.index.name = 'new_index'
+    df.index.name = 'bootstrap_index'
+    df.columns = ["a", "c_h_1_pred", "c_h_1_pred_c_90"]
     return df
 
 
