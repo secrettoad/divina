@@ -11,6 +11,8 @@ from ..predict import dask_predict
 from ..validate import dask_validate
 from ..vision import set_parameters, get_parameters
 import pytest
+import pathlib
+import shutil
 
 
 @pytest.fixture(autouse=True)
@@ -89,6 +91,7 @@ def test_predict(
     test_model_1,
     test_forecast_1,
     test_bucket,
+    test_bootstrap_models
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
@@ -97,23 +100,28 @@ def test_predict(
             "data",
         )
     )
-    ddf.from_pandas(test_df_1.describe(), chunksize=10000).to_parquet(
-        os.path.join(
-            test_fd_1["forecast_definition"]["dataset_directory"],
-            "profile",
+    pathlib.Path(
+            "models/bootstrap"
+    ).mkdir(parents=True, exist_ok=True)
+
+    joblib.dump(test_model_1, "models/s-19700101-000007_h-1")
+    for seed in test_bootstrap_models:
+        joblib.dump(
+            test_bootstrap_models[seed],
+            os.path.join(
+                "models/bootstrap",
+                "s-19700101-000007_h-1_r-{}".format(seed),
+            ),
         )
-    )
-    joblib.dump(test_model_1, "s-19700101-000007_h-1")
     s3_fs.put(
-        "s-19700101-000007_h-1",
+        "models",
         os.path.join(
             vision_path,
-            "models",
-            "s-19700101-000007_h-1",
+            "models"
         ),
         recursive=True,
     )
-    os.remove("s-19700101-000007_h-1")
+    shutil.rmtree('models', ignore_errors=True)
 
     dask_predict(
         s3_fs=s3_fs,

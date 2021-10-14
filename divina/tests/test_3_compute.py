@@ -75,7 +75,6 @@ def test_train_small(
         ) as f:
             compare_sk_models(joblib.load(f), test_bootstrap_models)
 
-
 def test_predict_small(
     s3_fs,
     test_df_1,

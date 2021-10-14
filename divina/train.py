@@ -59,7 +59,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
             raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
         df_train = df[df[forecast_definition["time_index"]] < s]
         for h in forecast_definition["time_horizons"]:
-            model = dask_model()
+            model = dask_model(solver_kwargs={"normalize":False})
 
             if "drop_features" in forecast_definition:
                 features = [
@@ -129,7 +129,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                         df_train_bootstrap = df.sample(replace=False, frac=.8, random_state=random_seed)
                     else:
                         df_train_bootstrap = df.sample(replace=False, frac=.8)
-                    bootstrap_model = dask_model()
+                    bootstrap_model = dask_model(solver_kwargs={"normalize": False})
                     bootstrap_model.fit(
                         df_train_bootstrap[features].to_dask_array(lengths=True),
                         df_train_bootstrap[target],

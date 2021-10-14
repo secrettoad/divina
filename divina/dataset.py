@@ -6,6 +6,9 @@ import pandas as pd
 from .utils import cull_empty_partitions
 from dask_ml.preprocessing import Categorizer, DummyEncoder, PolynomialFeatures
 from sklearn.pipeline import make_pipeline
+import numpy as np
+from functools import partial
+
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def get_dataset(forecast_definition, start=None, end=None, pad=False):
@@ -40,7 +43,7 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
                     new_dates = pd.date_range(time_max, pd.to_datetime(str(end)),
                                               freq=forecast_definition["forecast_freq"])
                 new_dates_df = dd.from_pandas(pd.DataFrame(new_dates, columns=[forecast_definition["time_index"]]),
-                                                  chunksize=10000)
+                                              chunksize=10000)
                 df = df.append(new_dates_df)
             else:
                 raise Exception(
@@ -87,17 +90,35 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
                 df = df.append(df_scenario)
 
     if "encode_features" in forecast_definition:
-        for c in forecast_definition["encode_features"] :
+        for c in forecast_definition["encode_features"]:
             df['dummy_{}'.format(c)] = df[c]
 
         pipe = make_pipeline(
-            Categorizer(columns=forecast_definition["encode_features"]), DummyEncoder(columns=forecast_definition["encode_features"]))
+            Categorizer(columns=forecast_definition["encode_features"]),
+            DummyEncoder(columns=forecast_definition["encode_features"]))
 
         pipe.fit(df)
 
         df = pipe.transform(df)
 
         df = df.drop(columns=['dummy_{}'.format(c) for c in forecast_definition["encode_features"]])
+
+    if "bin_features" in forecast_definition:
+        def bin_df(bin_map, df):
+            for c in bin_map:
+                df_bin = pd.get_dummies(pd.cut(df[c], bin_map[c]['quantiles'], labels=bin_map[c]['labels']))
+                for c2 in df_bin:
+                    df[c2] = df_bin[c2]
+            return df
+
+        bin_map = {}
+        meta = {c: df.dtypes[c] for c in df.columns.tolist()}
+        for c in forecast_definition["bin_features"]:
+            quantiles = [-np.inf] + df[c].quantile([.2, .4, .6, .8]).compute().values.tolist() + [np.inf]
+            bin_map[c] = {'quantiles': quantiles, 'labels': ["{}_({}, {}]".format(c, v, v_1) for v, v_1 in zip(quantiles, quantiles[1:])]}
+            meta.update({l: df.dtypes[c] for l in bin_map[c]['labels']})
+            df = df.map_partitions(partial(bin_df, bin_map),
+                                   meta=dd.from_pandas(pd.DataFrame(columns=meta.keys()).astype(meta), chunksize=1))
 
     if "interaction_terms" in forecast_definition:
         for t in forecast_definition["interaction_terms"]:
@@ -146,9 +167,11 @@ def build_dataset_dask(s3_fs, read_path, write_path, partition_dimensions=None, 
                 partition_dimensions=partition_dimensions,
             )
     except ValueError as e:
-        if sample_rows*5 < len(df):
-            build_dataset_dask(s3_fs=s3_fs, read_path=read_path, write_path=write_path, partition_dimensions=partition_dimensions, sample_rows=sample_rows*5)
+        if sample_rows * 5 < len(df):
+            build_dataset_dask(s3_fs=s3_fs, read_path=read_path, write_path=write_path,
+                               partition_dimensions=partition_dimensions, sample_rows=sample_rows * 5)
         elif sample_rows < len(df):
-            build_dataset_dask(s3_fs=s3_fs, read_path=read_path, write_path=write_path, partition_dimensions=partition_dimensions, sample_rows=len(df))
+            build_dataset_dask(s3_fs=s3_fs, read_path=read_path, write_path=write_path,
+                               partition_dimensions=partition_dimensions, sample_rows=len(df))
         else:
             raise e

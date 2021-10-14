@@ -6,7 +6,6 @@ from .dataset import get_dataset
 import backoff
 from botocore.exceptions import ClientError
 import os
-import dask.bag as db
 from functools import partial
 
 
@@ -17,11 +16,6 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
         if k in forecast_definition:
             forecast_kwargs.update({k.split('_')[1]: forecast_definition[k]})
     forecast_df = get_dataset(forecast_definition, pad=True, **forecast_kwargs)
-
-    forecast_df['bootstrap_index'] = 1
-    forecast_df['bootstrap_index'] = forecast_df['bootstrap_index'].cumsum()
-    forecast_df = forecast_df.set_index('bootstrap_index')
-
 
     horizon_ranges = [x for x in forecast_definition["time_horizons"] if type(x) == tuple]
     if len(horizon_ranges) > 0:
@@ -37,6 +31,16 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
                 region_name=os.environ["AWS_DEFAULT_REGION"],
                 acl="private",
             )
+
+    if read_path[:5] == "s3://":
+        read_open = s3_fs.open
+        read_ls = s3_fs.ls
+        bootstrap_prefix = None
+    else:
+        read_open = open
+        read_ls = os.listdir
+        bootstrap_prefix = os.path.join(read_path, 'models', 'bootstrap')
+
 
     for s in forecast_definition["time_validation_splits"]:
 
@@ -58,7 +62,7 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
         validate_df = get_dataset(forecast_definition, pad=True, **validate_kwargs)
 
         for h in forecast_definition["time_horizons"]:
-            with s3_fs.open(
+            with read_open(
                     "{}/models/s-{}_h-{}".format(
                         read_path,
                         pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
@@ -68,7 +72,7 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
             ) as f:
                 fit_model = joblib.load(f)
             if "drop_features" in forecast_definition:
-                features = [
+                val_features = [
                     c
                     for c in validate_df.columns
                     if not c
@@ -82,8 +86,22 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
                            ]
                            + forecast_definition["drop_features"]
                 ]
+                forecast_features = [
+                    c
+                    for c in forecast_df.columns
+                    if not c
+                           in ["{}_h_{}".format(forecast_definition["target"], h) for h in
+                               forecast_definition["time_horizons"]]
+                           +
+                           ["{}_h_{}_pred".format(forecast_definition["target"], h) for h in
+                            forecast_definition["time_horizons"]] + [
+                               forecast_definition["time_index"],
+                               forecast_definition["target"],
+                           ]
+                           + forecast_definition["drop_features"]
+                ]
             else:
-                features = [
+                val_features = [
                     c
                     for c in validate_df.columns
                     if not c
@@ -99,39 +117,76 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
                                forecast_definition["target"],
                            ]
                 ]
+                forecast_features = [
+                    c
+                    for c in forecast_df.columns
+                    if not c
+                           in [
+                               "{}_h_{}".format(forecast_definition["target"], h)
+                               for h in forecast_definition["time_horizons"]
+                           ]
+                           +
+                           ["{}_h_{}_pred".format(forecast_definition["target"], h) for h in
+                            forecast_definition["time_horizons"]] +
+                           [
+                               forecast_definition["time_index"],
+                               forecast_definition["target"],
+                           ]
+                ]
             validate_df[
                 "{}_h_{}_pred".format(forecast_definition["target"], h)
-            ] = fit_model.predict(validate_df[features].to_dask_array(lengths=True))
+            ] = fit_model.predict(validate_df[val_features].to_dask_array(lengths=True))
             sys.stdout.write("Validation predictions made for split {}\n".format(s))
             forecast_df[
                 "{}_h_{}_pred".format(forecast_definition["target"], h)
-            ] = fit_model.predict(forecast_df[features].to_dask_array(lengths=True))
+            ] = fit_model.predict(forecast_df[forecast_features].to_dask_array(lengths=True))
 
             if "confidence_intervals" in forecast_definition:
-                bootstrap_model_paths = [p for p in s3_fs.ls("{}/models/bootstrap".format(
+                bootstrap_model_paths = [p for p in read_ls("{}/models/bootstrap".format(
                     read_path
                 )) if '.' not in p]
 
                 def load_and_predict_bootstrap_model(features, paths, intervals, df):
                     for i, path in enumerate(paths):
-                        with s3_fs.open(
-                                path,
+                        if bootstrap_prefix:
+                            model_path = os.path.join(bootstrap_prefix, path)
+                        else:
+                            model_path = path
+                        with read_open(
+                                model_path,
                                 "rb",
                         ) as f:
                             bootstrap_model = joblib.load(f)
                         df['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i)] = bootstrap_model.predict(
                             dd.from_pandas(df[features], chunksize=10000).to_dask_array(lengths=True))
-                    df_agg = df[['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i) for i in
-                                 range(0, len(paths))]].T
-                    for i in intervals:
-                        df['{}_h_{}_pred_c_{}'.format(forecast_definition["target"], h, i)] = df_agg.quantile(i * .01).T
-                        return df
 
-                forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model, features,
-                                                    bootstrap_model_paths,
-                                                    forecast_definition['confidence_intervals']))
+                    df_agg = df[['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i) for i in
+                                 range(0, len(paths))] + ['{}_h_{}_pred'.format(forecast_definition["target"], h)]].T
+                    for i in intervals:
+                        if i > 50:
+                            interpolation = 'higher'
+                        elif i < 50:
+                            interpolation = 'lower'
+                        else:
+                            interpolation = 'linear'
+                        df['{}_h_{}_pred_c_{}'.format(forecast_definition["target"], h, i)] = df_agg.quantile(i * .01, interpolation=interpolation).T
+                    return df
+
+                forecast_features = [c for c in forecast_features if
+                                     not c in ['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, b) for b in
+                                               range(0, len(bootstrap_model_paths))] + ['{}_h_{}_pred_c_{}'.format(forecast_definition["target"], h, b) for b in
+                                               forecast_definition["confidence_intervals"]]]
+
+                forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model, forecast_features,
+                                                                 bootstrap_model_paths,
+                                                                 forecast_definition['confidence_intervals']))
 
             sys.stdout.write("Blind predictions made for split {}\n".format(s))
+
+        forecast_df['forecast_index'] = 1
+        forecast_df['forecast_index'] = forecast_df['forecast_index'].cumsum()
+        forecast_df = forecast_df.set_index('forecast_index')
+
         dd.to_parquet(
             validate_df[
                 [forecast_definition["time_index"]]
