@@ -100,6 +100,7 @@ def test_predict(
             "data",
         )
     )
+    ###TODO write these locally to correct directory
     pathlib.Path(
             "models/bootstrap"
     ).mkdir(parents=True, exist_ok=True)

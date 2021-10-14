@@ -227,14 +227,14 @@ def test_params_1(test_model_1):
 
 
 @pytest.fixture()
-def test_bootstrap_models(test_df_1, random_state):
+def test_bootstrap_models(test_df_1, random_state, test_fd_1):
     train_df = test_df_1.groupby('a').agg('sum').reset_index()
     train_df['c'] = train_df['c'].shift(-1)
     train_df = train_df[train_df['a'] < "1970-01-01 00:00:07"]
     train_df = pd.concat([train_df, pd.DataFrame(
         KBinsDiscretizer(n_bins=5, encode='onehot-dense', strategy='quantile').fit_transform(train_df[['b']]))], axis=1)
     bootstrap_models = {}
-    for rs in range(random_state, random_state + 5):
+    for rs in range(random_state, random_state + test_fd_1['forecast_definition']['bootstrap_sample']):
         model = LinearRegression(solver_kwargs={"normalize": False})
         confidence_df = train_df.sample(frac=.8, random_state=rs)
         model.fit(
@@ -329,6 +329,7 @@ def test_fd_1():
             "forecast_end": "1970-01-01 00:00:14",
             "forecast_freq": 'S',
             "confidence_intervals": [90],
+            "bootstrap_sample": 5,
             "bin_features": ['b'],
             "scenarios": {'b': {'values': [(0, 5)], 'start': "1970-01-01 00:00:09", 'end': "1970-01-01 00:00:14"}},
             "time_horizons": [1],
