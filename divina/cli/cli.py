@@ -112,6 +112,7 @@ def cli_train_vision(
         local=False,
         debug=False,
         dask_client=None,
+        random_state=None
 ):
     dask_model = LinearRegression
     if local:
@@ -121,6 +122,7 @@ def cli_train_vision(
                 dask_model=dask_model,
                 forecast_definition=forecast_definition,
                 write_path=write_path,
+                random_seed=random_state
             )
     elif not dask_client:
         if not keep_instances_alive:
@@ -143,6 +145,7 @@ def cli_train_vision(
                             dask_model=dask_model,
                             forecast_definition=forecast_definition,
                             write_path=write_path,
+                            random_seed=random_state
                         )
             except NoRegionError:
                 sys.stderr.write(
@@ -169,6 +172,7 @@ def cli_train_vision(
                     dask_model=dask_model,
                     forecast_definition=forecast_definition,
                     write_path=write_path,
+                    random_seed=random_state
                 )
 
     else:
@@ -177,6 +181,7 @@ def cli_train_vision(
             dask_model=dask_model,
             forecast_definition=forecast_definition,
             write_path=write_path,
+            random_seed=random_state
         )
 
 
@@ -189,7 +194,7 @@ def cli_predict_vision(
         keep_instances_alive=False,
         local=False,
         debug=False,
-        dask_client=None,
+        dask_client=None
 ):
     if local:
         with Client():
@@ -197,7 +202,7 @@ def cli_predict_vision(
                 s3_fs=s3_fs,
                 forecast_definition=forecast_definition,
                 write_path=write_path,
-                read_path=read_path,
+                read_path=read_path
             )
     elif not dask_client:
         if not keep_instances_alive:
@@ -219,7 +224,7 @@ def cli_predict_vision(
                             s3_fs=s3_fs,
                             forecast_definition=forecast_definition,
                             write_path=write_path,
-                            read_path=read_path,
+                            read_path=read_path
                         )
             except NoRegionError:
                 sys.stderr.write(
@@ -245,7 +250,7 @@ def cli_predict_vision(
                     s3_fs=s3_fs,
                     forecast_definition=forecast_definition,
                     write_path=write_path,
-                    read_path=read_path,
+                    read_path=read_path
                 )
 
     else:
@@ -253,7 +258,7 @@ def cli_predict_vision(
             s3_fs=s3_fs,
             forecast_definition=forecast_definition,
             write_path=write_path,
-            read_path=read_path,
+            read_path=read_path
         )
 
 

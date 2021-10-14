@@ -1,4 +1,3 @@
-from unittest.mock import patch
 import os
 from ..cli.cli import (
     cli_build_dataset,
@@ -12,6 +11,8 @@ import joblib
 from ..utils import compare_sk_models
 import json
 import pytest
+import pathlib
+import shutil
 
 
 @pytest.fixture(autouse=True)
@@ -46,20 +47,20 @@ def test_train_small(
             "data",
         )
     )
-    forecast_definition = test_fd_3["forecast_definition"]
     cli_train_vision(
         s3_fs=s3_fs,
-        forecast_definition=forecast_definition,
+        forecast_definition=test_fd_3["forecast_definition"],
         write_path=vision_path,
         keep_instances_alive=False,
         dask_client=dask_client_remote,
         ec2_keypair_name="divina2",
+        random_state=random_state
     )
     with s3_fs.open(
         os.path.join(
             vision_path,
             "models",
-            "s-19700101-000006_h-1",
+            "s-19700101-000007_h-1",
         ),
         "rb",
     ) as f:
@@ -75,6 +76,7 @@ def test_train_small(
         ) as f:
             compare_sk_models(joblib.load(f), test_bootstrap_models)
 
+
 def test_predict_small(
     s3_fs,
     test_df_1,
@@ -83,7 +85,9 @@ def test_predict_small(
     test_fd_3,
     dask_client_remote,
     test_bucket,
-    test_forecast_1
+    test_forecast_1,
+    test_bootstrap_models,
+    random_state
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
@@ -92,25 +96,34 @@ def test_predict_small(
             "data",
         )
     )
-    joblib.dump(test_model_1, "s-19700101-000007_h-1")
+    pathlib.Path(
+        "models/bootstrap"
+    ).mkdir(parents=True, exist_ok=True)
+    joblib.dump(test_model_1, "models/s-19700101-000007_h-1")
+    for seed in test_bootstrap_models:
+        joblib.dump(
+            test_bootstrap_models[seed],
+            os.path.join(
+                "models/bootstrap",
+                "s-19700101-000007_h-1_r-{}".format(seed),
+            ),
+        )
     s3_fs.put(
-        "s-19700101-000007_h-1",
+        "models",
         os.path.join(
             vision_path,
-            "models",
-            "s-19700101-000007_h-1",
+            "models"
         ),
         recursive=True,
     )
-    os.remove("s-19700101-000007_h-1")
-    forecast_definition = test_fd_3["forecast_definition"]
+    shutil.rmtree('models', ignore_errors=True)
     cli_predict_vision(
         s3_fs=s3_fs,
-        forecast_definition=forecast_definition,
+        forecast_definition=test_fd_3["forecast_definition"],
         write_path=vision_path,
         read_path=vision_path,
         keep_instances_alive=False,
-        dask_client=dask_client_remote,
+        dask_client=dask_client_remote
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(

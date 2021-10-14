@@ -92,6 +92,8 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                 ]
 
             df_train = df_train[~df_train["{}_h_{}".format(forecast_definition["target"], h)].isnull()]
+
+            ###TODO START HERE
             model.fit(
                 df_train[features].to_dask_array(lengths=True),
                 df_train["{}_h_{}".format(forecast_definition["target"], h)],
@@ -120,9 +122,11 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                 json.dump({"params": {feature: coef for feature, coef in zip(features, model.coef_)}}, f)
 
             if 'confidence_intervals' in forecast_definition:
+                if not 'bootstrap_sample' in forecast_definition:
+                    bootstrap_sample = 30
+                else:
+                    bootstrap_sample = forecast_definition['bootstrap_sample']
                 from functools import partial
-
-                ###TODO start here - turn bag map function into train_bootstrap_model and persist them as {}/models/s-{}_h-{}_c-{}
 
                 def train_persist_bootstrap_model(features, df, target, random_seed):
                     if random_seed:
@@ -163,9 +167,9 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                     return bootstrap_model
 
                 if random_seed:
-                    sample_bag = db.from_sequence([x for x in range(random_seed, random_seed + 30)], npartitions=10)
+                    sample_bag = db.from_sequence([x for x in range(random_seed, random_seed + bootstrap_sample)], npartitions=10)
                 else:
-                    sample_bag = db.from_sequence([x for x in np.random.randint(0, 10000, size=30)], npartitions=10)
+                    sample_bag = db.from_sequence([x for x in np.random.randint(0, 10000, size=bootstrap_sample)], npartitions=10)
                 sample_bag.map(
                     partial(train_persist_bootstrap_model, features, df_train,
                             "{}_h_{}".format(forecast_definition["target"], h))).compute()
