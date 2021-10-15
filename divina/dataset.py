@@ -1,4 +1,5 @@
 import dask.dataframe as dd
+import dask.array as da
 import os
 import backoff
 from botocore.exceptions import ClientError
@@ -104,21 +105,12 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
         df = df.drop(columns=['dummy_{}'.format(c) for c in forecast_definition["encode_features"]])
 
     if "bin_features" in forecast_definition:
-        def bin_df(bin_map, df):
-            for c in bin_map:
-                df_bin = pd.get_dummies(pd.cut(df[c], bin_map[c]['quantiles'], labels=bin_map[c]['labels']))
-                for c2 in df_bin:
-                    df[c2] = df_bin[c2]
-            return df
-
-        bin_map = {}
-        meta = {c: df.dtypes[c] for c in df.columns.tolist()}
         for c in forecast_definition["bin_features"]:
             quantiles = [-np.inf] + df[c].quantile([.2, .4, .6, .8]).compute().values.tolist() + [np.inf]
-            bin_map[c] = {'quantiles': quantiles, 'labels': ["{}_({}, {}]".format(c, v, v_1) for v, v_1 in zip(quantiles, quantiles[1:])]}
-            meta.update({l: df.dtypes[c] for l in bin_map[c]['labels']})
-            df = df.map_partitions(partial(bin_df, bin_map),
-                                   meta=dd.from_pandas(pd.DataFrame(columns=meta.keys()).astype(meta), chunksize=1))
+            for v, v_1 in zip(quantiles, quantiles[1:]):
+                df["{}_({}, {}]".format(c, v, v_1)] = 0
+                df["{}_({}, {}]".format(c, v, v_1)] = df["{}_({}, {}]".format(c, v, v_1)].where(
+                    ((df[c] < v_1) & (df[c] >= v)), 1)
 
     if "interaction_terms" in forecast_definition:
         for t in forecast_definition["interaction_terms"]:

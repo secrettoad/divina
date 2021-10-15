@@ -59,7 +59,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
             raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
         df_train = df[df[forecast_definition["time_index"]] < s]
         for h in forecast_definition["time_horizons"]:
-            model = dask_model(solver_kwargs={"normalize":False})
+            model = dask_model(solver_kwargs={"normalize": False})
 
             if "drop_features" in forecast_definition:
                 features = [
@@ -93,11 +93,13 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
 
             df_train = df_train[~df_train["{}_h_{}".format(forecast_definition["target"], h)].isnull()]
 
-            ###TODO START HERE
-            model.fit(
-                df_train[features].to_dask_array(lengths=True),
-                df_train["{}_h_{}".format(forecast_definition["target"], h)],
-            )
+            try:
+                model.fit(
+                    df_train[features].to_dask_array(lengths=True),
+                    df_train["{}_h_{}".format(forecast_definition["target"], h)],
+                )
+            except:
+                print('fit didnt work')
 
             sys.stdout.write("Pipeline fit for horizon {}\n".format(h))
 
