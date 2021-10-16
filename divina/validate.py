@@ -5,9 +5,10 @@ from .dataset import get_dataset
 import os
 import backoff
 from botocore.exceptions import ClientError
-from .utils import cull_empty_partitions
+from .utils import cull_empty_partitions, validate_forecast_definition
 
 
+@validate_forecast_definition
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def dask_validate(s3_fs, forecast_definition, write_path, read_path):
     def get_metrics(forecast_definition, df):

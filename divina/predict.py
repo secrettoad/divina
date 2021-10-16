@@ -7,8 +7,10 @@ import backoff
 from botocore.exceptions import ClientError
 import os
 from functools import partial
+from .utils import validate_forecast_definition
 
 
+@validate_forecast_definition
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def dask_predict(s3_fs, forecast_definition, read_path, write_path):
     forecast_kwargs = {}
