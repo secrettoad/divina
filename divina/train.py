@@ -10,8 +10,10 @@ from dask_ml.linear_model import LinearRegression
 import json
 import dask.bag as db
 import numpy as np
+from .utils import validate_forecast_definition
 
 
+@validate_forecast_definition
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, random_seed=None):
     if write_path[:5] == "s3://":

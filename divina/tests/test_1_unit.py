@@ -1,7 +1,7 @@
 import os
 import json
 from unittest.mock import patch
-from ..vision import validate_forecast_definition, get_parameters, set_parameters
+from ..vision import get_parameters, set_parameters
 from ..train import dask_train
 from ..predict import dask_predict
 from ..dataset import get_dataset, build_dataset_dask
@@ -13,6 +13,8 @@ from ..utils import compare_sk_models
 import joblib
 import pandas as pd
 import dask.dataframe as ddf
+from jsonschema import validate
+from jsonschema.exceptions import ValidationError
 
 
 def test_validate_forecast_definition(
@@ -34,8 +36,9 @@ def test_validate_forecast_definition(
         fd_time_horizons_range_not_tuple
     ]:
         try:
-            validate_forecast_definition(dd)
-        except InvalidDataDefinitionException:
+            with open(pathlib.Path(pathlib.Path(__file__).parent.parent, 'config/fd_schema.json'), 'r') as f:
+                validate(instance=dd, schema=json.load(f))
+        except ValidationError:
             assert True
         else:
             assert False

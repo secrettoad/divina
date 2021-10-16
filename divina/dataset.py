@@ -1,5 +1,4 @@
 import dask.dataframe as dd
-import dask.array as da
 import os
 import backoff
 from botocore.exceptions import ClientError
@@ -8,7 +7,6 @@ from .utils import cull_empty_partitions
 from dask_ml.preprocessing import Categorizer, DummyEncoder, PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 import numpy as np
-from functools import partial
 
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
@@ -69,7 +67,7 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
     if "scenarios" in forecast_definition:
         for x in forecast_definition["scenarios"]:
 
-            scenario_ranges = [x for x in forecast_definition["scenarios"][x]["values"] if type(x) == tuple]
+            scenario_ranges = [x for x in forecast_definition["scenarios"][x]["values"] if type(x) == list]
             if len(scenario_ranges) > 0:
                 forecast_definition["scenarios"][x]["values"] = [x for x in
                                                                  forecast_definition["scenarios"][x]["values"] if

@@ -1,0 +1,485 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "title": "The root schema",
+    "description": "The root schema comprises the entire JSON document.",
+    "default": {},
+    "examples": [
+        {
+            "forecast_definition": {
+                "time_index": "a",
+                "target": "c",
+                "time_validation_splits": [
+                    "1970-01-01 00:00:07"
+                ],
+                "validate_start": "1970-01-01 00:00:01",
+                "validate_end": "1970-01-01 00:00:09",
+                "forecast_start": "1970-01-01 00:00:05",
+                "forecast_end": "1970-01-01 00:00:14",
+                "forecast_freq": "S",
+                "confidence_intervals": [
+                    90
+                ],
+                "bootstrap_sample": 5,
+                "bin_features": [
+                    "b"
+                ],
+                "scenarios": {
+                    "b": {
+                        "values": [
+                            [
+                                0,
+                                5
+                            ],
+                            7,
+                            "red"
+                        ],
+                        "start": "1970-01-01 00:00:09",
+                        "end": "1970-01-01 00:00:14"
+                    }
+                },
+                "time_horizons": [
+                    1
+                ],
+                "dataset_directory": "divina-test/dataset/test1",
+                "model": "LinearRegression"
+            }
+        }
+    ],
+    "required": [
+        "forecast_definition"
+    ],
+    "properties": {
+        "forecast_definition": {
+            "$id": "#/properties/forecast_definition",
+            "type": "object",
+            "title": "The forecast_definition schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "time_index": "a",
+                    "target": "c",
+                    "time_validation_splits": [
+                        "1970-01-01 00:00:07"
+                    ],
+                    "validate_start": "1970-01-01 00:00:01",
+                    "validate_end": "1970-01-01 00:00:09",
+                    "forecast_start": "1970-01-01 00:00:05",
+                    "forecast_end": "1970-01-01 00:00:14",
+                    "forecast_freq": "S",
+                    "confidence_intervals": [
+                        90
+                    ],
+                    "bootstrap_sample": 5,
+                    "bin_features": [
+                        "b"
+                    ],
+                    "scenarios": {
+                        "b": {
+                            "values": [
+                                [
+                                    0,
+                                    5
+                                ],
+                                7,
+                                "red"
+                            ],
+                            "start": "1970-01-01 00:00:09",
+                            "end": "1970-01-01 00:00:14"
+                        }
+                    },
+                    "time_horizons": [
+                        1
+                    ],
+                    "dataset_directory": "divina-test/dataset/test1",
+                    "model": "LinearRegression"
+                }
+            ],
+            "required": [
+                "time_index",
+                "target",
+                "time_validation_splits",
+                "validate_start",
+                "validate_end",
+                "forecast_start",
+                "forecast_end",
+                "forecast_freq",
+                "confidence_intervals",
+                "bootstrap_sample",
+                "bin_features",
+                "scenarios",
+                "time_horizons",
+                "dataset_directory",
+                "model"
+            ],
+            "properties": {
+                "time_index": {
+                    "$id": "#/properties/forecast_definition/properties/time_index",
+                    "type": "string",
+                    "title": "The time_index schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "a"
+                    ]
+                },
+                "target": {
+                    "$id": "#/properties/forecast_definition/properties/target",
+                    "type": "string",
+                    "title": "The target schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "c"
+                    ]
+                },
+                "time_validation_splits": {
+                    "$id": "#/properties/forecast_definition/properties/time_validation_splits",
+                    "type": "array",
+                    "title": "The time_validation_splits schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            "1970-01-01 00:00:07"
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/forecast_definition/properties/time_validation_splits/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/forecast_definition/properties/time_validation_splits/items/anyOf/0",
+                                "type": "string",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": "",
+                                "examples": [
+                                    "1970-01-01 00:00:07"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "validate_start": {
+                    "$id": "#/properties/forecast_definition/properties/validate_start",
+                    "type": "string",
+                    "title": "The validate_start schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "1970-01-01 00:00:01"
+                    ]
+                },
+                "validate_end": {
+                    "$id": "#/properties/forecast_definition/properties/validate_end",
+                    "type": "string",
+                    "title": "The validate_end schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "1970-01-01 00:00:09"
+                    ]
+                },
+                "forecast_start": {
+                    "$id": "#/properties/forecast_definition/properties/forecast_start",
+                    "type": "string",
+                    "title": "The forecast_start schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "1970-01-01 00:00:05"
+                    ]
+                },
+                "forecast_end": {
+                    "$id": "#/properties/forecast_definition/properties/forecast_end",
+                    "type": "string",
+                    "title": "The forecast_end schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "1970-01-01 00:00:14"
+                    ]
+                },
+                "forecast_freq": {
+                    "$id": "#/properties/forecast_definition/properties/forecast_freq",
+                    "type": "string",
+                    "title": "The forecast_freq schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "S"
+                    ]
+                },
+                "confidence_intervals": {
+                    "$id": "#/properties/forecast_definition/properties/confidence_intervals",
+                    "type": "array",
+                    "title": "The confidence_intervals schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            90
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/forecast_definition/properties/confidence_intervals/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/forecast_definition/properties/confidence_intervals/items/anyOf/0",
+                                "type": "integer",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": 0,
+                                "examples": [
+                                    90
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "bootstrap_sample": {
+                    "$id": "#/properties/forecast_definition/properties/bootstrap_sample",
+                    "type": "integer",
+                    "title": "The bootstrap_sample schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": 0,
+                    "examples": [
+                        5
+                    ]
+                },
+                "bin_features": {
+                    "$id": "#/properties/forecast_definition/properties/bin_features",
+                    "type": "array",
+                    "title": "The bin_features schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            "b"
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/forecast_definition/properties/bin_features/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/forecast_definition/properties/bin_features/items/anyOf/0",
+                                "type": "string",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": "",
+                                "examples": [
+                                    "b"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "scenarios": {
+                    "$id": "#/properties/forecast_definition/properties/scenarios",
+                    "type": "object",
+                    "title": "The scenarios schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": {},
+                    "examples": [
+                        {
+                            "b": {
+                                "values": [
+                                    [
+                                        0,
+                                        5
+                                    ],
+                                    7,
+                                    "red"
+                                ],
+                                "start": "1970-01-01 00:00:09",
+                                "end": "1970-01-01 00:00:14"
+                            }
+                        }
+                    ],
+                    "required": [
+                        "b"
+                    ],
+                    "properties": {
+                        "b": {
+                            "$id": "#/properties/forecast_definition/properties/scenarios/properties/b",
+                            "type": "object",
+                            "title": "The b schema",
+                            "description": "An explanation about the purpose of this instance.",
+                            "default": {},
+                            "examples": [
+                                {
+                                    "values": [
+                                        [
+                                            0,
+                                            5
+                                        ],
+                                        7,
+                                        "red"
+                                    ],
+                                    "start": "1970-01-01 00:00:09",
+                                    "end": "1970-01-01 00:00:14"
+                                }
+                            ],
+                            "required": [
+                                "values",
+                                "start",
+                                "end"
+                            ],
+                            "properties": {
+                                "values": {
+                                    "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values",
+                                    "type": "array",
+                                    "title": "The values schema",
+                                    "description": "An explanation about the purpose of this instance.",
+                                    "default": [],
+                                    "examples": [
+                                        [
+                                            [
+                                                0,
+                                                5
+                                            ],
+                                            7
+                                        ]
+                                    ],
+                                    "additionalItems": true,
+                                    "items": {
+                                        "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items",
+                                        "anyOf": [
+                                            {
+                                                "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/0",
+                                                "type": "array",
+                                                "title": "The first anyOf schema",
+                                                "description": "An explanation about the purpose of this instance.",
+                                                "default": [],
+                                                "examples": [
+                                                    [
+                                                        0,
+                                                        5
+                                                    ]
+                                                ],
+                                                "additionalItems": true,
+                                                "items": {
+                                                    "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/0/items",
+                                                    "anyOf": [
+                                                        {
+                                                            "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/0/items/anyOf/0",
+                                                            "type": "integer",
+                                                            "title": "The first anyOf schema",
+                                                            "description": "An explanation about the purpose of this instance.",
+                                                            "default": 0,
+                                                            "examples": [
+                                                                0,
+                                                                5
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            },
+                                            {
+                                                "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/1",
+                                                "type": "integer",
+                                                "title": "The second anyOf schema",
+                                                "description": "An explanation about the purpose of this instance.",
+                                                "default": 0,
+                                                "examples": [
+                                                    7
+                                                ]
+                                            },
+                                            {
+                                                "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/2",
+                                                "type": "string",
+                                                "title": "The third anyOf schema",
+                                                "description": "An explanation about the purpose of this instance.",
+                                                "default": "",
+                                                "examples": [
+                                                    "red"
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                },
+                                "start": {
+                                    "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/start",
+                                    "type": "string",
+                                    "title": "The start schema",
+                                    "description": "An explanation about the purpose of this instance.",
+                                    "default": "",
+                                    "examples": [
+                                        "1970-01-01 00:00:09"
+                                    ]
+                                },
+                                "end": {
+                                    "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/end",
+                                    "type": "string",
+                                    "title": "The end schema",
+                                    "description": "An explanation about the purpose of this instance.",
+                                    "default": "",
+                                    "examples": [
+                                        "1970-01-01 00:00:14"
+                                    ]
+                                }
+                            },
+                            "additionalProperties": true
+                        }
+                    },
+                    "additionalProperties": true
+                },
+                "time_horizons": {
+                    "$id": "#/properties/forecast_definition/properties/time_horizons",
+                    "type": "array",
+                    "title": "The time_horizons schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            1
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/forecast_definition/properties/time_horizons/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/forecast_definition/properties/time_horizons/items/anyOf/0",
+                                "type": "integer",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": 0,
+                                "examples": [
+                                    1
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "dataset_directory": {
+                    "$id": "#/properties/forecast_definition/properties/dataset_directory",
+                    "type": "string",
+                    "title": "The dataset_directory schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "divina-test/dataset/test1"
+                    ]
+                },
+                "model": {
+                    "$id": "#/properties/forecast_definition/properties/model",
+                    "type": "string",
+                    "title": "The model schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "LinearRegression"
+                    ]
+                }
+            },
+            "additionalProperties": true
+        }
+    },
+    "additionalProperties": true
+}
