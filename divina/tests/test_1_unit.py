@@ -43,24 +43,24 @@ def test_validate_forecast_definition(
             assert False
 
 
-@patch.dict(os.environ, {"DATA_BUCKET": "divina-test/data"})
-@patch.dict(os.environ, {"DATASET_PATH": "divina-test/dataset/test1"})
 def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
-    pathlib.Path(os.environ["DATA_BUCKET"]).mkdir(parents=True, exist_ok=True)
+    data_path = "divina-test/data"
+    dataset_path = "divina-test/dataset/test1"
+    pathlib.Path(dataset_path).mkdir(parents=True, exist_ok=True)
     test_df_1.to_csv(
-        os.path.join(os.environ["DATA_BUCKET"], "test_df_1.csv"), index=False
+        os.path.join(data_path, "test_df_1.csv"), index=False
     )
-    pathlib.Path(os.environ["DATASET_PATH"]).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(dataset_path).mkdir(parents=True, exist_ok=True)
     build_dataset_dask(
         s3_fs=s3_fs,
-        read_path=os.environ["DATA_BUCKET"],
-        write_path=os.environ["DATASET_PATH"],
+        read_path=data_path,
+        write_path=dataset_path,
         partition_dimensions=None,
     )
 
     pd.testing.assert_frame_equal(
-        ddf.read_parquet(os.path.join(os.environ["DATASET_PATH"], "data/*")).compute(),
-        ddf.read_csv(os.path.join(os.environ["DATA_BUCKET"], "test_df_1.csv")).compute(),
+        ddf.read_parquet(os.path.join(dataset_path, "data/*")).compute(),
+        ddf.read_csv(os.path.join(data_path, "test_df_1.csv")).compute(),
     )
 
 
