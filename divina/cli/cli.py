@@ -2,7 +2,7 @@ import click
 from ..dataset import build_dataset_dask
 from ..train import dask_train
 from ..predict import dask_predict
-from ..vision import get_parameters, set_parameters
+from ..forecast import get_parameters, set_parameters
 from ..validate import dask_validate
 from ..aws.utils import create_divina_role
 from dask_cloudprovider.aws import EC2Cluster

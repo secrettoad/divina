@@ -37,6 +37,9 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
                 region_name=os.environ["AWS_DEFAULT_REGION"],
                 acl="private",
             )
+        write_open = s3_fs.open
+    else:
+        write_open = open
 
     dataset_kwargs = {}
     for k in ['validate_start', 'validate_end']:
@@ -84,5 +87,5 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
         validate_df = cull_empty_partitions(validate_df)
         metrics["splits"][s] = get_metrics(forecast_definition, validate_df)
 
-        with s3_fs.open("{}/metrics.json".format(write_path), "w") as f:
+        with write_open("{}/metrics.json".format(write_path), "w") as f:
             json.dump(metrics, f)

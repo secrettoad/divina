@@ -1,12 +1,11 @@
 import os
 import json
 from unittest.mock import patch
-from ..vision import get_parameters, set_parameters
+from ..forecast import get_parameters, set_parameters
 from ..train import dask_train
 from ..predict import dask_predict
 from ..dataset import get_dataset, build_dataset_dask
 from ..validate import dask_validate
-from ..errors import InvalidDataDefinitionException
 import pathlib
 from dask_ml.linear_model import LinearRegression
 from ..utils import compare_sk_models
@@ -44,8 +43,6 @@ def test_validate_forecast_definition(
             assert False
 
 
-@patch("s3fs.S3FileSystem.open", open)
-@patch("s3fs.S3FileSystem.ls", os.listdir)
 @patch.dict(os.environ, {"DATA_BUCKET": "divina-test/data"})
 @patch.dict(os.environ, {"DATASET_PATH": "divina-test/dataset/test1"})
 def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
@@ -67,8 +64,6 @@ def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
     )
 
 
-@patch("s3fs.S3FileSystem.open", open)
-@patch("s3fs.S3FileSystem.ls", os.listdir)
 def test_dask_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_bootstrap_models, random_state):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
@@ -117,9 +112,6 @@ def test_dask_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test
             test_bootstrap_models[seed],
         )
 
-
-@patch("s3fs.S3FileSystem.open", open)
-@patch("s3fs.S3FileSystem.ls", os.listdir)
 def test_get_composite_dataset(
         test_df_1,
         test_df_2,
@@ -158,8 +150,6 @@ def test_get_composite_dataset(
     pd.testing.assert_frame_equal(df.compute(), test_composite_dataset_1)
 
 
-@patch("s3fs.S3FileSystem.open", open)
-@patch("s3fs.S3FileSystem.ls", os.listdir)
 def test_dask_predict(
         s3_fs, dask_client, test_df_1, test_fd_1, test_model_1, test_val_predictions_1, test_forecast_1, test_bootstrap_models
 ):
@@ -233,8 +223,6 @@ def test_dask_predict(
     )
 
 
-@patch("s3fs.S3FileSystem.open", open)
-@patch("s3fs.S3FileSystem.ls", os.listdir)
 def test_dask_validate(
         s3_fs, test_fd_1, test_df_1, test_metrics_1, test_val_predictions_1, dask_client
 ):
@@ -268,8 +256,6 @@ def test_dask_validate(
     assert metrics == test_metrics_1
 
 
-@patch("s3fs.S3FileSystem.open", open)
-@patch("s3fs.S3FileSystem.ls", os.listdir)
 def test_get_params(
         s3_fs, test_model_1, test_params_1
 ):
@@ -300,8 +286,6 @@ def test_get_params(
     assert params == test_params_1
 
 
-@patch("s3fs.S3FileSystem.open", open)
-@patch("s3fs.S3FileSystem.ls", os.listdir)
 def test_set_params(
         s3_fs, test_model_1, test_params_1, test_params_2
 ):
