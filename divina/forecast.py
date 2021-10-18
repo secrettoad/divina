@@ -1,13 +1,25 @@
-from .errors import InvalidDataDefinitionException
-import pandas as pd
 import json
+import os
+import pathlib
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
 supported_models = ["LinearRegression"]
 
 
 def get_parameters(s3_fs, model_path):
-    with s3_fs.open(
+    if model_path[:5] == "s3://":
+        if not s3_fs.exists(model_path):
+            s3_fs.mkdir(
+                model_path,
+                create_parents=True,
+                region_name=os.environ["AWS_DEFAULT_REGION"],
+                acl="private",
+            )
+        write_open = s3_fs.open
+
+    else:
+        write_open = open
+    with write_open(
             '{}_params'.format(model_path),
             "rb"
     ) as f:
@@ -16,7 +28,19 @@ def get_parameters(s3_fs, model_path):
 
 
 def set_parameters(s3_fs, model_path, params):
-    with s3_fs.open(
+    if model_path[:5] == "s3://":
+        if not s3_fs.exists(model_path):
+            s3_fs.mkdir(
+                model_path,
+                create_parents=True,
+                region_name=os.environ["AWS_DEFAULT_REGION"],
+                acl="private",
+            )
+        write_open = s3_fs.open
+
+    else:
+        write_open = open
+    with write_open(
             '{}_params'.format(model_path),
             "rb"
     ) as f:
@@ -26,7 +50,7 @@ def set_parameters(s3_fs, model_path, params):
             ', '.join(list(set(params.keys()) - set(parameters.keys())))))
     else:
         parameters.update(params)
-        with s3_fs.open(
+        with write_open(
                 '{}_params'.format(model_path),
                 "w"
         ) as f:

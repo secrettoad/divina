@@ -9,7 +9,7 @@ from ..train import dask_train
 import joblib
 from ..predict import dask_predict
 from ..validate import dask_validate
-from ..vision import set_parameters, get_parameters
+from ..forecast import set_parameters, get_parameters
 import pytest
 import pathlib
 import shutil

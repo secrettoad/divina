@@ -29,25 +29,20 @@ def random_state():
 
 
 @pytest.fixture()
-def setup_teardown_test_bucket_contents(s3_fs, request, test_bucket):
+def setup_teardown_test_bucket_contents(s3_fs, test_bucket):
     fsspec.filesystem('s3').invalidate_cache()
-    test_path = "{}/{}".format(test_bucket, request.node.originalname)
     try:
-        s3_fs.mkdir(
-            test_path,
-            region_name=os.environ["AWS_DEFAULT_REGION"],
-            acl="private",
-        )
-    except FileExistsError:
-        s3_fs.rm(test_path, recursive=True)
-        s3_fs.mkdir(
-            test_path,
-            region_name=os.environ["AWS_DEFAULT_REGION"],
-            acl="private",
-        )
+        s3_fs.rm(test_bucket, recursive=True)
+    except FileNotFoundError:
+        pass
+    s3_fs.mkdir(
+        test_bucket,
+        region_name=os.environ["AWS_DEFAULT_REGION"],
+        acl="private",
+    )
     yield
     try:
-        s3_fs.rm(test_path, recursive=True)
+        s3_fs.rm(test_bucket, recursive=True)
     except FileNotFoundError:
         pass
 

@@ -19,7 +19,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
     if write_path[:5] == "s3://":
         if not s3_fs.exists(write_path):
             s3_fs.mkdir(
-                "{}/{}".format(write_path, "models/bootstrap"),
+                write_path,
                 create_parents=True,
                 region_name=os.environ["AWS_DEFAULT_REGION"],
                 acl="private",
