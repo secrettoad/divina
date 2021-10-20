@@ -129,39 +129,3 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
     return df
 
 
-def build_dataset_dask(s3_fs, read_path, write_path, partition_dimensions=None, sample_rows=10000):
-    if write_path[:5] == "s3://":
-        if not s3_fs.exists(write_path):
-            s3_fs.mkdir(
-                write_path,
-                create_parents=True,
-                region_name=os.environ["AWS_DEFAULT_REGION"],
-                acl="private",
-            )
-    try:
-        df = dd.read_parquet(read_path)
-    except:
-        try:
-            df = dd.read_csv("{}/*.csv".format(read_path), sample_rows=sample_rows)
-        except:
-            try:
-                df = dd.read_json("{}/*.json".format(read_path))
-            except:
-                raise Exception("Could not parse data at path: {}".format(read_path))
-    try:
-        if not partition_dimensions:
-            df.to_parquet("{}/data".format(write_path))
-        else:
-            df.to_parquet(
-                "{}/data".format(write_path),
-                partition_dimensions=partition_dimensions,
-            )
-    except ValueError as e:
-        if sample_rows * 5 < len(df):
-            build_dataset_dask(s3_fs=s3_fs, read_path=read_path, write_path=write_path,
-                               partition_dimensions=partition_dimensions, sample_rows=sample_rows * 5)
-        elif sample_rows < len(df):
-            build_dataset_dask(s3_fs=s3_fs, read_path=read_path, write_path=write_path,
-                               partition_dimensions=partition_dimensions, sample_rows=len(df))
-        else:
-            raise e
