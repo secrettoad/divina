@@ -46,7 +46,7 @@ def test_validate_forecast_definition(
 def test_dataset_build(s3_fs, vision_s3, test_df_1, account_number):
     data_path = "divina-test/data"
     dataset_path = "divina-test/dataset/test1"
-    pathlib.Path(dataset_path).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(data_path).mkdir(parents=True, exist_ok=True)
     test_df_1.to_csv(
         os.path.join(data_path, "test_df_1.csv"), index=False
     )
