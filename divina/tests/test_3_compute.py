@@ -20,23 +20,6 @@ def setup_teardown(setup_teardown_test_bucket_contents):
     pass
 
 
-def test_build_dataset_small(s3_fs, test_df_1, dask_client_remote, test_bucket):
-    dataset_path = "{}/dataset/test1".format(test_bucket)
-    data_path = "{}/data".format(test_bucket)
-    test_df_1.to_csv(os.path.join(data_path, "test_df_1.csv"), index=False)
-    cli_build_dataset(
-        s3_fs=s3_fs,
-        write_path=dataset_path,
-        read_path=data_path,
-        ec2_keypair_name="divina2",
-        dask_client=dask_client_remote,
-    )
-    pd.testing.assert_frame_equal(
-        ddf.read_parquet(os.path.join(dataset_path, "data")).compute(),
-        ddf.read_csv("{}/test_df_1.csv".format(data_path)).compute(),
-    )
-
-
 def test_train_small(
     s3_fs, test_df_1, test_model_1, test_fd_3, dask_client_remote, test_bucket, test_bootstrap_models, random_state
 ):
