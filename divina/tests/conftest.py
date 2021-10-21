@@ -1,9 +1,6 @@
 import pytest
 import pandas as pd
 import numpy as np
-import moto
-import pkg_resources
-from .stubs import pricing_stubs
 from dask.distributed import Client
 import os
 import s3fs
@@ -208,11 +205,13 @@ def test_model_1(test_df_1):
 
 @pytest.fixture()
 def test_model_retail(test_df_retail_sales, test_df_retail_time, test_df_retail_stores, test_fd_retail):
-    train_df = test_df_retail_sales.join(test_df_retail_time.set_index('date'), on='Date').join(test_df_retail_stores.set_index('Store'), on='Store')
-    train_df['Sales'] = train_df['Sales'].shift(-1)
+    train_df = test_df_retail_sales.join(test_df_retail_time.set_index('date'), on='Date').join(
+        test_df_retail_stores.set_index('Store'), on='Store')
+    train_df['Sales'] = train_df['Sales'].shift(-2)
     train_df = train_df[train_df['Date'] < "2015-07-18"]
     train_df = pd.get_dummies(train_df, columns=test_fd_retail['forecast_definition']['encode_features'])
-    features = [c for c in train_df if not c in test_fd_retail['forecast_definition']['drop_features'] + ['Date', 'Sales']]
+    features = [c for c in train_df if
+                not c in test_fd_retail['forecast_definition']['drop_features'] + ['Date', 'Sales']]
     for c in train_df:
         if train_df[c].dtype == bool:
             train_df[c] = train_df[c].astype(int)
@@ -251,6 +250,31 @@ def test_bootstrap_models(test_df_1, random_state, test_fd_1):
 
 
 @pytest.fixture()
+def test_bootstrap_models_retail(test_df_retail_sales, test_df_retail_stores, test_df_retail_time, random_state,
+                                 test_fd_retail):
+    train_df = test_df_retail_sales.join(test_df_retail_time.set_index('date'), on='Date').join(
+        test_df_retail_stores.set_index('Store'), on='Store')
+    train_df['Sales'] = train_df['Sales'].shift(-2)
+    train_df = train_df[train_df['Date'] < "2015-07-18"]
+    train_df = pd.get_dummies(train_df, columns=test_fd_retail['forecast_definition']['encode_features'])
+    features = [c for c in train_df if
+                not c in test_fd_retail['forecast_definition']['drop_features'] + ['Sales', 'Date']]
+    for c in train_df:
+        if train_df[c].dtype == bool:
+            train_df[c] = train_df[c].astype(int)
+    bootstrap_models = {}
+    for rs in range(random_state, random_state + test_fd_retail['forecast_definition']['bootstrap_sample']):
+        model = LinearRegression(solver_kwargs={"normalize": False})
+        confidence_df = train_df.sample(frac=.8, random_state=rs)
+        model.fit(
+            ddf.from_pandas(confidence_df[features], chunksize=10000).to_dask_array(lengths=True),
+            ddf.from_pandas(confidence_df, chunksize=10000)["Sales"],
+        )
+        bootstrap_models[rs] = model
+    return bootstrap_models
+
+
+@pytest.fixture()
 def test_params_2(test_model_1):
     return {'params': {'b': test_model_1._coef[0] + 1}}
 
@@ -261,6 +285,11 @@ def test_metrics_1():
 
 
 @pytest.fixture()
+def test_metrics_retail():
+    return {'splits': {'2015-07-18': {'time_horizons': {'2': {'mae': 79753.58203125}}}}}
+
+
+@pytest.fixture()
 def test_val_predictions_1():
     df = pd.DataFrame(
         [[Timestamp('1970-01-01 00:00:01'), 32.46771570069808], [Timestamp('1970-01-01 00:00:04'), 45.59044357498226],
@@ -268,6 +297,20 @@ def test_val_predictions_1():
          [Timestamp('1970-01-01 00:00:07'), 39.93991973974673]]
     )
     df.columns = ["a", "c_h_1_pred"]
+    return df
+
+
+@pytest.fixture()
+def test_val_predictions_retail():
+    df = pd.DataFrame(
+        [[Timestamp('2015-07-18 00:00:00'), 83948.984375], [Timestamp('2015-07-19 00:00:00'), 83443.9609375],
+         [Timestamp('2015-07-20 00:00:00'), 83957.9140625], [Timestamp('2015-07-21 00:00:00'), 83905.328125],
+         [Timestamp('2015-07-22 00:00:00'), 83903.34375], [Timestamp('2015-07-23 00:00:00'), 83947.0],
+         [Timestamp('2015-07-24 00:00:00'), 83907.3125], [Timestamp('2015-07-25 00:00:00'), 83951.9609375],
+         [Timestamp('2015-07-26 00:00:00'), 83458.84375], [Timestamp('2015-07-27 00:00:00'), 84060.109375],
+         [Timestamp('2015-07-28 00:00:00'), 84012.484375], [Timestamp('2015-07-29 00:00:00'), 83979.7421875],
+         [Timestamp('2015-07-30 00:00:00'), 84006.53125], [Timestamp('2015-07-31 00:00:00'), 84019.4296875]])
+    df.columns = ['Date', 'Sales_h_2_pred']
     return df
 
 
@@ -321,6 +364,25 @@ def test_forecast_1():
 
 
 @pytest.fixture()
+def test_forecast_retail():
+    df = pd.DataFrame([[Timestamp('2015-07-21 00:00:00'), 83905.328125, 83905.328125, 83905.328125],
+                       [Timestamp('2015-07-22 00:00:00'), 83903.34375, 83903.34375, 83903.34375],
+                       [Timestamp('2015-07-23 00:00:00'), 83947.0, 83947.0, 83947.0],
+                       [Timestamp('2015-07-24 00:00:00'), 83907.3125, 83907.3125, 83907.3125],
+                       [Timestamp('2015-07-25 00:00:00'), 83951.9609375, 83951.9609375, 83951.9609375],
+                       [Timestamp('2015-07-26 00:00:00'), 83458.84375, 83458.84375, 83458.84375],
+                       [Timestamp('2015-07-27 00:00:00'), 84060.109375, 84060.109375, 84060.109375],
+                       [Timestamp('2015-07-28 00:00:00'), 84012.484375, 84012.484375, 84012.484375],
+                       [Timestamp('2015-07-29 00:00:00'), 83979.7421875, 83979.7421875, 83979.7421875],
+                       [Timestamp('2015-07-30 00:00:00'), 84006.53125, 84006.53125, 84006.53125],
+                       [Timestamp('2015-07-31 00:00:00'), 84019.4296875, 84019.4296875, 84019.4296875]])
+    df.index = list(df.index + 1)
+    df.index.name = 'forecast_index'
+    df.columns = ['Date', 'Sales_h_2_pred', 'Sales_h_2_pred_c_90', 'Sales_h_2_pred_c_10']
+    return df
+
+
+@pytest.fixture()
 def test_fd_1():
     return {
         "forecast_definition": {
@@ -351,10 +413,11 @@ def test_fd_retail():
             "target": "Sales",
             "drop_features": ['date', 'holiday_type', 'Promo2SinceWeek', 'Promo2SinceYear'],
             "time_validation_splits": ["2015-07-18"],
-            "forecast_start": "2015-01-01",
-            "forecast_end": "2016-01-01",
+            "forecast_start": "2015-07-21",
+            "forecast_end": "2015-07-31",
             "forecast_freq": 'D',
-            "time_horizons": [2, 14],
+            "bootstrap_sample": 5,
+            "time_horizons": [2],
             "encode_features": ['StateHoliday', 'StoreType', 'Assortment', 'PromoInterval', 'Store'],
             "dataset_directory": "dataset/retail/sales2",
             "confidence_intervals": [90, 10],
@@ -373,6 +436,15 @@ def test_fd_retail():
             "model": "LinearRegression",
         }
     }
+
+
+@pytest.fixture()
+def test_fd_retail_2(test_bucket, test_fd_retail):
+    test_fd = test_fd_retail
+    test_fd["forecast_definition"].update({"dataset_directory": "{}/{}".format(test_bucket, test_fd['forecast_definition']['dataset_directory'])})
+    for join in test_fd["forecast_definition"]["joins"]:
+        join.update({"dataset_directory": "{}/{}".format(test_bucket, join['dataset_directory'])})
+    return test_fd
 
 
 @pytest.fixture()
@@ -526,5 +598,3 @@ def test_df_retail_time():
     df.columns = ['date', 'month', 'day', 'year', 'weekday', 'holiday', 'holiday_type',
                   'week_of_year', 't']
     return df
-
-

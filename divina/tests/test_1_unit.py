@@ -86,7 +86,7 @@ def test_dask_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test
 
 
 def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
-                           test_model_retail, dask_client, test_bootstrap_models, random_state):
+                           test_model_retail, dask_client, test_bootstrap_models_retail, random_state):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
         os.path.join(
@@ -128,18 +128,18 @@ def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, t
         ),
         test_model_retail,
     )
-    for seed in test_bootstrap_models:
+    for seed in test_bootstrap_models_retail:
         compare_sk_models(
             joblib.load(
                 os.path.abspath(
                     os.path.join(
                         vision_path,
                         "models/bootstrap",
-                        "s-19700101-000007_h-1_r-{}".format(seed),
+                        "s-20150718-000000_h-2_r-{}".format(seed),
                     )
                 )
             ),
-            test_bootstrap_models[seed],
+            test_bootstrap_models_retail[seed],
         )
 
 
@@ -152,7 +152,7 @@ def test_get_composite_dataset(
 ):
     for dataset in test_fd_2["forecast_definition"]["joins"]:
         pathlib.Path(
-                dataset["dataset_directory"]
+            dataset["dataset_directory"]
         ).mkdir(parents=True, exist_ok=True)
     pathlib.Path(
         test_fd_2["forecast_definition"]["dataset_directory"],
@@ -163,7 +163,7 @@ def test_get_composite_dataset(
     )
     ddf.from_pandas(test_df_2, chunksize=10000).to_parquet(
 
-            test_fd_2["forecast_definition"]["joins"][0]["dataset_directory"]
+        test_fd_2["forecast_definition"]["joins"][0]["dataset_directory"]
     )
     df = get_dataset(test_fd_2["forecast_definition"])
 
@@ -176,13 +176,13 @@ def test_dask_predict(
 ):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
-            test_fd_1["forecast_definition"]["dataset_directory"]
+        test_fd_1["forecast_definition"]["dataset_directory"]
     ).mkdir(parents=True, exist_ok=True)
     pathlib.Path(os.path.join(vision_path, "models/bootstrap")).mkdir(
         parents=True, exist_ok=True
     )
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-            test_fd_1["forecast_definition"]["dataset_directory"]
+        test_fd_1["forecast_definition"]["dataset_directory"]
     )
     joblib.dump(
         test_model_1,
@@ -201,14 +201,6 @@ def test_dask_predict(
                 "s-19700101-000007_h-1_r-{}".format(seed),
             ),
         )
-    with open(
-            os.path.join(
-                vision_path,
-                "forecast_definition.json",
-            ),
-            "w+",
-    ) as f:
-        json.dump(test_fd_1, f)
 
     dask_predict(
         s3_fs=s3_fs,
@@ -235,6 +227,75 @@ def test_dask_predict(
             )
         ).compute(),
         test_forecast_1,
+    )
+
+
+def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
+                             test_model_retail, test_val_predictions_retail, test_forecast_retail,
+                             test_bootstrap_models_retail, dask_client, random_state):
+    vision_path = "divina-test/vision/test1"
+    pathlib.Path(
+        os.path.join(
+            vision_path, "models", "bootstrap"
+        )
+    ).mkdir(parents=True, exist_ok=True)
+    ddf.from_pandas(test_df_retail_sales, chunksize=10000).to_parquet(
+        os.path.join(
+            test_fd_retail["forecast_definition"]["dataset_directory"],
+        )
+    )
+    ddf.from_pandas(test_df_retail_stores, chunksize=10000).to_parquet(
+        os.path.join(
+            test_fd_retail["forecast_definition"]["joins"][1]["dataset_directory"],
+        )
+    )
+    ddf.from_pandas(test_df_retail_time, chunksize=10000).to_parquet(
+        os.path.join(
+            test_fd_retail["forecast_definition"]["joins"][0]["dataset_directory"],
+        )
+    )
+    joblib.dump(
+        test_model_retail,
+        os.path.join(
+            vision_path,
+            "models",
+            "s-20150718-000000_h-2",
+        ),
+    )
+    for seed in test_bootstrap_models_retail:
+        joblib.dump(
+            test_bootstrap_models_retail[seed],
+            os.path.join(
+                vision_path,
+                "models/bootstrap",
+                "s-20150718-000000_h-2_r-{}".format(seed),
+            ),
+        )
+    dask_predict(
+        s3_fs=s3_fs,
+        forecast_definition=test_fd_retail["forecast_definition"],
+        read_path=vision_path,
+        write_path=vision_path
+    )
+    pd.testing.assert_frame_equal(
+        ddf.read_parquet(
+            os.path.join(
+                vision_path,
+                "predictions",
+                "s-20150718-000000",
+            )
+        ).compute(),
+        test_val_predictions_retail,
+    )
+    pd.testing.assert_frame_equal(
+        ddf.read_parquet(
+            os.path.join(
+                vision_path,
+                "predictions",
+                "s-20150718-000000_forecast",
+            )
+        ).compute(),
+        test_forecast_retail,
     )
 
 
@@ -266,6 +327,51 @@ def test_dask_validate(
         metrics = json.load(f)
 
     assert metrics == test_metrics_1
+
+
+def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
+                              test_val_predictions_retail, test_metrics_retail, dask_client):
+    vision_path = "divina-test/vision/test1"
+    pathlib.Path(
+        os.path.join(
+            vision_path, "models", "bootstrap"
+        )
+    ).mkdir(parents=True, exist_ok=True)
+    ddf.from_pandas(test_df_retail_sales, chunksize=10000).to_parquet(
+        os.path.join(
+            test_fd_retail["forecast_definition"]["dataset_directory"],
+        )
+    )
+    ddf.from_pandas(test_df_retail_stores, chunksize=10000).to_parquet(
+        os.path.join(
+            test_fd_retail["forecast_definition"]["joins"][1]["dataset_directory"],
+        )
+    )
+    ddf.from_pandas(test_df_retail_time, chunksize=10000).to_parquet(
+        os.path.join(
+            test_fd_retail["forecast_definition"]["joins"][0]["dataset_directory"],
+        )
+    )
+    ddf.from_pandas(test_val_predictions_retail, chunksize=10000).to_parquet(
+        os.path.join(
+            vision_path,
+            "predictions",
+            "s-20150718-000000",
+        )
+    )
+    dask_validate(
+        s3_fs=s3_fs,
+        forecast_definition=test_fd_retail["forecast_definition"],
+        read_path=vision_path,
+        write_path=vision_path
+    )
+    with open(
+            os.path.join(vision_path, "metrics.json"),
+            "r",
+    ) as f:
+        metrics = json.load(f)
+
+    assert metrics == test_metrics_retail
 
 
 def test_get_params(
