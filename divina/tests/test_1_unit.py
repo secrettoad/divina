@@ -1,10 +1,9 @@
 import os
 import json
-from unittest.mock import patch
 from ..forecast import get_parameters, set_parameters
 from ..train import dask_train
 from ..predict import dask_predict
-from ..dataset import get_dataset, build_dataset_dask
+from ..dataset import get_dataset
 from ..validate import dask_validate
 import pathlib
 from dask_ml.linear_model import LinearRegression
@@ -46,16 +45,10 @@ def test_validate_forecast_definition(
 def test_dask_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_bootstrap_models, random_state):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
-        os.path.join(
-            test_fd_1["forecast_definition"]["dataset_directory"],
-            "data",
-        )
+        test_fd_1["forecast_definition"]["dataset_directory"],
     ).mkdir(parents=True, exist_ok=True)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join(
-            test_fd_1["forecast_definition"]["dataset_directory"],
-            "data",
-        )
+        test_fd_1["forecast_definition"]["dataset_directory"]
     )
     dask_train(
         s3_fs=s3_fs,
@@ -91,6 +84,65 @@ def test_dask_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test
             test_bootstrap_models[seed],
         )
 
+
+def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
+                           test_model_retail, dask_client, test_bootstrap_models, random_state):
+    vision_path = "divina-test/vision/test1"
+    pathlib.Path(
+        os.path.join(
+            test_fd_retail["forecast_definition"]["dataset_directory"],
+        )
+    ).mkdir(parents=True, exist_ok=True)
+    ddf.from_pandas(test_df_retail_sales, chunksize=10000).to_parquet(
+        os.path.join(
+            test_fd_retail["forecast_definition"]["dataset_directory"],
+        )
+    )
+    ddf.from_pandas(test_df_retail_stores, chunksize=10000).to_parquet(
+        os.path.join(
+            test_fd_retail["forecast_definition"]["joins"][1]["dataset_directory"],
+        )
+    )
+    ddf.from_pandas(test_df_retail_time, chunksize=10000).to_parquet(
+        os.path.join(
+            test_fd_retail["forecast_definition"]["joins"][0]["dataset_directory"],
+        )
+    )
+    dask_train(
+        s3_fs=s3_fs,
+        dask_model=LinearRegression,
+        forecast_definition=test_fd_retail["forecast_definition"],
+        write_path=vision_path,
+        random_seed=random_state,
+    )
+
+    compare_sk_models(
+        joblib.load(
+            os.path.abspath(
+                os.path.join(
+                    vision_path,
+                    "models",
+                    "s-20150718-000000_h-2",
+                )
+            )
+        ),
+        test_model_retail,
+    )
+    for seed in test_bootstrap_models:
+        compare_sk_models(
+            joblib.load(
+                os.path.abspath(
+                    os.path.join(
+                        vision_path,
+                        "models/bootstrap",
+                        "s-19700101-000007_h-1_r-{}".format(seed),
+                    )
+                )
+            ),
+            test_bootstrap_models[seed],
+        )
+
+
 def test_get_composite_dataset(
         test_df_1,
         test_df_2,
@@ -98,31 +150,20 @@ def test_get_composite_dataset(
         test_composite_dataset_1,
         dask_client,
 ):
-    for path in ["data"]:
-        for dataset in test_fd_2["forecast_definition"]["joins"]:
-            pathlib.Path(
-                os.path.join(
-                    dataset["dataset_directory"],
-                    path,
-                )
-            ).mkdir(parents=True, exist_ok=True)
+    for dataset in test_fd_2["forecast_definition"]["joins"]:
         pathlib.Path(
-            os.path.join(
-                test_fd_2["forecast_definition"]["dataset_directory"],
-                path,
-            )
+                dataset["dataset_directory"]
         ).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(
+        test_fd_2["forecast_definition"]["dataset_directory"],
+    ).mkdir(parents=True, exist_ok=True)
+
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join(
-            test_fd_2["forecast_definition"]["dataset_directory"],
-            "data",
-        )
+        test_fd_2["forecast_definition"]["dataset_directory"]
     )
     ddf.from_pandas(test_df_2, chunksize=10000).to_parquet(
-        os.path.join(
-            test_fd_2["forecast_definition"]["joins"][0]["dataset_directory"],
-            "data",
-        )
+
+            test_fd_2["forecast_definition"]["joins"][0]["dataset_directory"]
     )
     df = get_dataset(test_fd_2["forecast_definition"])
 
@@ -130,23 +171,18 @@ def test_get_composite_dataset(
 
 
 def test_dask_predict(
-        s3_fs, dask_client, test_df_1, test_fd_1, test_model_1, test_val_predictions_1, test_forecast_1, test_bootstrap_models
+        s3_fs, dask_client, test_df_1, test_fd_1, test_model_1, test_val_predictions_1, test_forecast_1,
+        test_bootstrap_models
 ):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
-        os.path.join(
-            test_fd_1["forecast_definition"]["dataset_directory"],
-            "data",
-        )
+            test_fd_1["forecast_definition"]["dataset_directory"]
     ).mkdir(parents=True, exist_ok=True)
     pathlib.Path(os.path.join(vision_path, "models/bootstrap")).mkdir(
         parents=True, exist_ok=True
     )
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join(
-            test_fd_1["forecast_definition"]["dataset_directory"],
-            "data",
-        )
+            test_fd_1["forecast_definition"]["dataset_directory"]
     )
     joblib.dump(
         test_model_1,
@@ -214,10 +250,7 @@ def test_dask_validate(
         )
     )
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join(
-            test_fd_1["forecast_definition"]["dataset_directory"],
-            "data",
-        )
+        test_fd_1["forecast_definition"]["dataset_directory"]
     )
     dask_validate(
         s3_fs=s3_fs,

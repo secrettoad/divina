@@ -67,16 +67,6 @@ def divina_session():
     return boto3.Session()
 
 
-@pytest.fixture(autouse=True)
-def reset_s3():
-    pass
-
-
-@pytest.fixture(autouse=True)
-def reset_local_filesystem():
-    pass
-
-
 @pytest.fixture(scope="session")
 def s3_fs():
     return s3fs.S3FileSystem()
@@ -217,6 +207,25 @@ def test_model_1(test_df_1):
 
 
 @pytest.fixture()
+def test_model_retail(test_df_retail_sales, test_df_retail_time, test_df_retail_stores, test_fd_retail):
+    train_df = test_df_retail_sales.join(test_df_retail_time.set_index('date'), on='Date').join(test_df_retail_stores.set_index('Store'), on='Store')
+    train_df['Sales'] = train_df['Sales'].shift(-1)
+    train_df = train_df[train_df['Date'] < "2015-07-18"]
+    train_df = pd.get_dummies(train_df, columns=test_fd_retail['forecast_definition']['encode_features'])
+    features = [c for c in train_df if not c in test_fd_retail['forecast_definition']['drop_features'] + ['Date', 'Sales']]
+    for c in train_df:
+        if train_df[c].dtype == bool:
+            train_df[c] = train_df[c].astype(int)
+    model = LinearRegression(solver_kwargs={"normalize": False})
+    model.fit(
+        ddf.from_pandas(train_df[features], chunksize=10000).to_dask_array(
+            lengths=True),
+        ddf.from_pandas(train_df, chunksize=10000)["Sales"],
+    )
+    return model
+
+
+@pytest.fixture()
 def test_params_1(test_model_1):
     return {'params': {'b': test_model_1._coef[0]}}
 
@@ -335,6 +344,38 @@ def test_fd_1():
 
 
 @pytest.fixture()
+def test_fd_retail():
+    return {
+        "forecast_definition": {
+            "time_index": "Date",
+            "target": "Sales",
+            "drop_features": ['date', 'holiday_type', 'Promo2SinceWeek', 'Promo2SinceYear'],
+            "time_validation_splits": ["2015-07-18"],
+            "forecast_start": "2015-01-01",
+            "forecast_end": "2016-01-01",
+            "forecast_freq": 'D',
+            "time_horizons": [2, 14],
+            "encode_features": ['StateHoliday', 'StoreType', 'Assortment', 'PromoInterval', 'Store'],
+            "dataset_directory": "dataset/retail/sales2",
+            "confidence_intervals": [90, 10],
+            "joins": [
+                {
+                    "dataset_directory": "dataset/time",
+                    "join_on": ("Date", "date"),
+                    "as": "time"
+                },
+                {
+                    "dataset_directory": "dataset/retail/store",
+                    "join_on": ("Store", "Store"),
+                    "as": "store"
+                }
+            ],
+            "model": "LinearRegression",
+        }
+    }
+
+
+@pytest.fixture()
 def test_fd_2():
     return {
         "forecast_definition": {
@@ -415,68 +456,75 @@ def test_df_3():
 
 
 @pytest.fixture()
-def source_sts():
-    with moto.mock_sts():
-        yield boto3.client("sts", region_name="us-east-2")
+def test_df_retail_sales():
+    df = pd.DataFrame([[1, 5, '2015-07-31', 5263, 555, 1, 1, 'z', 1],
+                       [1, 4, '2015-07-30', 5020, 546, 1, 1, 'z', 1],
+                       [1, 3, '2015-07-29', 4782, 523, 1, 1, 'z', 1],
+                       [1, 2, '2015-07-28', 5011, 560, 1, 1, 'z', 1],
+                       [1, 1, '2015-07-27', 6102, 612, 1, 1, 'z', 1],
+                       [1, 7, '2015-07-26', 0, 0, 0, 0, 'z', 0],
+                       [1, 6, '2015-07-25', 4364, 500, 1, 0, 'z', 0],
+                       [1, 5, '2015-07-24', 3706, 459, 1, 0, 'z', 0],
+                       [1, 4, '2015-07-23', 3769, 503, 1, 0, 'z', 0],
+                       [1, 3, '2015-07-22', 3464, 463, 1, 0, 'z', 0],
+                       [1, 2, '2015-07-21', 3558, 469, 1, 0, 'z', 0],
+                       [1, 1, '2015-07-20', 4395, 526, 1, 0, 'z', 0],
+                       [1, 7, '2015-07-19', 0, 0, 0, 0, 'z', 0],
+                       [1, 6, '2015-07-18', 4406, 512, 1, 0, 'z', 0],
+                       [1, 5, '2015-07-17', 4852, 519, 1, 1, 'z', 0],
+                       [1, 4, '2015-07-16', 4427, 517, 1, 1, 'z', 0],
+                       [1, 3, '2015-07-15', 4767, 550, 1, 1, 'z', 0],
+                       [1, 2, '2015-07-14', 5042, 544, 1, 1, 'z', 0],
+                       [1, 1, '2015-07-13', 5054, 553, 1, 1, 'z', 0],
+                       [1, 7, '2015-07-12', 0, 0, 0, 0, 'z', 0],
+                       [1, 6, '2015-07-11', 3530, 441, 1, 0, 'z', 0],
+                       [1, 5, '2015-07-10', 3808, 449, 1, 0, 'z', 0],
+                       [1, 4, '2015-07-09', 3897, 480, 1, 0, 'z', 0],
+                       [1, 3, '2015-07-08', 3797, 485, 1, 0, 'z', 0],
+                       [1, 2, '2015-07-07', 3650, 485, 1, 0, 'z', 0]])
+    df.columns = ['Store', 'DayOfWeek', 'Date', 'Sales', 'Customers', 'Open', 'Promo',
+                  'StateHoliday', 'SchoolHoliday']
+    return df
 
 
 @pytest.fixture()
-def source_s3():
-    with moto.mock_s3():
-        yield boto3.client("s3", region_name="us-east-2")
+def test_df_retail_stores():
+    df = pd.DataFrame([[1.0, 'c', 'a', 1270.0, 9.0, 2008, 0.0, np.NaN, np.NaN, None]])
+    df.columns = ['Store', 'StoreType', 'Assortment', 'CompetitionDistance',
+                  'CompetitionOpenSinceMonth', 'CompetitionOpenSinceYear', 'Promo2',
+                  'Promo2SinceWeek', 'Promo2SinceYear', 'PromoInterval']
+    return df
 
 
 @pytest.fixture()
-def source_iam():
-    with moto.mock_iam():
-        yield boto3.client("iam", region_name="us-east-2")
+def test_df_retail_time():
+    df = pd.DataFrame([['2015-07-07', 7, 7, 2015, 1, False, None, 28, 78714],
+                       ['2015-07-08', 7, 8, 2015, 2, False, None, 28, 78715],
+                       ['2015-07-09', 7, 9, 2015, 3, False, None, 28, 78716],
+                       ['2015-07-10', 7, 10, 2015, 4, False, None, 28, 78717],
+                       ['2015-07-11', 7, 11, 2015, 5, False, None, 28, 78718],
+                       ['2015-07-12', 7, 12, 2015, 6, False, None, 28, 78719],
+                       ['2015-07-13', 7, 13, 2015, 0, False, None, 29, 78720],
+                       ['2015-07-14', 7, 14, 2015, 1, False, None, 29, 78721],
+                       ['2015-07-15', 7, 15, 2015, 2, False, None, 29, 78722],
+                       ['2015-07-16', 7, 16, 2015, 3, False, None, 29, 78723],
+                       ['2015-07-17', 7, 17, 2015, 4, False, None, 29, 78724],
+                       ['2015-07-18', 7, 18, 2015, 5, False, None, 29, 78725],
+                       ['2015-07-19', 7, 19, 2015, 6, False, None, 29, 78726],
+                       ['2015-07-20', 7, 20, 2015, 0, False, None, 30, 78727],
+                       ['2015-07-21', 7, 21, 2015, 1, False, None, 30, 78728],
+                       ['2015-07-22', 7, 22, 2015, 2, False, None, 30, 78729],
+                       ['2015-07-23', 7, 23, 2015, 3, False, None, 30, 78730],
+                       ['2015-07-24', 7, 24, 2015, 4, False, None, 30, 78731],
+                       ['2015-07-25', 7, 25, 2015, 5, False, None, 30, 78732],
+                       ['2015-07-26', 7, 26, 2015, 6, False, None, 30, 78733],
+                       ['2015-07-27', 7, 27, 2015, 0, False, None, 31, 78734],
+                       ['2015-07-28', 7, 28, 2015, 1, False, None, 31, 78735],
+                       ['2015-07-29', 7, 29, 2015, 2, False, None, 31, 78736],
+                       ['2015-07-30', 7, 30, 2015, 3, False, None, 31, 78737],
+                       ['2015-07-31', 7, 31, 2015, 4, False, None, 31, 78738]])
+    df.columns = ['date', 'month', 'day', 'year', 'weekday', 'holiday', 'holiday_type',
+                  'week_of_year', 't']
+    return df
 
 
-@pytest.fixture()
-def vision_sts():
-    with moto.mock_sts():
-        yield boto3.client("sts", region_name="us-east-2")
-
-
-@pytest.fixture()
-def vision_s3():
-    with moto.mock_s3():
-        yield boto3.client("s3", region_name="us-east-2")
-
-
-@pytest.fixture()
-def vision_ec2():
-    with moto.mock_ec2():
-        yield boto3.client("ec2", region_name="us-east-2")
-
-
-@pytest.fixture()
-def vision_emr():
-    with moto.mock_emr():
-        yield boto3.client("emr", region_name="us-east-2")
-
-
-@pytest.fixture()
-def vision_iam():
-    with moto.mock_iam():
-        yield boto3.client("iam", region_name="us-east-2")
-
-
-@pytest.fixture()
-def divina_test_version():
-    return pkg_resources.get_distribution("divina").version
-
-
-@pytest.fixture()
-def vision_codeartifact():
-    return boto3.client("codeartifact", region_name="us-west-2")
-
-
-@pytest.fixture()
-def account_number(monkeypatch):
-    monkeypatch.setenv("ACCOUNT_NUMBER", "123456789012")
-
-
-@pytest.fixture()
-def ec2_pricing_stub():
-    return pricing_stubs.ec2_pricing_stub
