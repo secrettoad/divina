@@ -1,5 +1,4 @@
 import os
-from ..dataset import build_dataset_dask
 from dask import dataframe as ddf
 import pandas as pd
 import json
@@ -23,10 +22,7 @@ def setup_teardown(setup_teardown_test_bucket_contents):
 def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_bucket, test_bootstrap_models, random_state):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join(
-            test_fd_1["forecast_definition"]["dataset_directory"],
-            "data",
-        )
+        test_fd_1["forecast_definition"]["dataset_directory"]
     )
     with open(
         os.path.join(
@@ -77,10 +73,7 @@ def test_predict(
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join(
-            test_fd_1["forecast_definition"]["dataset_directory"],
-            "data",
-        )
+            test_fd_1["forecast_definition"]["dataset_directory"]
     )
     ###TODO write these locally to correct directory
     pathlib.Path(
@@ -146,10 +139,7 @@ def test_validate(
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join(
-            test_fd_1["forecast_definition"]["dataset_directory"],
-            "data",
-        )
+            test_fd_1["forecast_definition"]["dataset_directory"]
     )
     ddf.from_pandas(test_val_predictions_1, chunksize=10000).to_parquet(
         os.path.join(

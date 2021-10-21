@@ -1,6 +1,5 @@
 import os
 from ..cli.cli import (
-    cli_build_dataset,
     cli_train_vision,
     cli_predict_vision,
     cli_validate_vision,
@@ -25,10 +24,7 @@ def test_train_small(
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join(
-            test_fd_3["forecast_definition"]["dataset_directory"],
-            "data",
-        )
+        test_fd_3["forecast_definition"]["dataset_directory"]
     )
     cli_train_vision(
         s3_fs=s3_fs,
@@ -74,10 +70,7 @@ def test_predict_small(
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join(
-            test_fd_3["forecast_definition"]["dataset_directory"],
-            "data",
-        )
+        test_fd_3["forecast_definition"]["dataset_directory"],
     )
     pathlib.Path(
         "models/bootstrap"
@@ -141,10 +134,7 @@ def test_validate_small(
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
-        os.path.join(
-            test_fd_3["forecast_definition"]["dataset_directory"],
-            "data",
-        )
+        test_fd_3["forecast_definition"]["dataset_directory"]
     )
 
     ddf.from_pandas(test_val_predictions_1, chunksize=10000).to_parquet(
