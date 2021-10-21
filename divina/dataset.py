@@ -1,5 +1,4 @@
 import dask.dataframe as dd
-import os
 import backoff
 from botocore.exceptions import ClientError
 import pandas as pd
@@ -7,6 +6,34 @@ from .utils import cull_empty_partitions
 from dask_ml.preprocessing import Categorizer, DummyEncoder, PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 import numpy as np
+
+
+def chunk(s):
+    # for the comments, assume only a single grouping column, the
+    # implementation can handle multiple group columns.
+    #
+    # s is a grouped series. value_counts creates a multi-series like
+    # (group, value): count
+    return s.value_counts()
+
+
+def agg(s):
+    return s.apply(lambda s: s.groupby(level=-1).sum())
+
+
+def finalize(s):
+    # s is a multi-index series of the form (group, value): count. First
+    # manually group on the group part of the index. The lambda will receive a
+    # sub-series with multi index. Next, drop the group part from the index.
+    # Finally, determine the index with the maximum value, i.e., the mode.
+    level = list(range(s.index.nlevels - 1))
+    return (
+        s.groupby(level=level)
+            .apply(lambda s: s.reset_index(level=level, drop=True).argmax())
+    )
+
+
+mode = dd.Aggregation('mode', chunk, agg, finalize)
 
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
@@ -20,9 +47,16 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
 
     if "signal_dimensions" in forecast_definition:
         df = df.groupby([forecast_definition["time_index"]] + forecast_definition["signal_dimensions"]).agg(
-            "sum").reset_index()
+            {**{c: "sum" for c in df.columns if df[c].dtype in [int, float] and c != forecast_definition['time_index']},
+             **{c: "first" for c in df.columns if
+                df[c].dtype not in [int, float] and c != forecast_definition['time_index']}}).reset_index()
     else:
-        df = df.groupby(forecast_definition["time_index"]).agg("sum").reset_index()
+
+        df = df.groupby(forecast_definition["time_index"]).agg(
+            {**{c: "sum" for c in df.columns if df[c].dtype in [int, float] and c != forecast_definition['time_index']},
+             **{c: "first" for c in df.columns if
+                df[c].dtype not in [int, float] and c != forecast_definition['time_index']}}).reset_index()
+
 
     if start:
         if pd.to_datetime(start) < time_min:
@@ -129,5 +163,3 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
     df = cull_empty_partitions(df)
     df = df.reset_index(drop=True)
     return df
-
-
