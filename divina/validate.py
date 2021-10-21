@@ -16,16 +16,16 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
         for h in forecast_definition["time_horizons"]:
             metrics["time_horizons"][h] = {}
             df["resid_h_{}".format(h)] = (
-                df[forecast_definition["target"]].shift(-h)
-                - df["{}_h_{}_pred".format(forecast_definition["target"], h)]
+                    df[forecast_definition["target"]].shift(-h)
+                    - df["{}_h_{}_pred".format(forecast_definition["target"], h)]
             )
             metrics["time_horizons"][h]["mae"] = (
                 df[
                     "resid_h_{}".format(h)
                 ]
-                .abs()
-                .mean()
-                .compute()
+                    .abs()
+                    .mean()
+                    .compute()
             )
         return metrics
 
@@ -44,7 +44,7 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
     dataset_kwargs = {}
     for k in ['validate_start', 'validate_end']:
         if k in forecast_definition:
-            dataset_kwargs.update({k.split('_')[1]:forecast_definition[k]})
+            dataset_kwargs.update({k.split('_')[1]: forecast_definition[k]})
 
     df = get_dataset(forecast_definition)
 
@@ -76,11 +76,13 @@ def dask_validate(s3_fs, forecast_definition, write_path, read_path):
             )
         )
 
+        df[forecast_definition["time_index"]] = df[forecast_definition["time_index"]].astype(
+            df_pred[forecast_definition["time_index"]].dtype)
         if "signal_dimensions" in forecast_definition:
             validate_df = df_pred.merge(
                 df,
                 on=[forecast_definition["time_index"]]
-                + forecast_definition["signal_dimensions"],
+                   + forecast_definition["signal_dimensions"],
             )
         else:
             validate_df = df_pred.merge(df, on=[forecast_definition["time_index"]])
