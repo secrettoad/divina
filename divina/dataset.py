@@ -54,8 +54,7 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
     if "joins" in forecast_definition:
         for i, join in enumerate(forecast_definition["joins"]):
             join_df = dd.read_parquet("{}/*".format(join["dataset_directory"]))
-            join_df[join["join_on"][1]] = dd.to_datetime(join_df[join["join_on"][1]])
-            df[join["join_on"][0]] = dd.to_datetime(df[join["join_on"][0]])
+            join_df[join["join_on"][1]] = join_df[join["join_on"][1]].astype(df[join["join_on"][0]].dtype)
             df = df.merge(
                 join_df,
                 how="left",
