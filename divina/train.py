@@ -148,7 +148,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                         df_train_bootstrap[bootstrap_features].to_dask_array(lengths=True),
                         df_train_bootstrap[target].to_dask_array(lengths=True),
                     )
-
+                    print(bootstrap_model.coef_)
                     with write_open(
                             "{}/models/bootstrap/s-{}_h-{}_r-{}".format(
                                 write_path,

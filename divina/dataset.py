@@ -57,7 +57,6 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
              **{c: "first" for c in df.columns if
                 df[c].dtype not in [int, float] and c != forecast_definition['time_index']}}).reset_index()
 
-
     if start:
         if pd.to_datetime(start) < time_min:
             raise Exception(
@@ -96,6 +95,9 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
                 right_on=join["join_on"][1],
                 suffixes=("", "{}_".format(join["as"])),
             )
+
+    if "drop_features" in forecast_definition:
+        df = df.drop(columns=forecast_definition["drop_features"])
 
     if "scenarios" in forecast_definition:
         for x in forecast_definition["scenarios"]:
@@ -143,22 +145,19 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
                 df["{}_({}, {}]".format(c, v, v_1)] = df["{}_({}, {}]".format(c, v, v_1)].where(
                     ((df[c] < v_1) & (df[c] >= v)), 0)
 
-    if "interaction_terms" in forecast_definition:
-        for t in forecast_definition["interaction_terms"]:
-            poly = PolynomialFeatures(len(t), preserve_dataframe=True, interaction_only=True)
-            if '*' in t:
-                drop_features = [forecast_definition['target'], forecast_definition['time_index']]
-                if "drop_features" in forecast_definition:
-                    drop_features += forecast_definition["drop_features"]
-                interaction_features = [c for c in df.columns if not c in drop_features]
-            else:
-                interaction_features = list(t)
-            df_interaction = poly.fit_transform(df[interaction_features])
-            for c in df_interaction.drop(columns=['1']).columns:
-                df[c] = df_interaction[c]
-
     for c in df.columns:
         if df[c].dtype == bool:
             df[c] = df[c].astype(int)
+
+    if "interaction_terms" in forecast_definition:
+        for t in forecast_definition["interaction_terms"]:
+            if forecast_definition["interaction_terms"][t] == '*':
+                for c in [f for f in df.columns if not f in
+                           [forecast_definition['target'], forecast_definition['time_index']]]:
+                    df['{}-x-{}'.format(t, c)] = df[t] * df[c]
+            else:
+                for c in forecast_definition["interaction_terms"][t]:
+                    df['{}-x-{}'.format(t, c)] = df[t] * df[c]
+
     df = cull_empty_partitions(df)
     return df

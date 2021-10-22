@@ -430,9 +430,10 @@ def test_fd_retail():
             "forecast_freq": 'D',
             "bootstrap_sample": 5,
             "time_horizons": [2],
-            "encode_features": ['StateHoliday', 'StoreType', 'Assortment', 'PromoInterval', 'Store'],
+            "encode_features": ['StateHoliday', 'StoreType', 'Assortment', 'PromoInterval', 'Store', 'weekday'],
             "dataset_directory": "dataset/retail/sales2",
             "confidence_intervals": [90, 10],
+            "interaction_terms": {'weekday_5': '*'},
             "joins": [
                 {
                     "dataset_directory": "dataset/time",
