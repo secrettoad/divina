@@ -23,7 +23,7 @@ def test_train_small(
     s3_fs, test_df_1, test_model_1, test_fd_3, dask_client_remote, test_bucket, test_bootstrap_models, random_state
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
-    ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
         test_fd_3["forecast_definition"]["dataset_directory"]
     )
     cli_train_vision(
@@ -64,17 +64,17 @@ def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, t
             test_fd_retail_2["forecast_definition"]["dataset_directory"],
         )
     ).mkdir(parents=True, exist_ok=True)
-    ddf.from_pandas(test_df_retail_sales, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_df_retail_stores, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["joins"][1]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_df_retail_time, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
         )
@@ -123,7 +123,7 @@ def test_predict_small(
     random_state
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
-    ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
         test_fd_3["forecast_definition"]["dataset_directory"],
     )
     pathlib.Path(
@@ -162,8 +162,8 @@ def test_predict_small(
                 "predictions",
                 "s-19700101-000007",
             )
-        ).compute(),
-        test_val_predictions_1,
+        ).compute().reset_index(drop=True),
+        test_val_predictions_1.reset_index(drop=True),
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
@@ -172,8 +172,8 @@ def test_predict_small(
                 "predictions",
                 "s-19700101-000007_forecast",
             )
-        ).compute(),
-        test_forecast_1,
+        ).compute().reset_index(drop=True),
+        test_forecast_1.reset_index(drop=True),
     )
 
 
@@ -186,17 +186,17 @@ def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores,
             "models", "bootstrap"
         )
     ).mkdir(parents=True, exist_ok=True)
-    ddf.from_pandas(test_df_retail_sales, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_df_retail_stores, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["joins"][1]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_df_retail_time, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
         )
@@ -240,8 +240,8 @@ def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores,
                 "predictions",
                 "s-20150718-000000",
             )
-        ).compute(),
-        test_val_predictions_retail,
+        ).compute().reset_index(drop=True),
+        test_val_predictions_retail.reset_index(drop=True),
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
@@ -250,8 +250,8 @@ def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores,
                 "predictions",
                 "s-20150718-000000_forecast",
             )
-        ).compute(),
-        test_forecast_retail,
+        ).compute().reset_index(drop=True),
+        test_forecast_retail.reset_index(drop=True),
     )
 
 
@@ -265,11 +265,11 @@ def test_validate_small(
     test_bucket,
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
-    ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
         test_fd_3["forecast_definition"]["dataset_directory"]
     )
 
-    ddf.from_pandas(test_val_predictions_1, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_val_predictions_1, npartitions=2).to_parquet(
         os.path.join(
             vision_path,
             "predictions",
@@ -300,22 +300,22 @@ def test_validate_small(
 def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
                               test_val_predictions_retail, test_metrics_retail, dask_client_remote, test_bucket):
     vision_path = "{}/vision/test1".format(test_bucket)
-    ddf.from_pandas(test_df_retail_sales, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_df_retail_stores, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["joins"][1]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_df_retail_time, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_val_predictions_retail, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_val_predictions_retail, npartitions=2).to_parquet(
         os.path.join(
             vision_path,
             "predictions",

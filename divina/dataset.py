@@ -161,5 +161,4 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
         if df[c].dtype == bool:
             df[c] = df[c].astype(int)
     df = cull_empty_partitions(df)
-    df = df.reset_index(drop=True)
     return df

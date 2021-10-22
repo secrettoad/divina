@@ -185,9 +185,6 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
 
             sys.stdout.write("Blind predictions made for split {}\n".format(s))
 
-        forecast_df['forecast_index'] = 1
-        forecast_df['forecast_index'] = forecast_df['forecast_index'].cumsum()
-        forecast_df = forecast_df.set_index('forecast_index')
         forecast_df[forecast_definition["time_index"]] = dd.to_datetime(forecast_df[forecast_definition["time_index"]])
         validate_df[forecast_definition["time_index"]] = dd.to_datetime(validate_df[forecast_definition["time_index"]])
 
