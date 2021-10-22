@@ -411,7 +411,7 @@ def test_fd_retail():
         "forecast_definition": {
             "time_index": "Date",
             "target": "Sales",
-            "drop_features": ['date', 'holiday_type', 'Promo2SinceWeek', 'Promo2SinceYear'],
+            "drop_features": ['date', 'holiday_type', 'Promo2SinceWeek', 'Promo2SinceYear', 'Customers'],
             "time_validation_splits": ["2015-07-18"],
             "forecast_start": "2015-07-21",
             "forecast_end": "2015-07-31",
@@ -419,16 +419,16 @@ def test_fd_retail():
             "bootstrap_sample": 5,
             "time_horizons": [2],
             "encode_features": ['StateHoliday', 'StoreType', 'Assortment', 'PromoInterval', 'Store'],
-            "dataset_directory": "dataset/retail/sales2",
+            "dataset_directory": "s3://divina-quickstart/retail/datasets/sales2",
             "confidence_intervals": [90, 10],
             "joins": [
                 {
-                    "dataset_directory": "dataset/time",
+                    "dataset_directory": "s3://divina-quickstart/time3/data",
                     "join_on": ("Date", "date"),
                     "as": "time"
                 },
                 {
-                    "dataset_directory": "dataset/retail/store",
+                    "dataset_directory": "s3://divina-quickstart/retail/datasets/store/data",
                     "join_on": ("Store", "Store"),
                     "as": "store"
                 }
