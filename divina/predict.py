@@ -8,6 +8,7 @@ from botocore.exceptions import ClientError
 import os
 from functools import partial
 from .utils import validate_forecast_definition
+import json
 
 
 @validate_forecast_definition
@@ -43,7 +44,6 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
         read_ls = os.listdir
         bootstrap_prefix = os.path.join(read_path, 'models', 'bootstrap')
 
-
     for s in forecast_definition["time_validation_splits"]:
 
         validate_kwargs = {}
@@ -73,82 +73,31 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
                     "rb",
             ) as f:
                 fit_model = joblib.load(f)
-            if "drop_features" in forecast_definition:
-                val_features = [
-                    c
-                    for c in validate_df.columns
-                    if not c
-                           in ["{}_h_{}".format(forecast_definition["target"], h) for h in
-                               forecast_definition["time_horizons"]]
-                           +
-                           ["{}_h_{}_pred".format(forecast_definition["target"], h) for h in
-                            forecast_definition["time_horizons"]] + [
-                               forecast_definition["time_index"],
-                               forecast_definition["target"],
-                           ]
-                           + forecast_definition["drop_features"]
-                ]
-                forecast_features = [
-                    c
-                    for c in forecast_df.columns
-                    if not c
-                           in ["{}_h_{}".format(forecast_definition["target"], h) for h in
-                               forecast_definition["time_horizons"]]
-                           +
-                           ["{}_h_{}_pred".format(forecast_definition["target"], h) for h in
-                            forecast_definition["time_horizons"]] + [
-                               forecast_definition["time_index"],
-                               forecast_definition["target"],
-                           ]
-                           + forecast_definition["drop_features"]
-                ]
-            else:
-                val_features = [
-                    c
-                    for c in validate_df.columns
-                    if not c
-                           in [
-                               "{}_h_{}".format(forecast_definition["target"], h)
-                               for h in forecast_definition["time_horizons"]
-                           ]
-                           +
-                           ["{}_h_{}_pred".format(forecast_definition["target"], h) for h in
-                            forecast_definition["time_horizons"]] +
-                           [
-                               forecast_definition["time_index"],
-                               forecast_definition["target"],
-                           ]
-                ]
-                forecast_features = [
-                    c
-                    for c in forecast_df.columns
-                    if not c
-                           in [
-                               "{}_h_{}".format(forecast_definition["target"], h)
-                               for h in forecast_definition["time_horizons"]
-                           ]
-                           +
-                           ["{}_h_{}_pred".format(forecast_definition["target"], h) for h in
-                            forecast_definition["time_horizons"]] +
-                           [
-                               forecast_definition["time_index"],
-                               forecast_definition["target"],
-                           ]
-                ]
+            with read_open(
+                    "{}/models/s-{}_h-{}_params.json".format(
+                        read_path,
+                        pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
+                        h,
+                    ),
+                    "rb",
+            ) as f:
+                fit_model_params = json.load(f)
+            features = list(fit_model_params["params"].keys())
+
             validate_df[
                 "{}_h_{}_pred".format(forecast_definition["target"], h)
-            ] = fit_model.predict(validate_df[val_features].to_dask_array(lengths=True))
+            ] = fit_model.predict(validate_df[features].to_dask_array(lengths=True))
             sys.stdout.write("Validation predictions made for split {}\n".format(s))
             forecast_df[
                 "{}_h_{}_pred".format(forecast_definition["target"], h)
-            ] = fit_model.predict(forecast_df[forecast_features].to_dask_array(lengths=True))
+            ] = fit_model.predict(forecast_df[features].to_dask_array(lengths=True))
 
             if "confidence_intervals" in forecast_definition:
                 bootstrap_model_paths = [p for p in read_ls("{}/models/bootstrap".format(
                     read_path
                 )) if '.' not in p]
 
-                def load_and_predict_bootstrap_model(features, paths, intervals, df):
+                def load_and_predict_bootstrap_model(paths, intervals, df):
                     for i, path in enumerate(paths):
                         if bootstrap_prefix:
                             model_path = os.path.join(bootstrap_prefix, path)
@@ -159,8 +108,15 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
                                 "rb",
                         ) as f:
                             bootstrap_model = joblib.load(f)
+                        with read_open(
+                            "{}_params.json".format(
+                                model_path),
+                                "r",
+                        ) as f:
+                            bootstrap_params = json.load(f)
+                            bootstrap_features = list(bootstrap_params['params'].keys())
                         df['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i)] = bootstrap_model.predict(
-                            dd.from_pandas(df[features], chunksize=10000).to_dask_array(lengths=True))
+                            dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(lengths=True))
 
                     df_agg = df[['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i) for i in
                                  range(0, len(paths))] + ['{}_h_{}_pred'.format(forecast_definition["target"], h)]].T
@@ -174,12 +130,7 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
                         df['{}_h_{}_pred_c_{}'.format(forecast_definition["target"], h, i)] = df_agg.quantile(i * .01, interpolation=interpolation).T
                     return df
 
-                forecast_features = [c for c in forecast_features if
-                                     not c in ['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, b) for b in
-                                               range(0, len(bootstrap_model_paths))] + ['{}_h_{}_pred_c_{}'.format(forecast_definition["target"], h, b) for b in
-                                               forecast_definition["confidence_intervals"]]]
-
-                forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model, forecast_features,
+                forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model,
                                                                  bootstrap_model_paths,
                                                                  forecast_definition['confidence_intervals']))\
 

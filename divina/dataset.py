@@ -137,11 +137,11 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
 
     if "bin_features" in forecast_definition:
         for c in forecast_definition["bin_features"]:
-            quantiles = [-np.inf] + df[c].quantile([.2, .4, .6, .8]).compute().values.tolist() + [np.inf]
-            for v, v_1 in zip(quantiles, quantiles[1:]):
-                df["{}_({}, {}]".format(c, v, v_1)] = 0
+            edges = [-np.inf] + forecast_definition["bin_features"][c] + [np.inf]
+            for v, v_1 in zip(edges, edges[1:]):
+                df["{}_({}, {}]".format(c, v, v_1)] = 1
                 df["{}_({}, {}]".format(c, v, v_1)] = df["{}_({}, {}]".format(c, v, v_1)].where(
-                    ((df[c] < v_1) & (df[c] >= v)), 1)
+                    ((df[c] < v_1) & (df[c] >= v)), 0)
 
     if "interaction_terms" in forecast_definition:
         for t in forecast_definition["interaction_terms"]:

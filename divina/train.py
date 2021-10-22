@@ -62,9 +62,11 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
         df_train = df[df[forecast_definition["time_index"]] < s]
         for h in forecast_definition["time_horizons"]:
             if random_seed:
-                model = dask_model(solver_kwargs={"normalize": False}, random_state=random_seed)
+                model = dask_model(random_state=random_seed)
             else:
-                model = dask_model(solver_kwargs={"normalize": False})
+                model = dask_model()
+
+            constant_columns = [c for c in df_train.columns if df_train[c].nunique().compute() == 1]
 
             if "drop_features" in forecast_definition:
                 features = [
@@ -79,7 +81,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                                forecast_definition["time_index"],
                                forecast_definition["target"],
                            ]
-                           + forecast_definition["drop_features"]
+                           + forecast_definition["drop_features"] + constant_columns
                 ]
             else:
                 features = [
@@ -93,7 +95,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                            + [
                                forecast_definition["time_index"],
                                forecast_definition["target"],
-                           ]
+                           ] + constant_columns
                 ]
 
             df_train = df_train[~df_train["{}_h_{}".format(forecast_definition["target"], h)].isnull()]
@@ -138,11 +140,12 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                     else:
                         df_train_bootstrap = df.sample(replace=False, frac=.8)
                     if random_seed:
-                        bootstrap_model = dask_model(solver_kwargs={"normalize": False}, random_state=random_seed)
+                        bootstrap_model = dask_model(random_state=random_seed)
                     else:
-                        bootstrap_model = dask_model(solver_kwargs={"normalize": False})
+                        bootstrap_model = dask_model()
+                    bootstrap_features = [c for c in features if not df_train_bootstrap[c].nunique().compute() == 1]
                     bootstrap_model.fit(
-                        df_train_bootstrap[features].to_dask_array(lengths=True),
+                        df_train_bootstrap[bootstrap_features].to_dask_array(lengths=True),
                         df_train_bootstrap[target].to_dask_array(lengths=True),
                     )
 
