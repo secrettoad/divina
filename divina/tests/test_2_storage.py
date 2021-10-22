@@ -21,7 +21,7 @@ def setup_teardown(setup_teardown_test_bucket_contents):
 
 def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_bucket, test_bootstrap_models, random_state):
     vision_path = "{}/vision/test1".format(test_bucket)
-    ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
         test_fd_1["forecast_definition"]["dataset_directory"]
     )
     dask_train(
@@ -60,17 +60,17 @@ def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, t
             test_fd_retail_2["forecast_definition"]["dataset_directory"],
         )
     ).mkdir(parents=True, exist_ok=True)
-    ddf.from_pandas(test_df_retail_sales, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_df_retail_stores, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["joins"][1]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_df_retail_time, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
         )
@@ -116,7 +116,7 @@ def test_predict(
     test_bootstrap_models
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
-    ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
             test_fd_1["forecast_definition"]["dataset_directory"]
     )
     ###TODO write these locally to correct directory
@@ -157,8 +157,8 @@ def test_predict(
                 "predictions",
                 "s-19700101-000007",
             )
-        ).compute(),
-        test_val_predictions_1,
+        ).compute().reset_index(drop=True),
+        test_val_predictions_1.reset_index(drop=True),
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
@@ -167,8 +167,8 @@ def test_predict(
                 "predictions",
                 "s-19700101-000007_forecast",
             )
-        ).compute(),
-        test_forecast_1,
+        ).compute().reset_index(drop=True),
+        test_forecast_1.reset_index(drop=True),
     )
 
 
@@ -181,17 +181,17 @@ def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores,
             "models", "bootstrap"
         )
     ).mkdir(parents=True, exist_ok=True)
-    ddf.from_pandas(test_df_retail_sales, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_df_retail_stores, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["joins"][1]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_df_retail_time, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
         )
@@ -233,8 +233,8 @@ def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores,
                 "predictions",
                 "s-20150718-000000",
             )
-        ).compute(),
-        test_val_predictions_retail,
+        ).compute().reset_index(drop=True),
+        test_val_predictions_retail.reset_index(drop=True),
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
@@ -243,8 +243,8 @@ def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores,
                 "predictions",
                 "s-20150718-000000_forecast",
             )
-        ).compute(),
-        test_forecast_retail,
+        ).compute().reset_index(drop=True),
+        test_forecast_retail.reset_index(drop=True),
     )
 
 
@@ -258,10 +258,10 @@ def test_validate(
     test_bucket,
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
-    ddf.from_pandas(test_df_1, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
             test_fd_1["forecast_definition"]["dataset_directory"]
     )
-    ddf.from_pandas(test_val_predictions_1, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_val_predictions_1, npartitions=2).to_parquet(
         os.path.join(
             vision_path,
             "predictions",
@@ -288,22 +288,22 @@ def test_validate(
 def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
                               test_val_predictions_retail, test_metrics_retail, dask_client, test_bucket):
     vision_path = "{}/vision/test1".format(test_bucket)
-    ddf.from_pandas(test_df_retail_sales, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_df_retail_stores, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["joins"][1]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_df_retail_time, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_val_predictions_retail, chunksize=10000).to_parquet(
+    ddf.from_pandas(test_val_predictions_retail, npartitions=2).to_parquet(
         os.path.join(
             vision_path,
             "predictions",

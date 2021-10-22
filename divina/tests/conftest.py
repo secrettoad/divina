@@ -198,7 +198,7 @@ def test_model_1(test_df_1):
     model.fit(
         ddf.from_pandas(train_df[[c for c in train_df.columns if not c in ['c', 'a']]], chunksize=10000).to_dask_array(
             lengths=True),
-        ddf.from_pandas(train_df, chunksize=10000)["c"],
+        ddf.from_pandas(train_df, chunksize=10000)["c"].to_dask_array(lengths=True),
     )
     return model
 
@@ -219,7 +219,7 @@ def test_model_retail(test_df_retail_sales, test_df_retail_time, test_df_retail_
     model.fit(
         ddf.from_pandas(train_df[features], chunksize=10000).to_dask_array(
             lengths=True),
-        ddf.from_pandas(train_df, chunksize=10000)["Sales"],
+        ddf.from_pandas(train_df, chunksize=10000)["Sales"].to_dask_array(lengths=True),
     )
     return model
 
@@ -243,7 +243,7 @@ def test_bootstrap_models(test_df_1, random_state, test_fd_1):
         model.fit(
             ddf.from_pandas(confidence_df, chunksize=10000)[
                 [c for c in train_df.columns if not c in ['c', 'a']]].to_dask_array(lengths=True),
-            ddf.from_pandas(confidence_df, chunksize=10000)["c"],
+            ddf.from_pandas(confidence_df, chunksize=10000)["c"].to_dask_array(lengths=True),
         )
         bootstrap_models[rs] = model
     return bootstrap_models
@@ -268,7 +268,7 @@ def test_bootstrap_models_retail(test_df_retail_sales, test_df_retail_stores, te
         confidence_df = train_df.sample(frac=.8, random_state=rs)
         model.fit(
             ddf.from_pandas(confidence_df[features], chunksize=10000).to_dask_array(lengths=True),
-            ddf.from_pandas(confidence_df, chunksize=10000)["Sales"],
+            ddf.from_pandas(confidence_df, chunksize=10000)["Sales"].to_dask_array(lengths=True),
         )
         bootstrap_models[rs] = model
     return bootstrap_models
@@ -281,12 +281,12 @@ def test_params_2(test_model_1):
 
 @pytest.fixture()
 def test_metrics_1():
-    return {'splits': {'1970-01-01 00:00:07': {'time_horizons': {'1': {'mae': 27.10527949438546}}}}}
+    return {'splits': {'1970-01-01 00:00:07': {'time_horizons': {'1': {'mae': 21.47333050414762}}}}}
 
 
 @pytest.fixture()
 def test_metrics_retail():
-    return {'splits': {'2015-07-18': {'time_horizons': {'2': {'mae': 79753.58203125}}}}}
+    return {'splits': {'2015-07-18': {'time_horizons': {'2': {'mae': 79705.29427083333}}}}}
 
 
 @pytest.fixture()
@@ -303,13 +303,13 @@ def test_val_predictions_1():
 @pytest.fixture()
 def test_val_predictions_retail():
     df = pd.DataFrame(
-        [[Timestamp('2015-07-18 00:00:00'), 83948.984375], [Timestamp('2015-07-19 00:00:00'), 83443.9609375],
-         [Timestamp('2015-07-20 00:00:00'), 83957.9140625], [Timestamp('2015-07-21 00:00:00'), 83905.328125],
-         [Timestamp('2015-07-22 00:00:00'), 83903.34375], [Timestamp('2015-07-23 00:00:00'), 83947.0],
-         [Timestamp('2015-07-24 00:00:00'), 83907.3125], [Timestamp('2015-07-25 00:00:00'), 83951.9609375],
-         [Timestamp('2015-07-26 00:00:00'), 83458.84375], [Timestamp('2015-07-27 00:00:00'), 84060.109375],
-         [Timestamp('2015-07-28 00:00:00'), 84012.484375], [Timestamp('2015-07-29 00:00:00'), 83979.7421875],
-         [Timestamp('2015-07-30 00:00:00'), 84006.53125], [Timestamp('2015-07-31 00:00:00'), 84019.4296875]])
+        [[Timestamp('2015-07-19 00:00:00'), 83443.9609375], [Timestamp('2015-07-21 00:00:00'), 83905.328125],
+         [Timestamp('2015-07-23 00:00:00'), 83947.0], [Timestamp('2015-07-25 00:00:00'), 83951.9609375],
+         [Timestamp('2015-07-27 00:00:00'), 84060.109375], [Timestamp('2015-07-28 00:00:00'), 84012.484375],
+         [Timestamp('2015-07-30 00:00:00'), 84006.53125], [Timestamp('2015-07-20 00:00:00'), 83957.9140625],
+         [Timestamp('2015-07-22 00:00:00'), 83903.34375], [Timestamp('2015-07-24 00:00:00'), 83907.3125],
+         [Timestamp('2015-07-26 00:00:00'), 83458.84375], [Timestamp('2015-07-29 00:00:00'), 83979.7421875],
+         [Timestamp('2015-07-31 00:00:00'), 84019.4296875], [Timestamp('2015-07-18 00:00:00'), 83948.984375]])
     df.columns = ['Date', 'Sales_h_2_pred']
     return df
 
@@ -366,15 +366,15 @@ def test_forecast_1():
 @pytest.fixture()
 def test_forecast_retail():
     df = pd.DataFrame([[Timestamp('2015-07-21 00:00:00'), 83905.328125, 83905.328125, 83905.328125],
-                       [Timestamp('2015-07-22 00:00:00'), 83903.34375, 83903.34375, 83903.34375],
                        [Timestamp('2015-07-23 00:00:00'), 83947.0, 83947.0, 83947.0],
-                       [Timestamp('2015-07-24 00:00:00'), 83907.3125, 83907.3125, 83907.3125],
                        [Timestamp('2015-07-25 00:00:00'), 83951.9609375, 83951.9609375, 83951.9609375],
-                       [Timestamp('2015-07-26 00:00:00'), 83458.84375, 83458.84375, 83458.84375],
                        [Timestamp('2015-07-27 00:00:00'), 84060.109375, 84060.109375, 84060.109375],
                        [Timestamp('2015-07-28 00:00:00'), 84012.484375, 84012.484375, 84012.484375],
-                       [Timestamp('2015-07-29 00:00:00'), 83979.7421875, 83979.7421875, 83979.7421875],
                        [Timestamp('2015-07-30 00:00:00'), 84006.53125, 84006.53125, 84006.53125],
+                       [Timestamp('2015-07-22 00:00:00'), 83903.34375, 83903.34375, 83903.34375],
+                       [Timestamp('2015-07-24 00:00:00'), 83907.3125, 83907.3125, 83907.3125],
+                       [Timestamp('2015-07-26 00:00:00'), 83458.84375, 83458.84375, 83458.84375],
+                       [Timestamp('2015-07-29 00:00:00'), 83979.7421875, 83979.7421875, 83979.7421875],
                        [Timestamp('2015-07-31 00:00:00'), 84019.4296875, 84019.4296875, 84019.4296875]])
     df.index = list(df.index + 1)
     df.index.name = 'forecast_index'
@@ -441,7 +441,8 @@ def test_fd_retail():
 @pytest.fixture()
 def test_fd_retail_2(test_bucket, test_fd_retail):
     test_fd = test_fd_retail
-    test_fd["forecast_definition"].update({"dataset_directory": "{}/{}".format(test_bucket, test_fd['forecast_definition']['dataset_directory'])})
+    test_fd["forecast_definition"].update(
+        {"dataset_directory": "{}/{}".format(test_bucket, test_fd['forecast_definition']['dataset_directory'])})
     for join in test_fd["forecast_definition"]["joins"]:
         join.update({"dataset_directory": "{}/{}".format(test_bucket, join['dataset_directory'])})
     return test_fd
