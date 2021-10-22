@@ -12,7 +12,6 @@ import boto3
 from dask_cloudprovider.aws import EC2Cluster
 from pandas import Timestamp
 import fsspec
-from sklearn.preprocessing import KBinsDiscretizer
 
 
 @pytest.fixture()
@@ -192,15 +191,20 @@ def test_model_1(test_df_1):
     train_df = test_df_1.groupby('a').agg('sum').reset_index()
     train_df['c'] = train_df['c'].shift(-1)
     train_df = train_df[train_df['a'] < "1970-01-01 00:00:07"]
-    train_df = pd.concat([train_df, pd.DataFrame(
-        KBinsDiscretizer(n_bins=5, encode='onehot-dense', strategy='quantile').fit_transform(train_df[['b']]))], axis=1)
-    model = LinearRegression(solver_kwargs={"normalize": False})
+    for c in ['b']:
+        edges = [-np.inf] + [5, 10, 15] + [np.inf]
+        for v, v_1 in zip(edges, edges[1:]):
+            train_df["{}_({}, {}]".format(c, v, v_1)] = 1
+            train_df["{}_({}, {}]".format(c, v, v_1)] = train_df["{}_({}, {}]".format(c, v, v_1)].where(
+                ((train_df[c] < v_1) & (train_df[c] >= v)), 0)
+    model = LinearRegression()
+    features = [c for c in train_df.columns if not c in ['c', 'a'] and train_df[c].nunique() != 1]
     model.fit(
-        ddf.from_pandas(train_df[[c for c in train_df.columns if not c in ['c', 'a']]], chunksize=10000).to_dask_array(
+        ddf.from_pandas(train_df[features], chunksize=10000).to_dask_array(
             lengths=True),
         ddf.from_pandas(train_df, chunksize=10000)["c"].to_dask_array(lengths=True),
     )
-    return model
+    return (model, {"params": {f: c for f, c in zip(features, model._coef)}})
 
 
 @pytest.fixture()
@@ -211,22 +215,23 @@ def test_model_retail(test_df_retail_sales, test_df_retail_time, test_df_retail_
     train_df = train_df[train_df['Date'] < "2015-07-18"]
     train_df = pd.get_dummies(train_df, columns=test_fd_retail['forecast_definition']['encode_features'])
     features = [c for c in train_df if
-                not c in test_fd_retail['forecast_definition']['drop_features'] + ['Date', 'Sales']]
+                not c in test_fd_retail['forecast_definition']['drop_features'] + ['Date', 'Sales'] and train_df[
+                    c].nunique() != 1]
     for c in train_df:
         if train_df[c].dtype == bool:
             train_df[c] = train_df[c].astype(int)
-    model = LinearRegression(solver_kwargs={"normalize": False})
+    model = LinearRegression()
     model.fit(
         ddf.from_pandas(train_df[features], chunksize=10000).to_dask_array(
             lengths=True),
         ddf.from_pandas(train_df, chunksize=10000)["Sales"].to_dask_array(lengths=True),
     )
-    return model
+    return (model, {"params": {f: c for f, c in zip(features, model._coef)}})
 
 
 @pytest.fixture()
 def test_params_1(test_model_1):
-    return {'params': {'b': test_model_1._coef[0]}}
+    return test_model_1[1]
 
 
 @pytest.fixture()
@@ -234,18 +239,23 @@ def test_bootstrap_models(test_df_1, random_state, test_fd_1):
     train_df = test_df_1.groupby('a').agg('sum').reset_index()
     train_df['c'] = train_df['c'].shift(-1)
     train_df = train_df[train_df['a'] < "1970-01-01 00:00:07"]
-    train_df = pd.concat([train_df, pd.DataFrame(
-        KBinsDiscretizer(n_bins=5, encode='onehot-dense', strategy='quantile').fit_transform(train_df[['b']]))], axis=1)
+    for c in ['b']:
+        edges = [-np.inf] + [5, 10, 15] + [np.inf]
+        for v, v_1 in zip(edges, edges[1:]):
+            train_df["{}_({}, {}]".format(c, v, v_1)] = 1
+            train_df["{}_({}, {}]".format(c, v, v_1)] = train_df["{}_({}, {}]".format(c, v, v_1)].where(
+                ((train_df[c] < v_1) & (train_df[c] >= v)), 0)
     bootstrap_models = {}
     for rs in range(random_state, random_state + test_fd_1['forecast_definition']['bootstrap_sample']):
-        model = LinearRegression(solver_kwargs={"normalize": False})
+        model = LinearRegression()
         confidence_df = train_df.sample(frac=.8, random_state=rs)
+        features = [c for c in confidence_df.columns if not c in ['c', 'a'] and confidence_df[c].nunique() != 1]
         model.fit(
-            ddf.from_pandas(confidence_df, chunksize=10000)[
-                [c for c in train_df.columns if not c in ['c', 'a']]].to_dask_array(lengths=True),
+            ddf.from_pandas(confidence_df[features], chunksize=10000)[features
+            ].to_dask_array(lengths=True),
             ddf.from_pandas(confidence_df, chunksize=10000)["c"].to_dask_array(lengths=True),
         )
-        bootstrap_models[rs] = model
+        bootstrap_models[rs] = (model, {"params": {f: c for f, c in zip(features, model._coef)}})
     return bootstrap_models
 
 
@@ -257,44 +267,46 @@ def test_bootstrap_models_retail(test_df_retail_sales, test_df_retail_stores, te
     train_df['Sales'] = train_df['Sales'].shift(-2)
     train_df = train_df[train_df['Date'] < "2015-07-18"]
     train_df = pd.get_dummies(train_df, columns=test_fd_retail['forecast_definition']['encode_features'])
-    features = [c for c in train_df if
-                not c in test_fd_retail['forecast_definition']['drop_features'] + ['Sales', 'Date']]
     for c in train_df:
         if train_df[c].dtype == bool:
             train_df[c] = train_df[c].astype(int)
     bootstrap_models = {}
     for rs in range(random_state, random_state + test_fd_retail['forecast_definition']['bootstrap_sample']):
-        model = LinearRegression(solver_kwargs={"normalize": False})
+        model = LinearRegression()
         confidence_df = train_df.sample(frac=.8, random_state=rs)
+        features = [c for c in confidence_df if
+                    not c in test_fd_retail['forecast_definition']['drop_features'] + ['Sales', 'Date'] and
+                    confidence_df[
+                        c].nunique() != 1]
         model.fit(
             ddf.from_pandas(confidence_df[features], chunksize=10000).to_dask_array(lengths=True),
             ddf.from_pandas(confidence_df, chunksize=10000)["Sales"].to_dask_array(lengths=True),
         )
-        bootstrap_models[rs] = model
+        bootstrap_models[rs] = (model, {"params": {f: c for f, c in zip(features, model._coef)}})
     return bootstrap_models
 
 
 @pytest.fixture()
 def test_params_2(test_model_1):
-    return {'params': {'b': test_model_1._coef[0] + 1}}
+    return {"params": {c: test_model_1[1]['params'][c] + 1 for c in test_model_1[1]['params']}}
 
 
 @pytest.fixture()
 def test_metrics_1():
-    return {'splits': {'1970-01-01 00:00:07': {'time_horizons': {'1': {'mae': 21.47333050414762}}}}}
+    return {'splits': {'1970-01-01 00:00:07': {'time_horizons': {'1': {'mae': 14.686136955152564}}}}}
 
 
 @pytest.fixture()
 def test_metrics_retail():
-    return {'splits': {'2015-07-18': {'time_horizons': {'2': {'mae': 79705.29427083333}}}}}
+    return {'splits': {'2015-07-18': {'time_horizons': {'2': {'mae': 4162.4048830079555}}}}}
 
 
 @pytest.fixture()
 def test_val_predictions_1():
     df = pd.DataFrame(
-        [[Timestamp('1970-01-01 00:00:01'), 32.46771570069808], [Timestamp('1970-01-01 00:00:04'), 45.59044357498226],
-         [Timestamp('1970-01-01 00:00:05'), 36.62197754599233], [Timestamp('1970-01-01 00:00:06'), 12.259018844130837],
-         [Timestamp('1970-01-01 00:00:07'), 39.93991973974673]]
+        [[Timestamp('1970-01-01 00:00:01'), 34.17995524296469], [Timestamp('1970-01-01 00:00:04'), 7.684012803524567],
+         [Timestamp('1970-01-01 00:00:05'), 11.577975376826522], [Timestamp('1970-01-01 00:00:06'), 36.51633278694585],
+         [Timestamp('1970-01-01 00:00:07'), -14.12217760696636]]
     )
     df.columns = ["a", "c_h_1_pred"]
     return df
@@ -303,13 +315,13 @@ def test_val_predictions_1():
 @pytest.fixture()
 def test_val_predictions_retail():
     df = pd.DataFrame(
-        [[Timestamp('2015-07-19 00:00:00'), 83443.9609375], [Timestamp('2015-07-21 00:00:00'), 83905.328125],
-         [Timestamp('2015-07-23 00:00:00'), 83947.0], [Timestamp('2015-07-25 00:00:00'), 83951.9609375],
-         [Timestamp('2015-07-27 00:00:00'), 84060.109375], [Timestamp('2015-07-28 00:00:00'), 84012.484375],
-         [Timestamp('2015-07-30 00:00:00'), 84006.53125], [Timestamp('2015-07-20 00:00:00'), 83957.9140625],
-         [Timestamp('2015-07-22 00:00:00'), 83903.34375], [Timestamp('2015-07-24 00:00:00'), 83907.3125],
-         [Timestamp('2015-07-26 00:00:00'), 83458.84375], [Timestamp('2015-07-29 00:00:00'), 83979.7421875],
-         [Timestamp('2015-07-31 00:00:00'), 84019.4296875], [Timestamp('2015-07-18 00:00:00'), 83948.984375]])
+        [[Timestamp('2015-07-19 00:00:00'), 2.9979032274495694], [Timestamp('2015-07-21 00:00:00'), 7.146434722515551],
+         [Timestamp('2015-07-23 00:00:00'), 10.897480974676], [Timestamp('2015-07-25 00:00:00'), 14.402110557140986],
+         [Timestamp('2015-07-27 00:00:00'), 14.714350657646719], [Timestamp('2015-07-28 00:00:00'), 16.13033999428808],
+         [Timestamp('2015-07-30 00:00:00'), 19.561710566838883], [Timestamp('2015-07-20 00:00:00'), 5.763744935833529],
+         [Timestamp('2015-07-22 00:00:00'), 8.868779918779182], [Timestamp('2015-07-24 00:00:00'), 12.366749591255939],
+         [Timestamp('2015-07-26 00:00:00'), 9.383130614867696], [Timestamp('2015-07-29 00:00:00'), 17.646227980803815],
+         [Timestamp('2015-07-31 00:00:00'), 21.383954412987805], [Timestamp('2015-07-18 00:00:00'), 8.096802089628909]])
     df.columns = ['Date', 'Sales_h_2_pred']
     return df
 
@@ -317,45 +329,45 @@ def test_val_predictions_retail():
 @pytest.fixture()
 def test_forecast_1():
     df = pd.DataFrame(
-        [[Timestamp('1970-01-01 00:00:05'), 37.53129033633809, 48.67375256418892],
-         [Timestamp('1970-01-01 00:00:06'), 36.801402638335475, 43.96236083161776],
-         [Timestamp('1970-01-01 00:00:07'), 39.93991973974673, 64.22134528167378],
-         [Timestamp('1970-01-01 00:00:10'), 11.894074995129527, 13.082770688225818],
-         [Timestamp('1970-01-01 00:00:10'), 11.894074995129527, 13.082770688225814],
-         [Timestamp('1970-01-01 00:00:11'), 11.894074995129527, 13.082770688225814],
-         [Timestamp('1970-01-01 00:00:12'), 11.894074995129527, 13.082770688225814],
-         [Timestamp('1970-01-01 00:00:13'), 11.894074995129527, 13.082770688225814],
-         [Timestamp('1970-01-01 00:00:14'), 11.894074995129527, 13.082770688225814],
-         [Timestamp('1970-01-01 00:00:10'), 31.956794312096235, 34.33993658224722],
-         [Timestamp('1970-01-01 00:00:10'), 31.956794312096243, 34.33993658224722],
-         [Timestamp('1970-01-01 00:00:11'), 31.956794312096243, 34.33993658224722],
-         [Timestamp('1970-01-01 00:00:12'), 31.956794312096243, 34.33993658224722],
-         [Timestamp('1970-01-01 00:00:13'), 31.956794312096243, 34.33993658224722],
-         [Timestamp('1970-01-01 00:00:14'), 31.956794312096243, 34.33993658224722],
-         [Timestamp('1970-01-01 00:00:10'), 35.673123538588925, 36.36557140801208],
-         [Timestamp('1970-01-01 00:00:10'), 35.673123538588925, 36.36557140801209],
-         [Timestamp('1970-01-01 00:00:11'), 35.673123538588925, 36.36557140801209],
-         [Timestamp('1970-01-01 00:00:12'), 35.673123538588925, 36.36557140801209],
-         [Timestamp('1970-01-01 00:00:13'), 35.673123538588925, 36.36557140801209],
-         [Timestamp('1970-01-01 00:00:14'), 35.673123538588925, 36.36557140801209],
-         [Timestamp('1970-01-01 00:00:10'), 44.3496344883778, 44.680081693897534],
-         [Timestamp('1970-01-01 00:00:10'), 44.34963448837781, 44.680081693897534],
-         [Timestamp('1970-01-01 00:00:11'), 44.34963448837781, 44.680081693897534],
-         [Timestamp('1970-01-01 00:00:12'), 44.34963448837781, 44.680081693897534],
-         [Timestamp('1970-01-01 00:00:13'), 44.34963448837781, 44.680081693897534],
-         [Timestamp('1970-01-01 00:00:14'), 44.34963448837781, 44.680081693897534],
-         [Timestamp('1970-01-01 00:00:10'), 44.422623258178064, 44.8860876026369],
-         [Timestamp('1970-01-01 00:00:10'), 44.42262325817808, 44.8860876026369],
-         [Timestamp('1970-01-01 00:00:11'), 44.42262325817808, 44.8860876026369],
-         [Timestamp('1970-01-01 00:00:12'), 44.42262325817808, 44.8860876026369],
-         [Timestamp('1970-01-01 00:00:13'), 44.42262325817808, 44.8860876026369],
-         [Timestamp('1970-01-01 00:00:14'), 44.42262325817808, 44.8860876026369],
-         [Timestamp('1970-01-01 00:00:10'), 36.801402638335475, 43.962360831617744],
-         [Timestamp('1970-01-01 00:00:10'), 36.801402638335475, 43.96236083161776],
-         [Timestamp('1970-01-01 00:00:11'), 36.801402638335475, 43.96236083161776],
-         [Timestamp('1970-01-01 00:00:12'), 36.801402638335475, 43.96236083161776],
-         [Timestamp('1970-01-01 00:00:13'), 36.801402638335475, 43.96236083161776],
-         [Timestamp('1970-01-01 00:00:14'), 36.801402638335475, 43.96236083161776]]
+        [[Timestamp('1970-01-01 00:00:05'), 11.577975376826522, 21.69483124057578],
+         [Timestamp('1970-01-01 00:00:06'), 36.51633278694585, 47.70685132054264],
+         [Timestamp('1970-01-01 00:00:07'), -14.12217760696636, 35.141751426272975],
+         [Timestamp('1970-01-01 00:00:10'), 31.835024241839548, 55.693340543877525],
+         [Timestamp('1970-01-01 00:00:10'), 31.835024241839548, 55.693340543877525],
+         [Timestamp('1970-01-01 00:00:11'), 31.835024241839548, 55.693340543877525],
+         [Timestamp('1970-01-01 00:00:12'), 31.835024241839548, 55.693340543877525],
+         [Timestamp('1970-01-01 00:00:13'), 31.835024241839548, 55.693340543877525],
+         [Timestamp('1970-01-01 00:00:14'), 31.835024241839548, 55.693340543877525],
+         [Timestamp('1970-01-01 00:00:10'), 31.056231727179156, 52.22393002379304],
+         [Timestamp('1970-01-01 00:00:10'), 31.056231727179156, 52.22393002379304],
+         [Timestamp('1970-01-01 00:00:11'), 31.056231727179156, 52.22393002379304],
+         [Timestamp('1970-01-01 00:00:12'), 31.056231727179156, 52.22393002379304],
+         [Timestamp('1970-01-01 00:00:13'), 31.056231727179156, 52.22393002379304],
+         [Timestamp('1970-01-01 00:00:14'), 31.056231727179156, 52.22393002379304],
+         [Timestamp('1970-01-01 00:00:10'), 30.277439212518768, 48.75451950370855],
+         [Timestamp('1970-01-01 00:00:10'), 30.277439212518768, 48.75451950370855],
+         [Timestamp('1970-01-01 00:00:11'), 30.277439212518768, 48.75451950370855],
+         [Timestamp('1970-01-01 00:00:12'), 30.277439212518768, 48.75451950370855],
+         [Timestamp('1970-01-01 00:00:13'), 30.277439212518768, 48.75451950370855],
+         [Timestamp('1970-01-01 00:00:14'), 30.277439212518768, 48.75451950370855],
+         [Timestamp('1970-01-01 00:00:10'), 29.498646697858376, 45.285108983624056],
+         [Timestamp('1970-01-01 00:00:10'), 29.498646697858376, 45.285108983624056],
+         [Timestamp('1970-01-01 00:00:11'), 29.498646697858376, 45.285108983624056],
+         [Timestamp('1970-01-01 00:00:12'), 29.498646697858376, 45.285108983624056],
+         [Timestamp('1970-01-01 00:00:13'), 29.498646697858376, 45.285108983624056],
+         [Timestamp('1970-01-01 00:00:14'), 29.498646697858376, 45.285108983624056],
+         [Timestamp('1970-01-01 00:00:10'), 28.719854183197988, 41.81569846353957],
+         [Timestamp('1970-01-01 00:00:10'), 28.719854183197988, 41.81569846353957],
+         [Timestamp('1970-01-01 00:00:11'), 28.719854183197988, 41.81569846353957],
+         [Timestamp('1970-01-01 00:00:12'), 28.719854183197988, 41.81569846353957],
+         [Timestamp('1970-01-01 00:00:13'), 28.719854183197988, 41.81569846353957],
+         [Timestamp('1970-01-01 00:00:14'), 28.719854183197988, 41.81569846353957],
+         [Timestamp('1970-01-01 00:00:10'), 36.51633278694585, 47.70685132054264],
+         [Timestamp('1970-01-01 00:00:10'), 36.51633278694585, 47.70685132054264],
+         [Timestamp('1970-01-01 00:00:11'), 36.51633278694585, 47.70685132054264],
+         [Timestamp('1970-01-01 00:00:12'), 36.51633278694585, 47.70685132054264],
+         [Timestamp('1970-01-01 00:00:13'), 36.51633278694585, 47.70685132054264],
+         [Timestamp('1970-01-01 00:00:14'), 36.51633278694585, 47.70685132054264]]
     )
     df.index = list(df.index + 1)
     df.index.name = 'forecast_index'
@@ -365,17 +377,17 @@ def test_forecast_1():
 
 @pytest.fixture()
 def test_forecast_retail():
-    df = pd.DataFrame([[Timestamp('2015-07-21 00:00:00'), 83905.328125, 83905.328125, 83905.328125],
-                       [Timestamp('2015-07-23 00:00:00'), 83947.0, 83947.0, 83947.0],
-                       [Timestamp('2015-07-25 00:00:00'), 83951.9609375, 83951.9609375, 83951.9609375],
-                       [Timestamp('2015-07-27 00:00:00'), 84060.109375, 84060.109375, 84060.109375],
-                       [Timestamp('2015-07-28 00:00:00'), 84012.484375, 84012.484375, 84012.484375],
-                       [Timestamp('2015-07-30 00:00:00'), 84006.53125, 84006.53125, 84006.53125],
-                       [Timestamp('2015-07-22 00:00:00'), 83903.34375, 83903.34375, 83903.34375],
-                       [Timestamp('2015-07-24 00:00:00'), 83907.3125, 83907.3125, 83907.3125],
-                       [Timestamp('2015-07-26 00:00:00'), 83458.84375, 83458.84375, 83458.84375],
-                       [Timestamp('2015-07-29 00:00:00'), 83979.7421875, 83979.7421875, 83979.7421875],
-                       [Timestamp('2015-07-31 00:00:00'), 84019.4296875, 84019.4296875, 84019.4296875]])
+    df = pd.DataFrame([[Timestamp('2015-07-21 00:00:00'), 7.146434722515551, 9.542689375084592, 5.209320027148351],
+                       [Timestamp('2015-07-23 00:00:00'), 10.897480974676, 13.308263108221581, 9.774275952666358],
+                       [Timestamp('2015-07-25 00:00:00'), 14.402110557140986, 16.843613759767322, 13.415718525709963],
+                       [Timestamp('2015-07-27 00:00:00'), 14.714350657646719, 17.885705157732446, 13.933398127832334],
+                       [Timestamp('2015-07-28 00:00:00'), 16.13033999428808, 19.339157088372303, 15.34090421541623],
+                       [Timestamp('2015-07-30 00:00:00'), 19.561710566838883, 22.80606303998502, 18.698973878235847],
+                       [Timestamp('2015-07-22 00:00:00'), 8.868779918779182, 11.282364596339903, 6.917722122147097],
+                       [Timestamp('2015-07-24 00:00:00'), 12.366749591255939, 14.81149300243851, 10.53420487484982],
+                       [Timestamp('2015-07-26 00:00:00'), 9.383130614867696, 12.352378437008156, 2.7939693740190705],
+                       [Timestamp('2015-07-29 00:00:00'), 17.646227980803815, 20.885942700730084, 16.575976495958457],
+                       [Timestamp('2015-07-31 00:00:00'), 21.383954412987805, 24.639071942969167, 20.474552263000078]])
     df.index = list(df.index + 1)
     df.index.name = 'forecast_index'
     df.columns = ['Date', 'Sales_h_2_pred', 'Sales_h_2_pred_c_90', 'Sales_h_2_pred_c_10']
@@ -396,7 +408,7 @@ def test_fd_1():
             "forecast_freq": "S",
             "confidence_intervals": [90],
             "bootstrap_sample": 5,
-            "bin_features": ["b"],
+            "bin_features": {"b": [5, 10, 15]},
             "scenarios": {"b": {"values": [[0, 5]], "start": "1970-01-01 00:00:09", "end": "1970-01-01 00:00:14"}},
             "time_horizons": [1],
             "dataset_directory": "divina-test/dataset/test1",
@@ -411,7 +423,7 @@ def test_fd_retail():
         "forecast_definition": {
             "time_index": "Date",
             "target": "Sales",
-            "drop_features": ['date', 'holiday_type', 'Promo2SinceWeek', 'Promo2SinceYear', 'Customers'],
+            "drop_features": ['date', 'holiday_type', 'Promo2SinceWeek', 'Promo2SinceYear'],
             "time_validation_splits": ["2015-07-18"],
             "forecast_start": "2015-07-21",
             "forecast_end": "2015-07-31",
@@ -419,16 +431,16 @@ def test_fd_retail():
             "bootstrap_sample": 5,
             "time_horizons": [2],
             "encode_features": ['StateHoliday', 'StoreType', 'Assortment', 'PromoInterval', 'Store'],
-            "dataset_directory": "s3://divina-quickstart/retail/datasets/sales2",
+            "dataset_directory": "dataset/retail/sales2",
             "confidence_intervals": [90, 10],
             "joins": [
                 {
-                    "dataset_directory": "s3://divina-quickstart/time3/data",
+                    "dataset_directory": "dataset/time",
                     "join_on": ("Date", "date"),
                     "as": "time"
                 },
                 {
-                    "dataset_directory": "s3://divina-quickstart/retail/datasets/store/data",
+                    "dataset_directory": "dataset/retail/store",
                     "join_on": ("Store", "Store"),
                     "as": "store"
                 }
