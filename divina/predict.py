@@ -181,7 +181,7 @@ def dask_predict(s3_fs, forecast_definition, read_path, write_path):
 
                 forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model, forecast_features,
                                                                  bootstrap_model_paths,
-                                                                 forecast_definition['confidence_intervals']))
+                                                                 forecast_definition['confidence_intervals']))\
 
             sys.stdout.write("Blind predictions made for split {}\n".format(s))
 
