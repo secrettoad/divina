@@ -68,6 +68,7 @@ In a more advanced configuration, divina can be used with the following command 
 
 to produce an s3 hosted output structure as shown below
 
+
 ###TODO - illustrate use of start date, end date and horizon to deliver "best information" forecast
 
 ###TODO visualization and interpretation interface
