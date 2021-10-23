@@ -1,9 +1,8 @@
 import json
 import os
-import pathlib
 
 ####TODO abtract rootish from role jsons - use os.path.expandvars
-supported_models = ["LinearRegression"]
+supported_models = ["LinearRegression", "PoissonRegression"]
 
 
 def get_parameters(s3_fs, model_path):

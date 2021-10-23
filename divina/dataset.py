@@ -60,7 +60,7 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
     if start:
         if pd.to_datetime(start) < time_min:
             raise Exception(
-                "Bad Start: {} | Check Dataset Time Range".format(start))
+                "Bad Start: {} < {} Check Dataset Time Range".format(start, time_min))
         else:
             df = df[dd.to_datetime(df[forecast_definition["time_index"]]) >= start]
             time_min = pd.to_datetime(str(start))
@@ -79,7 +79,7 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
                 df = df.append(new_dates_df)
             else:
                 raise Exception(
-                    "Bad End: {} | Check Dataset Time Range".format(end))
+                    "Bad End: {} | {} Check Dataset Time Range".format(end, time_max))
         else:
             df = df[dd.to_datetime(df[forecast_definition["time_index"]]) <= end]
         time_max = pd.to_datetime(str(end))
@@ -153,8 +153,10 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
         for t in forecast_definition["interaction_terms"]:
             if forecast_definition["interaction_terms"][t] == '*':
                 for c in [f for f in df.columns if not f in
-                           [forecast_definition['target'], forecast_definition['time_index']]]:
-                    df['{}-x-{}'.format(t, c)] = df[t] * df[c]
+                                                       [t, forecast_definition['target'],
+                                                        forecast_definition['time_index']]]:
+                    if not '{}-x-{}'.format(c, t) in df.columns:
+                        df['{}-x-{}'.format(t, c)] = df[t] * df[c]
             else:
                 for c in forecast_definition["interaction_terms"][t]:
                     df['{}-x-{}'.format(t, c)] = df[t] * df[c]
