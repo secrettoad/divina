@@ -129,15 +129,31 @@ def test_predict_small(
     pathlib.Path(
         "models/bootstrap"
     ).mkdir(parents=True, exist_ok=True)
-    joblib.dump(test_model_1, "models/s-19700101-000007_h-1")
+    joblib.dump(test_model_1[0], "models/s-19700101-000007_h-1")
+    with open(os.path.join(
+            "models",
+            "s-19700101-000007_h-1_params.json",
+    ), 'w+') as f:
+        json.dump(
+            test_model_1[1],
+            f
+        )
     for seed in test_bootstrap_models:
         joblib.dump(
-            test_bootstrap_models[seed],
+            test_bootstrap_models[seed][0],
             os.path.join(
                 "models/bootstrap",
                 "s-19700101-000007_h-1_r-{}".format(seed),
             ),
         )
+        with open(os.path.join(
+                "models/bootstrap",
+                "s-19700101-000007_h-1_r-{}_params.json".format(seed),
+            ), 'w+') as f:
+            json.dump(
+                test_bootstrap_models[seed][1],
+                f
+            )
     s3_fs.put(
         "models",
         os.path.join(
@@ -146,6 +162,7 @@ def test_predict_small(
         ),
         recursive=True,
     )
+
     shutil.rmtree('models', ignore_errors=True)
     cli_predict_vision(
         s3_fs=s3_fs,
@@ -202,20 +219,36 @@ def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores,
         )
     )
     joblib.dump(
-        test_model_retail,
+        test_model_retail[0],
         os.path.join(
             "models",
             "s-20150718-000000_h-2",
         ),
     )
+    with open(os.path.join(
+            "models",
+            "s-20150718-000000_h-2_params.json",
+    ), 'w+') as f:
+        json.dump(
+            test_model_retail[1],
+            f
+        )
     for seed in test_bootstrap_models_retail:
         joblib.dump(
-            test_bootstrap_models_retail[seed],
+            test_bootstrap_models_retail[seed][0],
             os.path.join(
                 "models/bootstrap",
                 "s-20150718-000000_h-2_r-{}".format(seed),
             ),
         )
+        with open(os.path.join(
+                "models/bootstrap",
+                "s-20150718-000000_h-2_r-{}_params.json".format(seed),
+        ), 'w+') as f:
+            json.dump(
+                test_bootstrap_models_retail[seed][1],
+                f
+            )
     s3_fs.put(
         "models",
         os.path.join(

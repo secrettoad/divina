@@ -6,16 +6,18 @@ from .dataset import get_dataset
 import pathlib
 import backoff
 from botocore.exceptions import ClientError
-from dask_ml.linear_model import LinearRegression
 import json
 import dask.bag as db
 import numpy as np
 from .utils import validate_forecast_definition
+from dask_ml.linear_model import LinearRegression, PoissonRegression
 
 
 @validate_forecast_definition
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, random_seed=None):
+    if "model" in forecast_definition:
+        dask_model = globals()[forecast_definition["model"]]
     if write_path[:5] == "s3://":
         if not s3_fs.exists(write_path):
             s3_fs.mkdir(
@@ -125,7 +127,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                     ),
                     "w",
             ) as f:
-                json.dump({"params": {feature: coef for feature, coef in zip(features, model.coef_)}}, f)
+                json.dump({"params": {feature: coef for feature, coef in zip(features, model.coef_)}, "intercept": model.intercept_}, f)
 
             if 'confidence_intervals' in forecast_definition:
                 if not 'bootstrap_sample' in forecast_definition:
@@ -148,7 +150,6 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                         df_train_bootstrap[bootstrap_features].to_dask_array(lengths=True),
                         df_train_bootstrap[target].to_dask_array(lengths=True),
                     )
-                    print(bootstrap_model.coef_)
                     with write_open(
                             "{}/models/bootstrap/s-{}_h-{}_r-{}".format(
                                 write_path,
@@ -170,7 +171,7 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
                             "w",
                     ) as f:
                         json.dump(
-                            {"params": {feature: coef for feature, coef in zip(features, bootstrap_model.coef_)}}, f)
+                            {"params": {feature: coef for feature, coef in zip(features, bootstrap_model.coef_)}, 'intercept': model.intercept_}, f)
 
                     sys.stdout.write("Pipeline persisted for horizon {} seed {}\n".format(h, random_seed))
 

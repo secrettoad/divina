@@ -6,7 +6,6 @@ from ..validate import dask_validate
 from ..aws.utils import create_divina_role
 from dask_cloudprovider.aws import EC2Cluster
 from dask.distributed import Client
-from dask_ml.linear_model import LinearRegression
 from botocore.exceptions import NoRegionError
 from botocore.exceptions import NoCredentialsError
 import os
@@ -48,12 +47,10 @@ def cli_train_vision(
         dask_client=None,
         random_state=None
 ):
-    dask_model = LinearRegression
     if local:
         with Client():
             dask_train(
                 s3_fs=s3_fs,
-                dask_model=dask_model,
                 forecast_definition=forecast_definition,
                 write_path=write_path,
                 random_seed=random_state
@@ -76,7 +73,6 @@ def cli_train_vision(
                     with Client(cluster):
                         dask_train(
                             s3_fs=s3_fs,
-                            dask_model=dask_model,
                             forecast_definition=forecast_definition,
                             write_path=write_path,
                             random_seed=random_state
@@ -103,7 +99,6 @@ def cli_train_vision(
             with Client(cluster):
                 dask_train(
                     s3_fs=s3_fs,
-                    dask_model=dask_model,
                     forecast_definition=forecast_definition,
                     write_path=write_path,
                     random_seed=random_state
@@ -112,7 +107,6 @@ def cli_train_vision(
     else:
         dask_train(
             s3_fs=s3_fs,
-            dask_model=dask_model,
             forecast_definition=forecast_definition,
             write_path=write_path,
             random_seed=random_state
