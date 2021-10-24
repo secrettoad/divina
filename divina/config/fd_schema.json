@@ -100,13 +100,8 @@
       "required": [
         "time_index",
         "target",
-        "time_validation_splits",
-        "forecast_start",
-        "forecast_end",
-        "forecast_freq",
         "time_horizons",
-        "dataset_directory",
-        "model"
+        "dataset_directory"
       ],
       "properties": {
         "time_index": {

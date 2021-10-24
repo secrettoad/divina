@@ -187,46 +187,38 @@ def fd_time_horizons_range_not_tuple():
 
 
 @pytest.fixture()
-def test_model_1(test_df_1):
-    train_df = test_df_1.groupby('a').agg('sum').reset_index()
-    train_df['c'] = train_df['c'].shift(-1)
-    train_df = train_df[train_df['a'] < "1970-01-01 00:00:07"]
-    for c in ['b']:
-        edges = [-np.inf] + [5, 10, 15] + [np.inf]
-        for v, v_1 in zip(edges, edges[1:]):
-            train_df["{}_({}, {}]".format(c, v, v_1)] = 1
-            train_df["{}_({}, {}]".format(c, v, v_1)] = train_df["{}_({}, {}]".format(c, v, v_1)].where(
-                ((train_df[c] < v_1) & (train_df[c] >= v)), 0)
+def test_model_1(test_df_1, random_state, test_fd_1):
+    params = [31.835024241839548, -0.7787925146603903, 8.57527111840826]
+    intercept = -8.575161145107172
+    features = ['b', 'b_(5, 10]', 'b_(15, inf]']
+
     model = LinearRegression()
-    features = [c for c in train_df.columns if not c in ['c', 'a'] and train_df[c].nunique() != 1]
     model.fit(
-        ddf.from_pandas(train_df[features], chunksize=10000).to_dask_array(
+        ddf.from_pandas(pd.DataFrame([np.array(params) + c for c in range(0, 2)]), npartitions=1).to_dask_array(
             lengths=True),
-        ddf.from_pandas(train_df, chunksize=10000)["c"].to_dask_array(lengths=True),
-    )
-    return (model, {"params": {f: c for f, c in zip(features, model._coef)}})
+        ddf.from_pandas(pd.Series([intercept, intercept]), npartitions=1).to_dask_array(lengths=True))
+    model.coef_ = np.array(params)
+    model.intercept_ = intercept
+    return (model, {"params": {f: c for f, c in zip(features, [intercept] + params)}})
 
 
 @pytest.fixture()
-def test_model_retail(test_df_retail_sales, test_df_retail_time, test_df_retail_stores, test_fd_retail):
-    train_df = test_df_retail_sales.join(test_df_retail_time.set_index('date'), on='Date').join(
-        test_df_retail_stores.set_index('Store'), on='Store')
-    train_df['Sales'] = train_df['Sales'].shift(-2)
-    train_df = train_df[train_df['Date'] < "2015-07-18"]
-    train_df = pd.get_dummies(train_df, columns=test_fd_retail['forecast_definition']['encode_features'])
-    features = [c for c in train_df if
-                not c in test_fd_retail['forecast_definition']['drop_features'] + ['Date', 'Sales'] and train_df[
-                    c].nunique() != 1]
-    for c in train_df:
-        if train_df[c].dtype == bool:
-            train_df[c] = train_df[c].astype(int)
+def test_model_retail(test_df_1, random_state, test_fd_1):
+    params = [-9040.396997870841, -0.04730598641740756, -0.00430890504763399, 0.30641800883493986, 0.6536763195876045,
+              0.11470366456826875, 0.653676319587673, 0.11470366456826875, -0.3063647362279681, 1.24802653260491,
+              -3.6093994724765786, ]
+    intercept = 0.786826644103978
+    features = ['Store', 'Open','Promo','SchoolHoliday', 'DayOfWeek_1.0','DayOfWeek_2.0',
+            'DayOfWeek_3.0','DayOfWeek_4.0','DayOfWeek_5.0','DayOfWeek_6.0','DayOfWeek_7.0']
+
     model = LinearRegression()
     model.fit(
-        ddf.from_pandas(train_df[features], chunksize=10000).to_dask_array(
+        ddf.from_pandas(pd.DataFrame([np.array(params) + c for c in range(0, 2)]), npartitions=1).to_dask_array(
             lengths=True),
-        ddf.from_pandas(train_df, chunksize=10000)["Sales"].to_dask_array(lengths=True),
-    )
-    return (model, {"params": {f: c for f, c in zip(features, model._coef)}})
+        ddf.from_pandas(pd.Series([intercept, intercept]), npartitions=1).to_dask_array(lengths=True))
+    model.coef_ = np.array(params)
+    model.intercept_ = intercept
+    return (model, {"params": {f: c for f, c in zip(features, [intercept] + params)}})
 
 
 @pytest.fixture()
@@ -236,53 +228,73 @@ def test_params_1(test_model_1):
 
 @pytest.fixture()
 def test_bootstrap_models(test_df_1, random_state, test_fd_1):
-    train_df = test_df_1.groupby('a').agg('sum').reset_index()
-    train_df['c'] = train_df['c'].shift(-1)
-    train_df = train_df[train_df['a'] < "1970-01-01 00:00:07"]
-    for c in ['b']:
-        edges = [-np.inf] + [5, 10, 15] + [np.inf]
-        for v, v_1 in zip(edges, edges[1:]):
-            train_df["{}_({}, {}]".format(c, v, v_1)] = 1
-            train_df["{}_({}, {}]".format(c, v, v_1)] = train_df["{}_({}, {}]".format(c, v, v_1)].where(
-                ((train_df[c] < v_1) & (train_df[c] >= v)), 0)
+    params = [[55.69334054387751, -3.4694105200844874, 1.5010004670187311],
+              [27.650949293638853, 0.0764031931120413, 19.67388606134358],
+              [27.65094929363883, 0.07640319311204169, 19.673886061343605],
+              [46.177552894648386, -1.6952607465242302, -0.9461935879036099],
+              [4.888905149914471, 0.8196202877424658, 9.088895999249898]]
+    intercepts = [-1.5010264833024487, -19.674023685557096, -19.67402368555708, 0.946189543790848, -9.088927535279836]
+    features = [['b', 'b_(5, 10]', 'b_(15, inf]'], ['b', 'b_(5, 10]', 'b_(15, inf]'], ['b', 'b_(5, 10]', 'b_(15, inf]'],
+                ['b', 'b_(5, 10]', 'b_(15, inf]'], ['b', 'b_(5, 10]', 'b_(15, inf]']]
+    seeds = range(random_state, random_state + test_fd_1['forecast_definition']['bootstrap_sample'])
     bootstrap_models = {}
-    for rs in range(random_state, random_state + test_fd_1['forecast_definition']['bootstrap_sample']):
+
+    for j, i, p, f, seed in zip(range(0, len(seeds)), intercepts, params, features, seeds):
         model = LinearRegression()
-        confidence_df = train_df.sample(frac=.8, random_state=rs)
-        features = [c for c in confidence_df.columns if not c in ['c', 'a'] and confidence_df[c].nunique() != 1]
         model.fit(
-            ddf.from_pandas(confidence_df[features], chunksize=10000)[features
-            ].to_dask_array(lengths=True),
-            ddf.from_pandas(confidence_df, chunksize=10000)["c"].to_dask_array(lengths=True),
-        )
-        bootstrap_models[rs] = (model, {"params": {f: c for f, c in zip(features, model._coef)}})
+            ddf.from_pandas(pd.DataFrame([np.array(params[j]) + c for c in range(0, len(seeds))]),
+                            npartitions=1).to_dask_array(
+                lengths=True),
+            ddf.from_pandas(pd.Series(intercepts), npartitions=1).to_dask_array(lengths=True))
+        model.coef_ = np.array(p)
+        model.intercept_ = i
+        bootstrap_models[seed] = (model, {"params": {_f: c for _f, c in zip(f, [i] + p)}})
     return bootstrap_models
 
 
 @pytest.fixture()
-def test_bootstrap_models_retail(test_df_retail_sales, test_df_retail_stores, test_df_retail_time, random_state,
-                                 test_fd_retail):
-    train_df = test_df_retail_sales.join(test_df_retail_time.set_index('date'), on='Date').join(
-        test_df_retail_stores.set_index('Store'), on='Store')
-    train_df['Sales'] = train_df['Sales'].shift(-2)
-    train_df = train_df[train_df['Date'] < "2015-07-18"]
-    train_df = pd.get_dummies(train_df, columns=test_fd_retail['forecast_definition']['encode_features'])
-    for c in train_df:
-        if train_df[c].dtype == bool:
-            train_df[c] = train_df[c].astype(int)
+def test_bootstrap_models_retail(test_df_1, random_state, test_fd_1):
+    params = [
+        [-9040.396997870841, -0.04730598641740756, -0.00430890504763399, 0.30641800883493986, 0.6536763195876045,
+         0.11470366456826875, 0.653676319587673, 0.11470366456826875, -0.3063647362279681, 1.24802653260491,
+         -3.6093994724765786, ],
+        [-9040.396997870841, -0.04730598641740756, -0.00430890504763399, 0.30641800883493986, 0.6536763195876045,
+         0.11470366456826875, 0.653676319587673, 0.11470366456826875, -0.3063647362279681, 1.24802653260491,
+         -3.6093994724765786, ],
+        [-9040.396997870841, -0.04730598641740756, -0.00430890504763399, 0.30641800883493986, 0.6536763195876045,
+         0.11470366456826875, 0.653676319587673, 0.11470366456826875, -0.3063647362279681, 1.24802653260491,
+         -3.6093994724765786, ],
+        [-9040.396997870841, -0.04730598641740756, -0.00430890504763399, 0.30641800883493986, 0.6536763195876045,
+         0.11470366456826875, 0.653676319587673, 0.11470366456826875, -0.3063647362279681, 1.24802653260491,
+         -3.6093994724765786, ],
+        [-9040.396997870841, -0.04730598641740756, -0.00430890504763399, 0.30641800883493986, 0.6536763195876045,
+         0.11470366456826875, 0.653676319587673, 0.11470366456826875, -0.3063647362279681, 1.24802653260491,
+         -3.6093994724765786, ]]
+    intercepts = [2.4322681041071452, 1.1812665944883771, -0.06481087507880388, 1.4161427480406554, 0.848539083149419]
+    features = [
+        ['Store', 'Open', 'Promo', 'SchoolHoliday', 'DayOfWeek_1.0', 'DayOfWeek_2.0',
+         'DayOfWeek_3.0', 'DayOfWeek_4.0', 'DayOfWeek_5.0', 'DayOfWeek_6.0', 'DayOfWeek_7.0'],
+        ['Store', 'Open', 'Promo', 'SchoolHoliday', 'DayOfWeek_1.0', 'DayOfWeek_2.0',
+         'DayOfWeek_3.0', 'DayOfWeek_4.0', 'DayOfWeek_5.0', 'DayOfWeek_6.0', 'DayOfWeek_7.0'],
+        ['Store', 'Open', 'Promo', 'SchoolHoliday', 'DayOfWeek_1.0', 'DayOfWeek_2.0',
+         'DayOfWeek_3.0', 'DayOfWeek_4.0', 'DayOfWeek_5.0', 'DayOfWeek_6.0', 'DayOfWeek_7.0'],
+        ['Store', 'Open', 'Promo', 'SchoolHoliday', 'DayOfWeek_1.0', 'DayOfWeek_2.0',
+         'DayOfWeek_3.0', 'DayOfWeek_4.0', 'DayOfWeek_5.0', 'DayOfWeek_6.0', 'DayOfWeek_7.0'],
+        ['Store', 'Open', 'Promo', 'SchoolHoliday', 'DayOfWeek_1.0', 'DayOfWeek_2.0',
+         'DayOfWeek_3.0', 'DayOfWeek_4.0', 'DayOfWeek_5.0', 'DayOfWeek_6.0', 'DayOfWeek_7.0']]
+    seeds = range(random_state, random_state + test_fd_1['forecast_definition']['bootstrap_sample'])
     bootstrap_models = {}
-    for rs in range(random_state, random_state + test_fd_retail['forecast_definition']['bootstrap_sample']):
+
+    for j, i, p, f, seed in zip(range(0, len(seeds)), intercepts, params, features, seeds):
         model = LinearRegression()
-        confidence_df = train_df.sample(frac=.8, random_state=rs)
-        features = [c for c in confidence_df if
-                    not c in test_fd_retail['forecast_definition']['drop_features'] + ['Sales', 'Date'] and
-                    confidence_df[
-                        c].nunique() != 1]
         model.fit(
-            ddf.from_pandas(confidence_df[features], chunksize=10000).to_dask_array(lengths=True),
-            ddf.from_pandas(confidence_df, chunksize=10000)["Sales"].to_dask_array(lengths=True),
-        )
-        bootstrap_models[rs] = (model, {"params": {f: c for f, c in zip(features, model._coef)}})
+            ddf.from_pandas(pd.DataFrame([np.array(params[j]) + c for c in range(0, len(seeds))]),
+                            npartitions=1).to_dask_array(
+                lengths=True),
+            ddf.from_pandas(pd.Series(intercepts), npartitions=1).to_dask_array(lengths=True))
+        model.coef_ = np.array(p)
+        model.intercept_ = i
+        bootstrap_models[seed] = (model, {"params": {_f: c for _f, c in zip(f, [i] + p)}})
     return bootstrap_models
 
 
@@ -423,17 +435,18 @@ def test_fd_retail():
         "forecast_definition": {
             "time_index": "Date",
             "target": "Sales",
-            "drop_features": ['date', 'holiday_type', 'Promo2SinceWeek', 'Promo2SinceYear'],
+            "include_features": ['Store', 'Open','Promo','SchoolHoliday', 'DayOfWeek_1.0','DayOfWeek_2.0',
+            'DayOfWeek_3.0','DayOfWeek_4.0','DayOfWeek_5.0','DayOfWeek_6.0','DayOfWeek_7.0'],
             "time_validation_splits": ["2015-07-18"],
-            "forecast_start": "2015-07-21",
-            "forecast_end": "2015-07-31",
-            "forecast_freq": 'D',
+            "forecast_end": "2016-01-01",
             "bootstrap_sample": 5,
+            "signal_dimensions": ['Store'],
             "time_horizons": [2],
-            "encode_features": ['StateHoliday', 'StoreType', 'Assortment', 'PromoInterval', 'Store', 'weekday'],
+            "forecast_freq": 'D',
+            "encode_features": ['StateHoliday', 'DayOfWeek'],
             "dataset_directory": "dataset/retail/sales2",
+            "link_function": "log",
             "confidence_intervals": [90, 10],
-            "interaction_terms": {'weekday_5': '*'},
             "joins": [
                 {
                     "dataset_directory": "dataset/time",
@@ -445,8 +458,7 @@ def test_fd_retail():
                     "join_on": ("Store", "Store"),
                     "as": "store"
                 }
-            ],
-            "model": "LinearRegression",
+            ]
         }
     }
 
