@@ -2,13 +2,12 @@ import os
 from dask import dataframe as ddf
 import pandas as pd
 import json
-from ..utils import compare_sk_models
+from ..utils import compare_sk_models, set_parameters, get_parameters
 from dask_ml.linear_model import LinearRegression
-from ..train import dask_train
+from ..train import _train
 import joblib
-from ..predict import dask_predict
-from ..validate import dask_validate
-from ..forecast import set_parameters, get_parameters
+from ..forecast import _forecast
+from ..validate import _validate
 import pytest
 import pathlib
 import shutil
@@ -24,7 +23,7 @@ def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_buck
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
         test_fd_1["forecast_definition"]["dataset_directory"]
     )
-    dask_train(
+    _train(
         s3_fs=s3_fs,
         dask_model=LinearRegression,
         forecast_definition=test_fd_1["forecast_definition"],
@@ -39,7 +38,7 @@ def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_buck
         ),
         "rb",
     ) as f:
-        compare_sk_models(joblib.load(f), test_model_1)
+        compare_sk_models(joblib.load(f), test_model_1[0])
     for seed in test_bootstrap_models:
         with s3_fs.open(
                     os.path.join(
@@ -49,10 +48,10 @@ def test_train(s3_fs, test_df_1, test_fd_1, dask_client, test_model_1, test_buck
                     ),
                 "rb",
         ) as f:
-            compare_sk_models(joblib.load(f), test_bootstrap_models)
+            compare_sk_models(joblib.load(f), test_bootstrap_models[seed][0])
 
 
-def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
+def test__train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
                            test_model_retail, dask_client, test_bootstrap_models_retail, random_state, test_bucket):
     vision_path = "{}/vision/test1".format(test_bucket)
     pathlib.Path(
@@ -75,7 +74,7 @@ def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, t
             test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
         )
     )
-    dask_train(
+    _train(
         s3_fs=s3_fs,
         dask_model=LinearRegression,
         forecast_definition=test_fd_retail_2["forecast_definition"],
@@ -91,7 +90,7 @@ def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, t
         ),
         "rb",
     ) as f:
-        compare_sk_models(joblib.load(f), test_model_retail)
+        compare_sk_models(joblib.load(f), test_model_retail[0])
     for seed in test_bootstrap_models_retail:
         with s3_fs.open(
                     os.path.join(
@@ -101,7 +100,7 @@ def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, t
                     ),
                 "rb",
         ) as f:
-            compare_sk_models(joblib.load(f), test_bootstrap_models_retail)
+            compare_sk_models(joblib.load(f), test_bootstrap_models_retail[seed][0])
 
 
 def test_predict(
@@ -159,7 +158,7 @@ def test_predict(
     )
     shutil.rmtree('models', ignore_errors=True)
 
-    dask_predict(
+    _forecast(
         s3_fs=s3_fs,
         forecast_definition=test_fd_1["forecast_definition"],
         read_path=vision_path,
@@ -188,7 +187,7 @@ def test_predict(
     )
 
 
-def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
+def test__forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
                              test_model_retail, test_val_predictions_retail, test_forecast_retail,
                              test_bootstrap_models_retail, dask_client, test_bucket):
     vision_path = "{}/vision/test1".format(test_bucket)
@@ -252,7 +251,7 @@ def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores,
         recursive=True,
     )
     shutil.rmtree('models', ignore_errors=True)
-    dask_predict(
+    _forecast(
         s3_fs=s3_fs,
         forecast_definition=test_fd_retail_2["forecast_definition"],
         read_path=vision_path,
@@ -301,7 +300,7 @@ def test_validate(
         )
     )
 
-    dask_validate(
+    _validate(
         s3_fs=s3_fs,
         forecast_definition=test_fd_1["forecast_definition"],
         read_path=vision_path,
@@ -317,7 +316,7 @@ def test_validate(
     assert metrics == test_metrics_1
 
 
-def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
+def test__validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
                               test_val_predictions_retail, test_metrics_retail, dask_client, test_bucket):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
@@ -342,7 +341,7 @@ def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores
             "s-20150718-000000",
         )
     )
-    dask_validate(
+    _validate(
         s3_fs=s3_fs,
         forecast_definition=test_fd_retail_2["forecast_definition"],
         read_path=vision_path,

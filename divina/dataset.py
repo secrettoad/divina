@@ -3,41 +3,14 @@ import backoff
 from botocore.exceptions import ClientError
 import pandas as pd
 from .utils import cull_empty_partitions
-from dask_ml.preprocessing import Categorizer, DummyEncoder, PolynomialFeatures
+from dask_ml.preprocessing import Categorizer, DummyEncoder
 from sklearn.pipeline import make_pipeline
 import numpy as np
-
-
-def chunk(s):
-    # for the comments, assume only a single grouping column, the
-    # implementation can handle multiple group columns.
-    #
-    # s is a grouped series. value_counts creates a multi-series like
-    # (group, value): count
-    return s.value_counts()
-
-
-def agg(s):
-    return s.apply(lambda s: s.groupby(level=-1).sum())
-
-
-def finalize(s):
-    # s is a multi-index series of the form (group, value): count. First
-    # manually group on the group part of the index. The lambda will receive a
-    # sub-series with multi index. Next, drop the group part from the index.
-    # Finally, determine the index with the maximum value, i.e., the mode.
-    level = list(range(s.index.nlevels - 1))
-    return (
-        s.groupby(level=level)
-            .apply(lambda s: s.reset_index(level=level, drop=True).argmax())
-    )
-
-
-mode = dd.Aggregation('mode', chunk, agg, finalize)
+from itertools import product
 
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-def get_dataset(forecast_definition, start=None, end=None, pad=False):
+def _get_dataset(forecast_definition, start=None, end=None, pad=False):
     df = dd.read_parquet("{}/*".format(forecast_definition["dataset_directory"]))
 
     time_min, time_max = (
@@ -49,9 +22,9 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
         df = df.groupby([forecast_definition["time_index"]] + forecast_definition["signal_dimensions"]).agg(
             {**{c: "sum" for c in df.columns if df[c].dtype in [int, float] and c != forecast_definition['time_index']},
              **{c: "first" for c in df.columns if
-                df[c].dtype not in [int, float] and c != forecast_definition['time_index']}}).reset_index()
+                df[c].dtype not in [int, float] and c != forecast_definition['time_index']}}).drop(
+            columns=forecast_definition["signal_dimensions"]).reset_index()
     else:
-
         df = df.groupby(forecast_definition["time_index"]).agg(
             {**{c: "sum" for c in df.columns if df[c].dtype in [int, float] and c != forecast_definition['time_index']},
              **{c: "first" for c in df.columns if
@@ -68,14 +41,26 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
     if end:
         if pd.to_datetime(end) > time_max:
             if pad:
-                if pd.to_datetime(start) > time_max:
+                if start and pd.to_datetime(start) > time_max:
                     new_dates = pd.date_range(pd.to_datetime(str(start)), pd.to_datetime(str(end)),
                                               freq=forecast_definition["forecast_freq"])
                 else:
                     new_dates = pd.date_range(time_max, pd.to_datetime(str(end)),
                                               freq=forecast_definition["forecast_freq"])
-                new_dates_df = dd.from_pandas(pd.DataFrame(new_dates, columns=[forecast_definition["time_index"]]),
-                                              chunksize=10000)
+                if "signal_dimensions" in forecast_definition:
+
+                    combinations = list(product(list(new_dates),
+                                                *[df[s].unique().compute().values for s in
+                                                  forecast_definition["signal_dimensions"]]))
+                    new_dates_df = dd.from_pandas(pd.DataFrame(combinations,
+                                                               columns=[forecast_definition["time_index"]] +
+                                                                       forecast_definition["signal_dimensions"]),
+                                                  npartitions=df.npartitions)
+
+                else:
+                    new_dates_df = dd.from_pandas(pd.DataFrame(new_dates, columns=[forecast_definition["time_index"]]),
+                                                  npartitions=df.npartitions)
+
                 df = df.append(new_dates_df)
             else:
                 raise Exception(
@@ -95,9 +80,6 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
                 right_on=join["join_on"][1],
                 suffixes=("", "{}_".format(join["as"])),
             )
-
-    if "drop_features" in forecast_definition:
-        df = df.drop(columns=forecast_definition["drop_features"])
 
     if "scenarios" in forecast_definition:
         for x in forecast_definition["scenarios"]:
@@ -126,6 +108,10 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
     if "encode_features" in forecast_definition:
         for c in forecast_definition["encode_features"]:
             df['dummy_{}'.format(c)] = df[c]
+            if df[c].dtype == int:
+                df[c] = df[c].astype(float)
+            else:
+                df[c] = df[c]
 
         pipe = make_pipeline(
             Categorizer(columns=forecast_definition["encode_features"]),
@@ -135,7 +121,7 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
 
         df = pipe.transform(df)
 
-        df = df.drop(columns=['dummy_{}'.format(c) for c in forecast_definition["encode_features"]])
+        df = df.rename(columns={'dummy_{}'.format(c): c for c in forecast_definition["encode_features"]})
 
     if "bin_features" in forecast_definition:
         for c in forecast_definition["bin_features"]:
@@ -147,7 +133,14 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
 
     for c in df.columns:
         if df[c].dtype == bool:
-            df[c] = df[c].astype(int)
+            df[c] = df[c].astype(float)
+
+    if "drop_features" in forecast_definition:
+        df = df.drop(columns=forecast_definition["drop_features"])
+
+    elif "include_features" in forecast_definition:
+        df = df[[forecast_definition["target"], forecast_definition["time_index"]] + forecast_definition[
+            "include_features"]]
 
     if "interaction_terms" in forecast_definition:
         for t in forecast_definition["interaction_terms"]:
@@ -156,10 +149,12 @@ def get_dataset(forecast_definition, start=None, end=None, pad=False):
                                                        [t, forecast_definition['target'],
                                                         forecast_definition['time_index']]]:
                     if not '{}-x-{}'.format(c, t) in df.columns:
-                        df['{}-x-{}'.format(t, c)] = df[t] * df[c]
+                        df['{}-x-{}'.format(t, c)] = df[t] + df[c]
             else:
                 for c in forecast_definition["interaction_terms"][t]:
-                    df['{}-x-{}'.format(t, c)] = df[t] * df[c]
+                    df['{}-x-{}'.format(t, c)] = df[t] + df[c]
 
     df = cull_empty_partitions(df)
+    df[forecast_definition["time_index"]] = dd.to_datetime(df[forecast_definition["time_index"]])
+    df = df.sort_values(forecast_definition["time_index"])
     return df

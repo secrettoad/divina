@@ -2,7 +2,7 @@ import sys
 import os
 import joblib
 import pandas as pd
-from .dataset import get_dataset
+from .dataset import _get_dataset
 import pathlib
 import backoff
 from botocore.exceptions import ClientError
@@ -10,14 +10,141 @@ import json
 import dask.bag as db
 import numpy as np
 from .utils import validate_forecast_definition
-from dask_ml.linear_model import LinearRegression, PoissonRegression
+from dask_ml.linear_model import LinearRegression
+import dask.array as da
+from functools import partial
+
+
+def _train_model(df, dask_model, model_name, random_seed, features, target, bootstrap_sample, confidence_intervals,
+                 link_function, write_open, write_path):
+    if random_seed:
+        model = dask_model(random_state=random_seed)
+    else:
+        model = dask_model()
+
+    constant_columns = [c for c in df.columns if df[c].nunique().compute() == 1]
+    features = [
+        c
+        for c in features
+        if not c
+               in constant_columns
+    ]
+
+    df_train = df[~df[target].isnull()]
+    if link_function == "log":
+        model.fit(
+            df_train[features].to_dask_array(lengths=True),
+            da.log1p(
+                df_train[target].to_dask_array(lengths=True)),
+        )
+    else:
+        model.fit(
+            df_train[features].to_dask_array(lengths=True),
+            df_train[target].to_dask_array(lengths=True))
+
+    with write_open(
+            "{}/models/{}".format(
+                write_path,
+                model_name
+            ),
+            "wb",
+    ) as f:
+        joblib.dump(model, f)
+
+    with write_open(
+            "{}/models/{}_params.json".format(
+                write_path,
+                model_name
+            ),
+            "w",
+    ) as f:
+        json.dump({"params": {feature: coef for feature, coef in zip(features, model.coef_)},
+                   "intercept": model.intercept_}, f)
+
+    sys.stdout.write("Model persisted: {}\n".format(model_name))
+
+    if confidence_intervals:
+        if not bootstrap_sample:
+            bootstrap_sample = 30
+
+        def train_persist_bootstrap_model(features, df, target, link_function, model_name, random_seed):
+            if random_seed:
+                df_train_bootstrap = df.sample(replace=False, frac=.8, random_state=random_seed)
+            else:
+                df_train_bootstrap = df.sample(replace=False, frac=.8)
+            if random_seed:
+                bootstrap_model = dask_model(random_state=random_seed)
+            else:
+                bootstrap_model = dask_model()
+            bootstrap_features = [c for c in features if not df_train_bootstrap[c].nunique().compute() == 1]
+            if link_function == 'log':
+                bootstrap_model.fit(
+                    df_train_bootstrap[bootstrap_features].to_dask_array(lengths=True),
+                    da.log1p(df_train_bootstrap[target].to_dask_array(lengths=True)),
+                )
+            else:
+                bootstrap_model.fit(
+                    df_train_bootstrap[bootstrap_features].to_dask_array(lengths=True),
+                    df_train_bootstrap[target].to_dask_array(lengths=True),
+                )
+            with write_open(
+                    "{}/models/bootstrap/{}_r-{}".format(
+                        write_path,
+                        model_name,
+                        random_seed
+                    ),
+                    "wb",
+            ) as f:
+                joblib.dump(bootstrap_model, f)
+
+            with write_open(
+                    "{}/models/bootstrap/{}_r-{}_params.json".format(
+                        write_path,
+                        model_name,
+                        random_seed
+                    ),
+                    "w",
+            ) as f:
+                json.dump(
+                    {"params": {feature: coef for feature, coef in zip(features, bootstrap_model.coef_)},
+                     'intercept': model.intercept_}, f)
+
+            sys.stdout.write("Model persisted: {}_r-{}\n".format(model_name, random_seed))
+
+            return (bootstrap_model, bootstrap_features)
+
+        if random_seed:
+            sample_bag = db.from_sequence([x for x in range(random_seed, random_seed + bootstrap_sample)],
+                                          npartitions=10)
+        else:
+            sample_bag = db.from_sequence([x for x in np.random.randint(0, 10000, size=bootstrap_sample)],
+                                          npartitions=10)
+        bootstrap_models = sample_bag.map(
+            partial(train_persist_bootstrap_model, features, df_train,
+                    target,
+                    link_function,
+                    model_name)).compute()
+
+
 
 
 @validate_forecast_definition
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, random_seed=None):
+def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, random_seed=None):
     if "model" in forecast_definition:
         dask_model = globals()[forecast_definition["model"]]
+    if not "confidence_intervals" in forecast_definition:
+        confidence_intervals = None
+    else:
+        confidence_intervals = forecast_definition["confidence_intervals"]
+    if not "bootstrap_sample" in forecast_definition:
+        bootstrap_sample = None
+    else:
+        bootstrap_sample = forecast_definition["bootstrap_sample"]
+    if not "link_function" in forecast_definition:
+        link_function = None
+    else:
+        link_function = forecast_definition["link_function"]
     if write_path[:5] == "s3://":
         if not s3_fs.exists(write_path):
             s3_fs.mkdir(
@@ -41,13 +168,13 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
         if k in forecast_definition:
             dataset_kwargs.update({k.split('_')[1]: forecast_definition[k]})
 
-    df = get_dataset(forecast_definition)
+    df = _get_dataset(forecast_definition)
 
     for h in forecast_definition["time_horizons"]:
         if "signal_dimension" in forecast_definition:
             df["{}_h_{}".format(forecast_definition["target"], h)] = df.groupby(
                 forecast_definition["signal_dimensions"]
-            )[forecast_definition["target"]].shift(-h)
+            )[forecast_definition["target"]].apply(lambda x: x.shift(-h))
         else:
             df["{}_h_{}".format(forecast_definition["target"], h)] = df[
                 forecast_definition["target"]
@@ -58,131 +185,36 @@ def dask_train(s3_fs, forecast_definition, write_path, dask_model=LinearRegressi
         pd.to_datetime(str(df[forecast_definition["time_index"]].max().compute())),
     )
 
-    for s in forecast_definition["time_validation_splits"]:
-        if pd.to_datetime(str(s)) <= time_min or pd.to_datetime(str(s)) >= time_max:
-            raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
-        df_train = df[df[forecast_definition["time_index"]] < s]
-        for h in forecast_definition["time_horizons"]:
-            if random_seed:
-                model = dask_model(random_state=random_seed)
-            else:
-                model = dask_model()
+    features = [
+        c
+        for c in df.columns
+        if not c
+               in [
+                   "{}_h_{}".format(forecast_definition["target"], h)
+                   for h in forecast_definition["time_horizons"]
+               ]
+               + [
+                   forecast_definition["time_index"],
+                   forecast_definition["target"],
+               ]
+    ]
 
-            constant_columns = [c for c in df_train.columns if df_train[c].nunique().compute() == 1]
+    for h in forecast_definition["time_horizons"]:
 
-            if "drop_features" in forecast_definition:
-                features = [
-                    c
-                    for c in df_train.columns
-                    if not c
-                           in [
-                               "{}_h_{}".format(forecast_definition["target"], h)
-                               for h in forecast_definition["time_horizons"]
-                           ]
-                           + [
-                               forecast_definition["time_index"],
-                               forecast_definition["target"],
-                           ]
-                           + forecast_definition["drop_features"] + constant_columns
-                ]
-            else:
-                features = [
-                    c
-                    for c in df_train.columns
-                    if not c
-                           in [
-                               "{}_h_{}".format(forecast_definition["target"], h)
-                               for h in forecast_definition["time_horizons"]
-                           ]
-                           + [
-                               forecast_definition["time_index"],
-                               forecast_definition["target"],
-                           ] + constant_columns
-                ]
+        _train_model(df=df, dask_model=dask_model, model_name="h-{}".format(h), random_seed=random_seed,
+                     features=features, target="{}_h_{}".format(forecast_definition["target"], h),
+                     bootstrap_sample=bootstrap_sample, confidence_intervals=confidence_intervals,
+                     link_function=link_function, write_open=write_open, write_path=write_path)
 
-            df_train = df_train[~df_train["{}_h_{}".format(forecast_definition["target"], h)].isnull()]
+        for s in forecast_definition["time_validation_splits"]:
+            if pd.to_datetime(str(s)) <= time_min or pd.to_datetime(str(s)) >= time_max:
+                raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
+            df_train = df[df[forecast_definition["time_index"]] < s]
 
-            model.fit(
-                df_train[features].to_dask_array(lengths=True),
-                df_train["{}_h_{}".format(forecast_definition["target"], h)].to_dask_array(lengths=True),
-            )
-
-            sys.stdout.write("Pipeline fit for horizon {}\n".format(h))
-
-            with write_open(
-                    "{}/models/s-{}_h-{}".format(
-                        write_path,
-                        pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
-                        h,
-                    ),
-                    "wb",
-            ) as f:
-                joblib.dump(model, f)
-
-            with write_open(
-                    "{}/models/s-{}_h-{}_params.json".format(
-                        write_path,
-                        pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
-                        h,
-                    ),
-                    "w",
-            ) as f:
-                json.dump({"params": {feature: coef for feature, coef in zip(features, model.coef_)}, "intercept": model.intercept_}, f)
-
-            if 'confidence_intervals' in forecast_definition:
-                if not 'bootstrap_sample' in forecast_definition:
-                    bootstrap_sample = 30
-                else:
-                    bootstrap_sample = forecast_definition['bootstrap_sample']
-                from functools import partial
-
-                def train_persist_bootstrap_model(features, df, target, random_seed):
-                    if random_seed:
-                        df_train_bootstrap = df.sample(replace=False, frac=.8, random_state=random_seed)
-                    else:
-                        df_train_bootstrap = df.sample(replace=False, frac=.8)
-                    if random_seed:
-                        bootstrap_model = dask_model(random_state=random_seed)
-                    else:
-                        bootstrap_model = dask_model()
-                    bootstrap_features = [c for c in features if not df_train_bootstrap[c].nunique().compute() == 1]
-                    bootstrap_model.fit(
-                        df_train_bootstrap[bootstrap_features].to_dask_array(lengths=True),
-                        df_train_bootstrap[target].to_dask_array(lengths=True),
-                    )
-                    with write_open(
-                            "{}/models/bootstrap/s-{}_h-{}_r-{}".format(
-                                write_path,
-                                pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
-                                h,
-                                random_seed
-                            ),
-                            "wb",
-                    ) as f:
-                        joblib.dump(bootstrap_model, f)
-
-                    with write_open(
-                            "{}/models/bootstrap/s-{}_h-{}_r-{}_params.json".format(
-                                write_path,
-                                pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
-                                h,
-                                random_seed
-                            ),
-                            "w",
-                    ) as f:
-                        json.dump(
-                            {"params": {feature: coef for feature, coef in zip(features, bootstrap_model.coef_)}, 'intercept': model.intercept_}, f)
-
-                    sys.stdout.write("Pipeline persisted for horizon {} seed {}\n".format(h, random_seed))
-
-                    return bootstrap_model
-
-                if random_seed:
-                    sample_bag = db.from_sequence([x for x in range(random_seed, random_seed + bootstrap_sample)], npartitions=10)
-                else:
-                    sample_bag = db.from_sequence([x for x in np.random.randint(0, 10000, size=bootstrap_sample)], npartitions=10)
-                sample_bag.map(
-                    partial(train_persist_bootstrap_model, features, df_train,
-                            "{}_h_{}".format(forecast_definition["target"], h))).compute()
-
-            sys.stdout.write("Pipeline persisted for horizon {}\n".format(h))
+            _train_model(df=df_train, dask_model=dask_model, model_name="s-{}_h-{}".format(
+                pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
+                h
+            ), random_seed=random_seed,
+                         features=features, target="{}_h_{}".format(forecast_definition["target"], h),
+                         bootstrap_sample=bootstrap_sample, confidence_intervals=confidence_intervals,
+                         link_function=link_function, write_open=write_open, write_path=write_path)

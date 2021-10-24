@@ -1,7 +1,7 @@
 import os
 from ..cli.cli import (
     cli_train_vision,
-    cli_predict_vision,
+    cli_forecast_vision,
     cli_validate_vision,
 )
 import dask.dataframe as ddf
@@ -43,7 +43,7 @@ def test_train_small(
         ),
         "rb",
     ) as f:
-        compare_sk_models(joblib.load(f), test_model_1)
+        compare_sk_models(joblib.load(f), test_model_1[0])
     for seed in test_bootstrap_models:
         with s3_fs.open(
                     os.path.join(
@@ -53,7 +53,7 @@ def test_train_small(
                     ),
                 "rb",
         ) as f:
-            compare_sk_models(joblib.load(f), test_bootstrap_models)
+            compare_sk_models(joblib.load(f), test_bootstrap_models[seed][0])
 
 
 def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
@@ -97,7 +97,7 @@ def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, t
         ),
         "rb",
     ) as f:
-        compare_sk_models(joblib.load(f), test_model_retail)
+        compare_sk_models(joblib.load(f), test_model_retail[0])
     for seed in test_bootstrap_models_retail:
         with s3_fs.open(
                     os.path.join(
@@ -107,7 +107,7 @@ def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, t
                     ),
                 "rb",
         ) as f:
-            compare_sk_models(joblib.load(f), test_bootstrap_models_retail)
+            compare_sk_models(joblib.load(f), test_bootstrap_models_retail[seed][0])
 
 
 def test_predict_small(
@@ -164,7 +164,7 @@ def test_predict_small(
     )
 
     shutil.rmtree('models', ignore_errors=True)
-    cli_predict_vision(
+    cli_forecast_vision(
         s3_fs=s3_fs,
         forecast_definition=test_fd_3["forecast_definition"],
         write_path=vision_path,
@@ -258,7 +258,7 @@ def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores,
         recursive=True,
     )
     shutil.rmtree('models', ignore_errors=True)
-    cli_predict_vision(
+    cli_forecast_vision(
         s3_fs=s3_fs,
         forecast_definition=test_fd_retail_2["forecast_definition"],
         write_path=vision_path,
