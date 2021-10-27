@@ -11,6 +11,7 @@ import joblib
 import pandas as pd
 import dask.dataframe as ddf
 from jsonschema import validate
+from jsonschema.exceptions import ValidationError
 import plotly.graph_objects as go
 
 
@@ -32,9 +33,13 @@ def test_validate_forecast_definition(
         fd_invalid_model,
         fd_time_horizons_range_not_tuple
     ]:
-        with open(pathlib.Path(pathlib.Path(__file__).parent.parent, 'config/fd_schema.json'), 'r') as f:
-            validate(instance=dd, schema=json.load(f))
-        return None
+        try:
+            with open(pathlib.Path(pathlib.Path(__file__).parent.parent, 'config/fd_schema.json'), 'r') as f:
+                validate(instance=dd, schema=json.load(f))
+        except ValidationError:
+            assert True
+        else:
+            assert False
 
 
 def test_get_composite_dataset(
