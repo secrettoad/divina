@@ -4,6 +4,7 @@ async-timeout==3.0.1
 aiobotocore[awscli,boto3]
 attrs==21.2.0
 backoff==1.11.1
+bokeh==2.4.0
 chardet==4.0.0
 click==8.0.1
 cloudpickle==1.6.0
@@ -14,6 +15,7 @@ idna==3.2
 importlib-metadata==4.6.4
 jmespath==0.10.0
 joblib==1.0.1
+jsonschema==4.0.0
 locket==0.2.1
 multidict==5.1.0
 numpy==1.21.1
