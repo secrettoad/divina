@@ -4,7 +4,7 @@ async-timeout==3.0.1
 aiobotocore[awscli,boto3]
 attrs==21.2.0
 backoff==1.11.1
-bokeh==2.4.0
+bokeh==2.3.2
 chardet==4.0.0
 click==8.0.1
 cloudpickle==1.6.0

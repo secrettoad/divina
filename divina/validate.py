@@ -94,7 +94,7 @@ def _validate(s3_fs, forecast_definition, write_path, read_path):
                         pd.to_datetime(str(forecast_definition['forecast_start']))))
             else:
                 validate_kwargs["end"] = pd.to_datetime(str(s))
-        validate_df = _get_dataset(forecast_definition, pad=True, **validate_kwargs)
+        validate_df = _get_dataset(forecast_definition, pad=False, **validate_kwargs)
 
         for h in forecast_definition["time_horizons"]:
             with read_open(
@@ -116,6 +116,9 @@ def _validate(s3_fs, forecast_definition, write_path, read_path):
             ) as f:
                 fit_model_params = json.load(f)
             features = list(fit_model_params["params"].keys())
+            for f in features:
+                if not f in validate_df.columns:
+                    validate_df[f] = 0
 
             if "link_function" in forecast_definition:
                 if forecast_definition["link_function"] == 'log':
@@ -134,6 +137,7 @@ def _validate(s3_fs, forecast_definition, write_path, read_path):
                 bootstrap_model_paths = [p for p in read_ls("{}/models/bootstrap".format(
                     read_path
                 )) if '.' not in p]
+
                 def load_and_predict_bootstrap_model(paths, intervals, link_function, df):
                     for i, path in enumerate(paths):
                         if bootstrap_prefix:

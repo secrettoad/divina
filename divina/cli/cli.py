@@ -61,7 +61,7 @@ def cli_train_vision(
                         },
                         auto_shutdown=True,
                 ) as cluster:
-                    cluster.adapt(minimum=0, maximum=10)
+                    cluster.scale(10)
                     with Client(cluster):
                         _train(
                             s3_fs=s3_fs,
@@ -87,7 +87,7 @@ def cli_train_vision(
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                 },
             )
-            cluster.adapt(minimum=0, maximum=10)
+            cluster.scale(10)
             with Client(cluster):
                 _train(
                     s3_fs=s3_fs,
@@ -138,7 +138,7 @@ def cli_forecast_vision(
                         },
                         auto_shutdown=True,
                 ) as cluster:
-                    cluster.adapt(minimum=0, maximum=10)
+                    cluster.scale(10)
                     with Client(cluster):
                         _forecast(
                             s3_fs=s3_fs,
@@ -164,7 +164,7 @@ def cli_forecast_vision(
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                 },
             )
-            cluster.adapt(minimum=0, maximum=10)
+            cluster.scale(10)
             with Client(cluster):
                 _forecast(
                     s3_fs=s3_fs,
@@ -215,7 +215,7 @@ def cli_validate_vision(
                         },
                         auto_shutdown=True,
                 ) as cluster:
-                    cluster.adapt(minimum=0, maximum=10)
+                    cluster.scale(50)
                     with Client(cluster):
                         _validate(
                             s3_fs=s3_fs,
@@ -241,7 +241,7 @@ def cli_validate_vision(
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                 },
             )
-            cluster.adapt(minimum=0, maximum=10)
+            cluster.scale(50)
             with Client(cluster):
                 _validate(
                     s3_fs=s3_fs,
@@ -295,9 +295,9 @@ def experiment(forecast_def, keep_alive, ec2_key, write_path, local, debug):
                     "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                 },
-                auto_shutdown=True,
+                auto_shutdown=not keep_alive,
         ) as cluster:
-            cluster.adapt(minimum=0, maximum=10)
+            cluster.scale(10)
             with Client(cluster) as client:
                 cli_train_vision(
                     s3_fs=s3fs.S3FileSystem(),
