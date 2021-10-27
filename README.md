@@ -8,7 +8,7 @@
 [![Continuous Integration](https://github.com/secrettoad/divina/actions/workflows/prod.yaml/badge.svg)](https://github.com/secrettoad/divina/actions/workflows/prod.yaml)
 [![PyPI Latest Release](https://img.shields.io/pypi/v/divina.svg)](https://pypi.org/project/divina/)
 [![Package Status](https://img.shields.io/pypi/status/divina.svg)](https://pypi.org/project/divina/)
-[![License](https://img.shields.io/pypi/l/divina.svg)](https://github.com/pandas-dev/divina/blob/master/LICENSE)
+[![License](https://img.shields.io/pypi/l/divina.svg)](https://github.com/secrettoad/divina/blob/master/LICENSE)
 [![Coverage](https://codecov.io/github/secrettoad/divina/coverage.svg?branch=main)](https://codecov.io/gh/secrettoad/divina)
 [![Downloads](https://img.shields.io/pypi/dm/divina.svg)](https://pypi.org/project/divina)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -22,7 +22,7 @@ More specifically, divina aims to raise the standard of functionality in forecas
 
 
 ## Main Features
-Here are just a few of the things that pandas does well:
+Here are just a few of the things that divina does well:
 
   - Easy construction of parquet-based [**datasets**][datasets] that allow for efficient, scalable modelling and dynamic, JSON-driven definition of multi-dataset experiments.
   - Abstraction of granular experiment configuration such as cross-validation, regularization and metric selection to a single, simple JSON-based configuration file with sensible defaults.  
