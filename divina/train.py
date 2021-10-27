@@ -22,7 +22,8 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
     else:
         model = dask_model()
 
-    constant_columns = [c for c in df.columns if df[c].nunique().compute() == 1]
+    df_train = df[~df[target].isnull()]
+    constant_columns = [c for c in df_train.columns if df_train[c].nunique().compute() == 1]
     features = [
         c
         for c in features
@@ -30,7 +31,6 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
                in constant_columns
     ]
 
-    df_train = df[~df[target].isnull()]
     if link_function == "log":
         model.fit(
             df_train[features].to_dask_array(lengths=True),
@@ -41,7 +41,6 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
         model.fit(
             df_train[features].to_dask_array(lengths=True),
             df_train[target].to_dask_array(lengths=True))
-
     with write_open(
             "{}/models/{}".format(
                 write_path,
@@ -68,6 +67,7 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
             bootstrap_sample = 30
 
         def train_persist_bootstrap_model(features, df, target, link_function, model_name, random_seed):
+
             if random_seed:
                 df_train_bootstrap = df.sample(replace=False, frac=.8, random_state=random_seed)
             else:
@@ -123,9 +123,9 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
             partial(train_persist_bootstrap_model, features, df_train,
                     target,
                     link_function,
-                    model_name)).compute()
+                    model_name)).compute(scheduler='single-threaded')
 
-
+        return model, bootstrap_models
 
 
 @validate_forecast_definition
@@ -201,7 +201,7 @@ def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, 
 
     for h in forecast_definition["time_horizons"]:
 
-        _train_model(df=df, dask_model=dask_model, model_name="h-{}".format(h), random_seed=random_seed,
+        model, bootstrap_models = _train_model(df=df, dask_model=dask_model, model_name="h-{}".format(h), random_seed=random_seed,
                      features=features, target="{}_h_{}".format(forecast_definition["target"], h),
                      bootstrap_sample=bootstrap_sample, confidence_intervals=confidence_intervals,
                      link_function=link_function, write_open=write_open, write_path=write_path)
@@ -211,7 +211,7 @@ def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, 
                 raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
             df_train = df[df[forecast_definition["time_index"]] < s]
 
-            _train_model(df=df_train, dask_model=dask_model, model_name="s-{}_h-{}".format(
+            model, bootstrap_models = _train_model(df=df_train, dask_model=dask_model, model_name="s-{}_h-{}".format(
                 pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                 h
             ), random_seed=random_seed,

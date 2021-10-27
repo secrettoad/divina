@@ -12,6 +12,7 @@ from itertools import product
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def _get_dataset(forecast_definition, start=None, end=None, pad=False):
     df = dd.read_parquet("{}/*".format(forecast_definition["dataset_directory"]))
+    npartitions = df.npartitions
 
     time_min, time_max = (
         pd.to_datetime(str(df[forecast_definition["time_index"]].min().compute())),
@@ -45,7 +46,7 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
                     new_dates = pd.date_range(pd.to_datetime(str(start)), pd.to_datetime(str(end)),
                                               freq=forecast_definition["forecast_freq"])
                 else:
-                    new_dates = pd.date_range(time_max, pd.to_datetime(str(end)),
+                    new_dates = pd.date_range(time_max + pd.offsets.Day(), pd.to_datetime(str(end)),
                                               freq=forecast_definition["forecast_freq"])
                 if "signal_dimensions" in forecast_definition:
 
@@ -71,7 +72,10 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
 
     if "joins" in forecast_definition:
         for i, join in enumerate(forecast_definition["joins"]):
-            join_df = dd.read_parquet("{}/*".format(join["dataset_directory"]))
+            try:
+                join_df = dd.read_parquet("{}/*".format(join["dataset_directory"]))
+            except IndexError:
+                raise Exception("Could not load dataset {}. No parquet files found.".format(join["dataset_directory"]))
             join_df[join["join_on"][1]] = join_df[join["join_on"][1]].astype(df[join["join_on"][0]].dtype)
             df = df.merge(
                 join_df,
@@ -105,24 +109,6 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
                 df_scenario[x] = v
                 df = df.append(df_scenario)
 
-    if "encode_features" in forecast_definition:
-        for c in forecast_definition["encode_features"]:
-            df['dummy_{}'.format(c)] = df[c]
-            if df[c].dtype == int:
-                df[c] = df[c].astype(float)
-            else:
-                df[c] = df[c]
-
-        pipe = make_pipeline(
-            Categorizer(columns=forecast_definition["encode_features"]),
-            DummyEncoder(columns=forecast_definition["encode_features"]))
-
-        pipe.fit(df)
-
-        df = pipe.transform(df)
-
-        df = df.rename(columns={'dummy_{}'.format(c): c for c in forecast_definition["encode_features"]})
-
     if "bin_features" in forecast_definition:
         for c in forecast_definition["bin_features"]:
             edges = [-np.inf] + forecast_definition["bin_features"][c] + [np.inf]
@@ -142,6 +128,21 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
         df = df[[forecast_definition["target"], forecast_definition["time_index"]] + forecast_definition[
             "include_features"]]
 
+    if "encode_features" in forecast_definition:
+        for c in forecast_definition["encode_features"]:
+            if df[c].dtype == int:
+                df[c] = df[c].astype(float)
+            else:
+                df[c] = df[c]
+
+        pipe = make_pipeline(
+            Categorizer(columns=forecast_definition["encode_features"]),
+            DummyEncoder(columns=forecast_definition["encode_features"]))
+
+        pipe.fit(df)
+
+        df = pipe.transform(df)
+
     if "interaction_terms" in forecast_definition:
         for t in forecast_definition["interaction_terms"]:
             if forecast_definition["interaction_terms"][t] == '*':
@@ -154,7 +155,8 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
                 for c in forecast_definition["interaction_terms"][t]:
                     df['{}-x-{}'.format(t, c)] = df[t] + df[c]
 
-    df = cull_empty_partitions(df)
     df[forecast_definition["time_index"]] = dd.to_datetime(df[forecast_definition["time_index"]])
     df = df.sort_values(forecast_definition["time_index"])
+    df = df.repartition(npartitions=npartitions)
+    df = cull_empty_partitions(df)
     return df

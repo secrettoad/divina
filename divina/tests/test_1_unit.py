@@ -11,6 +11,7 @@ import joblib
 import pandas as pd
 import dask.dataframe as ddf
 from jsonschema import validate
+import plotly.graph_objects as go
 
 
 def test_validate_forecast_definition(
@@ -107,7 +108,7 @@ def test_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_boot
 
 
 def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
-                           test_model_retail, dask_client, test_bootstrap_models_retail, random_state):
+                      test_model_retail, dask_client, test_bootstrap_models_retail, random_state):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
         os.path.join(
@@ -143,7 +144,7 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
                 os.path.join(
                     vision_path,
                     "models",
-                    "s-20150718-000000_h-2",
+                    "h-2",
                 )
             )
         ),
@@ -156,7 +157,7 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
                     os.path.join(
                         vision_path,
                         "models/bootstrap",
-                        "s-20150718-000000_h-2_r-{}".format(seed),
+                        "h-2_r-{}".format(seed),
                     )
                 )
             ),
@@ -232,8 +233,8 @@ def test_forecast(
 
 
 def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
-                             test_model_retail, test_val_predictions_retail, test_forecast_retail,
-                             test_bootstrap_models_retail, dask_client, random_state):
+                         test_model_retail, test_val_predictions_retail, test_forecast_retail,
+                         test_bootstrap_models_retail, dask_client, random_state):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
         os.path.join(
@@ -296,6 +297,27 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
         read_path=vision_path,
         write_path=vision_path
     )
+    result_df = ddf.read_parquet(
+        os.path.join(
+            vision_path,
+            "forecast"
+        )
+    ).compute().reset_index(drop=True)
+    fig = go.Figure(
+        layout=go.Layout(
+            title=go.layout.Title(text="A Figure Specified By A Graph Object")
+        )
+    )
+    fig.add_trace(go.Scatter(mode="lines", x=test_df_retail_sales[test_fd_retail["forecast_definition"]['time_index']],
+                             y=test_df_retail_sales[test_fd_retail["forecast_definition"]['target']]))
+    for h in test_fd_retail["forecast_definition"]['time_horizons']:
+        fig.add_trace(go.Scatter(mode="lines", x=result_df[test_fd_retail["forecast_definition"]['time_index']],
+                                 y=result_df['{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'], h)].shift(h)))
+        for i in test_fd_retail["forecast_definition"]['confidence_intervals']:
+            fig.add_trace(go.Scatter(mode="lines", x=result_df[test_fd_retail["forecast_definition"]['time_index']],
+                                     y=result_df[
+                                         '{}_h_{}_pred_c_{}'.format(test_fd_retail["forecast_definition"]['target'], h, i)].shift(h)))
+    fig.write_html('test_forecast_retail.html')
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
             os.path.join(
@@ -379,8 +401,8 @@ def test_validate(
 
 
 def test_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
-                              test_val_predictions_retail, test_metrics_retail, test_model_retail,
-                              test_bootstrap_models_retail, dask_client):
+                         test_val_predictions_retail, test_metrics_retail, test_model_retail,
+                         test_bootstrap_models_retail, dask_client):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
         os.path.join(
