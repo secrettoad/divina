@@ -1,504 +1,720 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema",
-  "$id": "http://example.com/example.json",
-  "type": "object",
-  "title": "The root schema",
-  "description": "The root schema comprises the entire JSON document.",
-  "default": {},
-  "examples": [
-    {
-      "forecast_definition": {
-        "time_index": "a",
-        "target": "c",
-        "time_validation_splits": [
-          "1970-01-01 00:00:07"
-        ],
-        "validate_start": "1970-01-01 00:00:01",
-        "validate_end": "1970-01-01 00:00:09",
-        "forecast_start": "1970-01-01 00:00:05",
-        "forecast_end": "1970-01-01 00:00:14",
-        "forecast_freq": "S",
-        "confidence_intervals": [
-          90
-        ],
-        "bootstrap_sample": 5,
-        "bin_features": [
-          "b"
-        ],
-        "scenarios": {
-          "b": {
-            "values": [
-              [
-                0,
-                5
-              ],
-              7,
-              "red"
-            ],
-            "start": "1970-01-01 00:00:09",
-            "end": "1970-01-01 00:00:14"
-          }
-        },
-        "time_horizons": [
-          1
-        ],
-        "dataset_directory": "divina-test/dataset/test1",
-        "model": "LinearRegression"
-      }
-    }
-  ],
-  "required": [
-    "forecast_definition"
-  ],
-  "properties": {
-    "forecast_definition": {
-      "$id": "#/properties/forecast_definition",
-      "type": "object",
-      "title": "The forecast_definition schema",
-      "description": "An explanation about the purpose of this instance.",
-      "default": {},
-      "examples": [
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "title": "The root schema",
+    "description": "The root schema comprises the entire JSON document.",
+    "default": {},
+    "examples": [
         {
-          "time_index": "a",
-          "target": "c",
-          "time_validation_splits": [
-            "1970-01-01 00:00:07"
-          ],
-          "validate_start": "1970-01-01 00:00:01",
-          "validate_end": "1970-01-01 00:00:09",
-          "forecast_start": "1970-01-01 00:00:05",
-          "forecast_end": "1970-01-01 00:00:14",
-          "forecast_freq": "S",
-          "confidence_intervals": [
-            90
-          ],
-          "bootstrap_sample": 5,
-          "bin_features": [
-            "b"
-          ],
-          "scenarios": {
-            "b": {
-              "values": [
-                [
-                  0,
-                  5
+            "forecast_definition": {
+                "time_index": "Date",
+                "target": "Sales",
+                "include_features": [
+                    "Store",
+                    "Open",
+                    "Promo",
+                    "StateHoliday",
+                    "SchoolHoliday",
+                    "DayOfWeek",
+                    "LastDayOfMonth",
+                    "DayOfMonth",
+                    "WeekOfYear",
+                    "MonthOfYear"
                 ],
-                7,
-                "red"
-              ],
-              "start": "1970-01-01 00:00:09",
-              "end": "1970-01-01 00:00:14"
-            }
-          },
-          "time_horizons": [
-            1
-          ],
-          "dataset_directory": "divina-test/dataset/test1",
-          "model": "LinearRegression"
-        }
-      ],
-      "required": [
-        "time_index",
-        "target",
-        "time_horizons",
-        "dataset_directory"
-      ],
-      "properties": {
-        "time_index": {
-          "$id": "#/properties/forecast_definition/properties/time_index",
-          "type": "string",
-          "title": "The time_index schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "a"
-          ]
-        },
-        "target": {
-          "$id": "#/properties/forecast_definition/properties/target",
-          "type": "string",
-          "title": "The target schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "c"
-          ]
-        },
-        "time_validation_splits": {
-          "$id": "#/properties/forecast_definition/properties/time_validation_splits",
-          "type": "array",
-          "title": "The time_validation_splits schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": [],
-          "examples": [
-            [
-              "1970-01-01 00:00:07"
-            ]
-          ],
-          "additionalItems": true,
-          "items": {
-            "$id": "#/properties/forecast_definition/properties/time_validation_splits/items",
-            "anyOf": [
-              {
-                "$id": "#/properties/forecast_definition/properties/time_validation_splits/items/anyOf/0",
-                "type": "string",
-                "title": "The first anyOf schema",
-                "description": "An explanation about the purpose of this instance.",
-                "default": "",
-                "examples": [
-                  "1970-01-01 00:00:07"
-                ]
-              }
-            ]
-          }
-        },
-        "validate_start": {
-          "$id": "#/properties/forecast_definition/properties/validate_start",
-          "type": "string",
-          "title": "The validate_start schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "1970-01-01 00:00:01"
-          ]
-        },
-        "validate_end": {
-          "$id": "#/properties/forecast_definition/properties/validate_end",
-          "type": "string",
-          "title": "The validate_end schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "1970-01-01 00:00:09"
-          ]
-        },
-        "forecast_start": {
-          "$id": "#/properties/forecast_definition/properties/forecast_start",
-          "type": "string",
-          "title": "The forecast_start schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "1970-01-01 00:00:05"
-          ]
-        },
-        "forecast_end": {
-          "$id": "#/properties/forecast_definition/properties/forecast_end",
-          "type": "string",
-          "title": "The forecast_end schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "1970-01-01 00:00:14"
-          ]
-        },
-        "forecast_freq": {
-          "$id": "#/properties/forecast_definition/properties/forecast_freq",
-          "type": "string",
-          "title": "The forecast_freq schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "S"
-          ]
-        },
-        "confidence_intervals": {
-          "$id": "#/properties/forecast_definition/properties/confidence_intervals",
-          "type": "array",
-          "title": "The confidence_intervals schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": [],
-          "examples": [
-            [
-              90
-            ]
-          ],
-          "additionalItems": true,
-          "items": {
-            "$id": "#/properties/forecast_definition/properties/confidence_intervals/items",
-            "anyOf": [
-              {
-                "$id": "#/properties/forecast_definition/properties/confidence_intervals/items/anyOf/0",
-                "type": "integer",
-                "title": "The first anyOf schema",
-                "description": "An explanation about the purpose of this instance.",
-                "default": 0,
-                "examples": [
-                  90
-                ]
-              }
-            ]
-          }
-        },
-        "bootstrap_sample": {
-          "$id": "#/properties/forecast_definition/properties/bootstrap_sample",
-          "type": "integer",
-          "title": "The bootstrap_sample schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": 0,
-          "examples": [
-            5
-          ]
-        },
-        "bin_features": {
-          "$id": "#/properties/forecast_definition/properties/bin_features",
-          "type": "object",
-          "title": "The bin_features schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": [],
-          "examples": [
-            [
-              "b"
-            ]
-          ],
-          "additionalItems": true,
-          "items": {
-            "$id": "#/properties/forecast_definition/properties/bin_features/items",
-            "anyOf": [
-              {
-                "$id": "#/properties/forecast_definition/properties/bin_features/items/anyOf/0",
-                "type": "object",
-                "title": "The first anyOf schema",
-                "description": "An explanation about the purpose of this instance.",
-                "default": "",
-                "examples": [
-                  "b"
+                "time_validation_splits": [
+                    "2015-07-18"
                 ],
-                "items": {
-                  "$id": "#/properties/forecast_definition/properties/bin_features/anyOf/0/0",
-                  "anyOf": [
+                "forecast_end": "2016-01-01",
+                "bootstrap_sample": 5,
+                "signal_dimensions": [
+                    "Store"
+                ],
+                "time_horizons": [
+                    2
+                ],
+                "forecast_freq": "D",
+                "encode_features": [
+                    "StateHoliday",
+                    "DayOfWeek",
+                    "DayOfMonth",
+                    "WeekOfYear",
+                    "MonthOfYear"
+                ],
+                "scenarios": [
                     {
-                      "$id": "#/properties/forecast_definition/properties/bin_features/items/anyOf/0",
-                      "type": "array",
-                      "title": "The first anyOf schema",
-                      "description": "An explanation about the purpose of this instance.",
-                      "default": "",
-                      "examples": [
-                        "[5, 15, 20]"
-                      ],
-                      "items": {
-                        "$id": "#/properties/forecast_definition/properties/bin_features/anyOf/0/0",
-                        "anyOf": [
-                          {
-                            "$id": "#/properties/forecast_definition/properties/bin_features/items/anyOf/0/0/0",
-                            "type": "number",
-                            "title": "The first anyOf schema",
-                            "description": "An explanation about the purpose of this instance.",
-                            "default": "",
-                            "examples": [
-                              "5"
-                            ]
-                          }
-                        ]
-                      }
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-        },
-        "scenarios": {
-          "$id": "#/properties/forecast_definition/properties/scenarios",
-          "type": "object",
-          "title": "The scenarios schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": {},
-          "examples": [
-            {
-              "b": {
-                "values": [
-                  [
-                    0,
-                    5
-                  ],
-                  7,
-                  "red"
-                ],
-                "start": "1970-01-01 00:00:09",
-                "end": "1970-01-01 00:00:14"
-              }
-            }
-          ],
-          "required": [
-            "b"
-          ],
-          "properties": {
-            "b": {
-              "$id": "#/properties/forecast_definition/properties/scenarios/properties/b",
-              "type": "object",
-              "title": "The b schema",
-              "description": "An explanation about the purpose of this instance.",
-              "default": {},
-              "examples": [
-                {
-                  "values": [
-                    [
-                      0,
-                      5
-                    ],
-                    7,
-                    "red"
-                  ],
-                  "start": "1970-01-01 00:00:09",
-                  "end": "1970-01-01 00:00:14"
-                }
-              ],
-              "required": [
-                "values",
-                "start",
-                "end"
-              ],
-              "properties": {
-                "values": {
-                  "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values",
-                  "type": "array",
-                  "title": "The values schema",
-                  "description": "An explanation about the purpose of this instance.",
-                  "default": [],
-                  "examples": [
-                    [
-                      [
-                        0,
-                        5
-                      ],
-                      7
-                    ]
-                  ],
-                  "additionalItems": true,
-                  "items": {
-                    "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items",
-                    "anyOf": [
-                      {
-                        "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/0",
-                        "type": "array",
-                        "title": "The first anyOf schema",
-                        "description": "An explanation about the purpose of this instance.",
-                        "default": [],
-                        "examples": [
-                          [
+                        "feature": "Promo",
+                        "values": [
                             0,
-                            5
-                          ]
+                            1
                         ],
-                        "additionalItems": true,
-                        "items": {
-                          "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/0/items",
-                          "anyOf": [
-                            {
-                              "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/0/items/anyOf/0",
-                              "type": "integer",
-                              "title": "The first anyOf schema",
-                              "description": "An explanation about the purpose of this instance.",
-                              "default": 0,
-                              "examples": [
-                                0,
-                                5
-                              ]
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/1",
-                        "type": "integer",
-                        "title": "The second anyOf schema",
-                        "description": "An explanation about the purpose of this instance.",
-                        "default": 0,
-                        "examples": [
-                          7
-                        ]
-                      },
-                      {
-                        "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/2",
-                        "type": "string",
-                        "title": "The third anyOf schema",
-                        "description": "An explanation about the purpose of this instance.",
-                        "default": "",
-                        "examples": [
-                          "red"
-                        ]
-                      }
-                    ]
-                  }
-                },
-                "start": {
-                  "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/start",
-                  "type": "string",
-                  "title": "The start schema",
-                  "description": "An explanation about the purpose of this instance.",
-                  "default": "",
-                  "examples": [
-                    "1970-01-01 00:00:09"
-                  ]
-                },
-                "end": {
-                  "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/end",
-                  "type": "string",
-                  "title": "The end schema",
-                  "description": "An explanation about the purpose of this instance.",
-                  "default": "",
-                  "examples": [
-                    "1970-01-01 00:00:14"
-                  ]
-                }
-              },
-              "additionalProperties": true
-            }
-          },
-          "additionalProperties": true
-        },
-        "time_horizons": {
-          "$id": "#/properties/forecast_definition/properties/time_horizons",
-          "type": "array",
-          "title": "The time_horizons schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": [],
-          "examples": [
-            [
-              1
-            ]
-          ],
-          "additionalItems": true,
-          "items": {
-            "$id": "#/properties/forecast_definition/properties/time_horizons/items",
-            "anyOf": [
-              {
-                "$id": "#/properties/forecast_definition/properties/time_horizons/items/anyOf/0",
-                "type": "integer",
-                "title": "The first anyOf schema",
-                "description": "An explanation about the purpose of this instance.",
-                "default": 0,
-                "examples": [
-                  1
+                        "start": "2015-08-01",
+                        "end": "2016-01-01"
+                    },
+                    {
+                        "feature": "Open",
+                        "values": [
+                            1
+                        ],
+                        "start": "2015-08-01",
+                        "end": "2016-01-01"
+                    },
+                    {
+                        "feature": "StateHoliday",
+                        "values": [
+                            "a",
+                            "b",
+                            "c",
+                            "z"
+                        ],
+                        "start": "2015-08-01",
+                        "end": "2016-01-01"
+                    },
+                    {
+                        "feature": "SchoolHoliday",
+                        "values": [
+                            0,
+                            1
+                        ],
+                        "start": "2015-08-01",
+                        "end": "2016-01-01"
+                    }
+                ],
+                "dataset_directory": "dataset/retail/sales2",
+                "link_function": "log",
+                "confidence_intervals": [
+                    90,
+                    10
+                ],
+                "joins": [
+                    {
+                        "dataset_directory": "dataset/time",
+                        "join_on": [
+                            "Date",
+                            "Date"
+                        ],
+                        "as": "time"
+                    },
+                    {
+                        "dataset_directory": "dataset/retail/store",
+                        "join_on": [
+                            "Store",
+                            "Store"
+                        ],
+                        "as": "store"
+                    }
                 ]
-              }
-            ]
-          }
-        },
-        "dataset_directory": {
-          "$id": "#/properties/forecast_definition/properties/dataset_directory",
-          "type": "string",
-          "title": "The dataset_directory schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "divina-test/dataset/test1"
-          ]
-        },
-        "model": {
-          "$id": "#/properties/forecast_definition/properties/model",
-          "type": "string",
-          "title": "The model schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "LinearRegression"
-          ]
+            }
         }
-      },
-      "additionalProperties": true
-    }
-  },
-  "additionalProperties": true
+    ],
+    "required": [
+        "forecast_definition"
+    ],
+    "properties": {
+        "forecast_definition": {
+            "$id": "#/properties/forecast_definition",
+            "type": "object",
+            "title": "The forecast_definition schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": {},
+            "examples": [
+                {
+                    "time_index": "Date",
+                    "target": "Sales",
+                    "include_features": [
+                        "Store",
+                        "Open",
+                        "Promo",
+                        "StateHoliday",
+                        "SchoolHoliday",
+                        "DayOfWeek",
+                        "LastDayOfMonth",
+                        "DayOfMonth",
+                        "WeekOfYear",
+                        "MonthOfYear"
+                    ],
+                    "time_validation_splits": [
+                        "2015-07-18"
+                    ],
+                    "forecast_end": "2016-01-01",
+                    "bootstrap_sample": 5,
+                    "signal_dimensions": [
+                        "Store"
+                    ],
+                    "time_horizons": [
+                        2
+                    ],
+                    "forecast_freq": "D",
+                    "encode_features": [
+                        "StateHoliday",
+                        "DayOfWeek",
+                        "DayOfMonth",
+                        "WeekOfYear",
+                        "MonthOfYear"
+                    ],
+                    "scenarios": [
+                        {
+                            "feature": "Promo",
+                            "values": [
+                                0,
+                                1
+                            ],
+                            "start": "2015-08-01",
+                            "end": "2016-01-01"
+                        },
+                        {
+                            "feature": "Open",
+                            "values": [
+                                1
+                            ],
+                            "start": "2015-08-01",
+                            "end": "2016-01-01"
+                        },
+                        {
+                            "feature": "StateHoliday",
+                            "values": [
+                                "a",
+                                "b",
+                                "c",
+                                "z"
+                            ],
+                            "start": "2015-08-01",
+                            "end": "2016-01-01"
+                        },
+                        {
+                            "feature": "SchoolHoliday",
+                            "values": [
+                                0,
+                                1
+                            ],
+                            "start": "2015-08-01",
+                            "end": "2016-01-01"
+                        }
+                    ],
+                    "dataset_directory": "dataset/retail/sales2",
+                    "link_function": "log",
+                    "confidence_intervals": [
+                        90,
+                        10
+                    ],
+                    "joins": [
+                        {
+                            "dataset_directory": "dataset/time",
+                            "join_on": [
+                                "Date",
+                                "Date"
+                            ],
+                            "as": "time"
+                        },
+                        {
+                            "dataset_directory": "dataset/retail/store",
+                            "join_on": [
+                                "Store",
+                                "Store"
+                            ],
+                            "as": "store"
+                        }
+                    ]
+                }
+            ],
+            "required": [
+                "time_index",
+                "target",
+                "include_features",
+                "time_validation_splits",
+                "forecast_end",
+                "bootstrap_sample",
+                "signal_dimensions",
+                "time_horizons",
+                "forecast_freq",
+                "encode_features",
+                "scenarios",
+                "dataset_directory",
+                "link_function",
+                "confidence_intervals",
+                "joins"
+            ],
+            "properties": {
+                "time_index": {
+                    "$id": "#/properties/forecast_definition/properties/time_index",
+                    "type": "string",
+                    "title": "The time_index schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "Date"
+                    ]
+                },
+                "target": {
+                    "$id": "#/properties/forecast_definition/properties/target",
+                    "type": "string",
+                    "title": "The target schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "Sales"
+                    ]
+                },
+                "include_features": {
+                    "$id": "#/properties/forecast_definition/properties/include_features",
+                    "type": "array",
+                    "title": "The include_features schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            "Store",
+                            "Open"
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/forecast_definition/properties/include_features/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/forecast_definition/properties/include_features/items/anyOf/0",
+                                "type": "string",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": "",
+                                "examples": [
+                                    "Store",
+                                    "Open"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "time_validation_splits": {
+                    "$id": "#/properties/forecast_definition/properties/time_validation_splits",
+                    "type": "array",
+                    "title": "The time_validation_splits schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            "2015-07-18"
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/forecast_definition/properties/time_validation_splits/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/forecast_definition/properties/time_validation_splits/items/anyOf/0",
+                                "type": "string",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": "",
+                                "examples": [
+                                    "2015-07-18"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "forecast_end": {
+                    "$id": "#/properties/forecast_definition/properties/forecast_end",
+                    "type": "string",
+                    "title": "The forecast_end schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "2016-01-01"
+                    ]
+                },
+                "bootstrap_sample": {
+                    "$id": "#/properties/forecast_definition/properties/bootstrap_sample",
+                    "type": "integer",
+                    "title": "The bootstrap_sample schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": 0,
+                    "examples": [
+                        5
+                    ]
+                },
+                "signal_dimensions": {
+                    "$id": "#/properties/forecast_definition/properties/signal_dimensions",
+                    "type": "array",
+                    "title": "The signal_dimensions schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            "Store"
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/forecast_definition/properties/signal_dimensions/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/forecast_definition/properties/signal_dimensions/items/anyOf/0",
+                                "type": "string",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": "",
+                                "examples": [
+                                    "Store"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "time_horizons": {
+                    "$id": "#/properties/forecast_definition/properties/time_horizons",
+                    "type": "array",
+                    "title": "The time_horizons schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            2
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/forecast_definition/properties/time_horizons/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/forecast_definition/properties/time_horizons/items/anyOf/0",
+                                "type": "integer",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": 0,
+                                "examples": [
+                                    2
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "forecast_freq": {
+                    "$id": "#/properties/forecast_definition/properties/forecast_freq",
+                    "type": "string",
+                    "title": "The forecast_freq schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "D"
+                    ]
+                },
+                "encode_features": {
+                    "$id": "#/properties/forecast_definition/properties/encode_features",
+                    "type": "array",
+                    "title": "The encode_features schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            "StateHoliday",
+                            "DayOfWeek"
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/forecast_definition/properties/encode_features/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/forecast_definition/properties/encode_features/items/anyOf/0",
+                                "type": "string",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": "",
+                                "examples": [
+                                    "StateHoliday",
+                                    "DayOfWeek"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "scenarios": {
+                    "$id": "#/properties/forecast_definition/properties/scenarios",
+                    "type": "array",
+                    "title": "The scenarios schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            {
+                                "feature": "Promo",
+                                "values": [
+                                    0,
+                                    1
+                                ],
+                                "start": "2015-08-01",
+                                "end": "2016-01-01"
+                            },
+                            {
+                                "feature": "Open",
+                                "values": [
+                                    1
+                                ],
+                                "start": "2015-08-01",
+                                "end": "2016-01-01"
+                            }
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/forecast_definition/properties/scenarios/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0",
+                                "type": "object",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": {},
+                                "examples": [
+                                    {
+                                        "feature": "Promo",
+                                        "values": [
+                                            0,
+                                            1
+                                        ],
+                                        "start": "2015-08-01",
+                                        "end": "2016-01-01"
+                                    }
+                                ],
+                                "required": [
+                                    "feature",
+                                    "values",
+                                    "start",
+                                    "end"
+                                ],
+                                "properties": {
+                                    "feature": {
+                                        "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0/properties/feature",
+                                        "type": "string",
+                                        "title": "The feature schema",
+                                        "description": "An explanation about the purpose of this instance.",
+                                        "default": "",
+                                        "examples": [
+                                            "Promo"
+                                        ]
+                                    },
+                                    "values": {
+                                        "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0/properties/values",
+                                        "type": "array",
+                                        "title": "The values schema",
+                                        "description": "An explanation about the purpose of this instance.",
+                                        "default": [],
+                                        "examples": [
+                                            [
+                                                0,
+                                                1
+                                            ]
+                                        ],
+                                        "additionalItems": true,
+                                        "items": {
+                                            "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0/properties/values/items",
+                                            "anyOf": [
+                                                {
+                                                    "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0/properties/values/items/anyOf/0",
+                                                    "default": 0,
+                                                    "description": "An explanation about the purpose of this instance.",
+                                                    "examples": [
+                                                        0,
+                                                        1
+                                                    ],
+                                                    "title": "The first anyOf schema",
+                                                    "type": [
+                                                        "integer",
+                                                        "array",
+                                                        "string",
+                                                        "number"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "start": {
+                                        "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0/properties/start",
+                                        "type": "string",
+                                        "title": "The start schema",
+                                        "description": "An explanation about the purpose of this instance.",
+                                        "default": "",
+                                        "examples": [
+                                            "2015-08-01"
+                                        ]
+                                    },
+                                    "end": {
+                                        "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0/properties/end",
+                                        "type": "string",
+                                        "title": "The end schema",
+                                        "description": "An explanation about the purpose of this instance.",
+                                        "default": "",
+                                        "examples": [
+                                            "2016-01-01"
+                                        ]
+                                    }
+                                },
+                                "additionalProperties": true
+                            }
+                        ]
+                    }
+                },
+                "dataset_directory": {
+                    "$id": "#/properties/forecast_definition/properties/dataset_directory",
+                    "type": "string",
+                    "title": "The dataset_directory schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "dataset/retail/sales2"
+                    ]
+                },
+                "link_function": {
+                    "$id": "#/properties/forecast_definition/properties/link_function",
+                    "type": "string",
+                    "title": "The link_function schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "log"
+                    ]
+                },
+                "confidence_intervals": {
+                    "$id": "#/properties/forecast_definition/properties/confidence_intervals",
+                    "type": "array",
+                    "title": "The confidence_intervals schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            90,
+                            10
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/forecast_definition/properties/confidence_intervals/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/forecast_definition/properties/confidence_intervals/items/anyOf/0",
+                                "type": "integer",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": 0,
+                                "examples": [
+                                    90,
+                                    10
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "joins": {
+                    "$id": "#/properties/forecast_definition/properties/joins",
+                    "type": "array",
+                    "title": "The joins schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            {
+                                "dataset_directory": "dataset/time",
+                                "join_on": [
+                                    "Date",
+                                    "Date"
+                                ],
+                                "as": "time"
+                            },
+                            {
+                                "dataset_directory": "dataset/retail/store",
+                                "join_on": [
+                                    "Store",
+                                    "Store"
+                                ],
+                                "as": "store"
+                            }
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/forecast_definition/properties/joins/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/forecast_definition/properties/joins/items/anyOf/0",
+                                "type": "object",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": {},
+                                "examples": [
+                                    {
+                                        "dataset_directory": "dataset/time",
+                                        "join_on": [
+                                            "Date",
+                                            "Date"
+                                        ],
+                                        "as": "time"
+                                    }
+                                ],
+                                "required": [
+                                    "dataset_directory",
+                                    "join_on",
+                                    "as"
+                                ],
+                                "properties": {
+                                    "dataset_directory": {
+                                        "$id": "#/properties/forecast_definition/properties/joins/items/anyOf/0/properties/dataset_directory",
+                                        "type": "string",
+                                        "title": "The dataset_directory schema",
+                                        "description": "An explanation about the purpose of this instance.",
+                                        "default": "",
+                                        "examples": [
+                                            "dataset/time"
+                                        ]
+                                    },
+                                    "join_on": {
+                                        "$id": "#/properties/forecast_definition/properties/joins/items/anyOf/0/properties/join_on",
+                                        "type": "array",
+                                        "title": "The join_on schema",
+                                        "description": "An explanation about the purpose of this instance.",
+                                        "default": [],
+                                        "examples": [
+                                            [
+                                                "Date",
+                                                "Date"
+                                            ]
+                                        ],
+                                        "additionalItems": true,
+                                        "items": {
+                                            "$id": "#/properties/forecast_definition/properties/joins/items/anyOf/0/properties/join_on/items",
+                                            "anyOf": [
+                                                {
+                                                    "$id": "#/properties/forecast_definition/properties/joins/items/anyOf/0/properties/join_on/items/anyOf/0",
+                                                    "type": "string",
+                                                    "title": "The first anyOf schema",
+                                                    "description": "An explanation about the purpose of this instance.",
+                                                    "default": "",
+                                                    "examples": [
+                                                        "Date"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "as": {
+                                        "$id": "#/properties/forecast_definition/properties/joins/items/anyOf/0/properties/as",
+                                        "type": "string",
+                                        "title": "The as schema",
+                                        "description": "An explanation about the purpose of this instance.",
+                                        "default": "",
+                                        "examples": [
+                                            "time"
+                                        ]
+                                    }
+                                },
+                                "additionalProperties": true
+                            }
+                        ]
+                    }
+                }
+            },
+            "additionalProperties": true
+        }
+    },
+    "additionalProperties": true
 }

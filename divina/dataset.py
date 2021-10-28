@@ -87,26 +87,25 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
 
     if "scenarios" in forecast_definition:
         for x in forecast_definition["scenarios"]:
-
-            scenario_ranges = [x for x in forecast_definition["scenarios"][x]["values"] if type(x) == list]
+            scenario_ranges = [c for c in x["values"] if type(c) == list]
             if len(scenario_ranges) > 0:
-                forecast_definition["scenarios"][x]["values"] = [x for x in
-                                                                 forecast_definition["scenarios"][x]["values"] if
-                                                                 type(x) == int]
+                x["values"] = [c for c in
+                               x["values"] if
+                               type(c) == int]
                 for y in scenario_ranges:
-                    forecast_definition["scenarios"][x]["values"] = set(
-                        forecast_definition["scenarios"][x]["values"] + list(range(y[0], y[1] + 1)))
+                    x["values"] = set(
+                        x["values"] + list(range(y[0], y[1] + 1)))
 
-            df_scenario = df[(df[forecast_definition["time_index"]] <= pd.to_datetime(
-                str(forecast_definition["scenarios"][x]["end"]))) & (
-                                     df[forecast_definition["time_index"]] >= pd.to_datetime(
-                                 str(forecast_definition["scenarios"][x]["start"])))]
-            df = df[(df[forecast_definition["time_index"]] > pd.to_datetime(
-                str(forecast_definition["scenarios"][x]["end"]))) | (
-                            df[forecast_definition["time_index"]] < pd.to_datetime(
-                        str(forecast_definition["scenarios"][x]["start"])))]
-            for v in forecast_definition["scenarios"][x]["values"]:
-                df_scenario[x] = v
+            df_scenario = df[(dd.to_datetime(df[forecast_definition["time_index"]]) <= pd.to_datetime(
+                str(x["end"]))) & (
+                                     dd.to_datetime(df[forecast_definition["time_index"]]) >= pd.to_datetime(
+                                 str(x["start"])))]
+            df = df[(dd.to_datetime(df[forecast_definition["time_index"]]) > pd.to_datetime(
+                str(x["end"]))) | (
+                            dd.to_datetime(df[forecast_definition["time_index"]]) < pd.to_datetime(
+                        str(x["start"])))]
+            for v in x["values"]:
+                df_scenario[x["feature"]] = v
                 df = df.append(df_scenario)
 
     if "bin_features" in forecast_definition:

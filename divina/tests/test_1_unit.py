@@ -37,7 +37,7 @@ def test_validate_forecast_definition(
             with open(pathlib.Path(pathlib.Path(__file__).parent.parent, 'config/fd_schema.json'), 'r') as f:
                 validate(instance=dd, schema=json.load(f))
         except ValidationError:
-            assert True
+            return None
         else:
             assert False
 
