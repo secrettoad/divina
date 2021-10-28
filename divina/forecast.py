@@ -135,16 +135,7 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
         forecast_df[forecast_definition["time_index"]] = dd.to_datetime(forecast_df[forecast_definition["time_index"]])
 
         dd.to_parquet(
-            forecast_df[
-                [forecast_definition["time_index"]]
-                + [
-                    "{}_h_{}_pred".format(forecast_definition["target"], h)
-                    for h in forecast_definition["time_horizons"]
-                ] + [
-                    "{}_h_{}_pred_c_{}".format(forecast_definition["target"], h, c)
-                    for c in forecast_definition["confidence_intervals"] for h in forecast_definition["time_horizons"]
-                ]
-                ],
+            forecast_df,
             "{}/forecast".format(
                 write_path,
             )
