@@ -14,9 +14,11 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
     df = dd.read_parquet("{}/*".format(forecast_definition["dataset_directory"]))
     npartitions = df.npartitions
 
+    df[forecast_definition["time_index"]] = dd.to_datetime(df[forecast_definition["time_index"]])
+
     time_min, time_max = (
-        pd.to_datetime(str(df[forecast_definition["time_index"]].min().compute())),
-        pd.to_datetime(str(df[forecast_definition["time_index"]].max().compute())),
+       df[forecast_definition["time_index"]].min().compute(),
+       df[forecast_definition["time_index"]].max().compute(),
     )
 
     if "signal_dimensions" in forecast_definition:
@@ -76,7 +78,7 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
                 join_df = dd.read_parquet("{}/*".format(join["dataset_directory"]))
             except IndexError:
                 raise Exception("Could not load dataset {}. No parquet files found.".format(join["dataset_directory"]))
-            join_df[join["join_on"][1]] = join_df[join["join_on"][1]].astype(df[join["join_on"][0]].dtype)
+            join_df[join["join_on"][0]] = join_df[join["join_on"][0]].astype(df[join["join_on"][1]].dtype)
             df = df.merge(
                 join_df,
                 how="left",
