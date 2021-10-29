@@ -220,19 +220,7 @@
             "required": [
                 "time_index",
                 "target",
-                "include_features",
-                "time_validation_splits",
-                "forecast_end",
-                "bootstrap_sample",
-                "signal_dimensions",
-                "time_horizons",
-                "forecast_freq",
-                "encode_features",
-                "scenarios",
-                "dataset_directory",
-                "link_function",
-                "confidence_intervals",
-                "joins"
+                "dataset_directory"
             ],
             "properties": {
                 "time_index": {
