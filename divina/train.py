@@ -23,7 +23,8 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
         model = dask_model()
 
     df_train = df[~df[target].isnull()]
-    constant_columns = [c for c in df_train.columns if df_train[c].nunique().compute() == 1]
+    df_std = df_train[features].std().compute()
+    constant_columns = [c for c in df_std.index if df_std[c] == 0]
     features = [
         c
         for c in features
@@ -76,7 +77,8 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
                 bootstrap_model = dask_model(random_state=random_seed)
             else:
                 bootstrap_model = dask_model()
-            bootstrap_features = [c for c in features if not df_train_bootstrap[c].nunique().compute() == 1]
+            df_std_bootstrap = df_train_bootstrap[features].std().compute()
+            bootstrap_features = [c for c in features if not df_std_bootstrap.loc[c] == 0]
             if link_function == 'log':
                 bootstrap_model.fit(
                     df_train_bootstrap[bootstrap_features].to_dask_array(lengths=True),
@@ -123,7 +125,7 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
             partial(train_persist_bootstrap_model, features, df_train,
                     target,
                     link_function,
-                    model_name)).compute(scheduler='single-threaded')
+                    model_name)).compute()
 
         return model, bootstrap_models
 
