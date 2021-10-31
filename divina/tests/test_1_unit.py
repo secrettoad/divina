@@ -308,25 +308,60 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             "forecast"
         )
     ).compute().reset_index(drop=True)
-    for p in [0,1]:
-        result_df_promo = result_df[result_df.Promo == p]
-        for h in test_fd_retail["forecast_definition"]['time_horizons']:
-            fig = go.Figure(
-                layout=go.Layout(
-                    title=go.layout.Title(text="A Figure Specified By A Graph Object")
-                )
-            )
-            fig.add_trace(
-                go.Scatter(mode="lines", x=test_df_retail_sales[test_fd_retail["forecast_definition"]['time_index']],
-                           y=test_df_retail_sales[test_fd_retail["forecast_definition"]['target']], name="truth"))
-            fig.add_trace(go.Scatter(mode="lines", x=result_df_promo[test_fd_retail["forecast_definition"]['time_index']],
-                                     y=result_df_promo['{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'], h)].shift(h), name="h_{}".format(h)))
-            for i in test_fd_retail["forecast_definition"]['confidence_intervals']:
-                fig.add_trace(go.Scatter(mode="lines", x=result_df_promo[test_fd_retail["forecast_definition"]['time_index']],
-                                         y=result_df_promo[
-                                             '{}_h_{}_pred_c_{}'.format(test_fd_retail["forecast_definition"]['target'], h, i)].shift(h), name="h_{}_c_{}".format(h, i)))
-            fig.update_traces(fill='tonexty', selector=dict(name="h_{}_c_{}".format(h, test_fd_retail["forecast_definition"]['confidence_intervals'][-1])))
-            fig.write_html('test_forecast_retail_h_{}_promo_{}.html'.format(h, p))
+    pathlib.Path(
+        "plots"
+    ).mkdir(parents=True, exist_ok=True)
+    fig = go.Figure(
+        layout=go.Layout(
+            title=go.layout.Title(text="A Figure Specified By A Graph Object")
+        )
+    )
+    for h in test_fd_retail["forecast_definition"]['time_horizons']:
+        result_df_2d = result_df.sort_values('Promo').groupby('Date').agg('first').reset_index()
+        for i in test_fd_retail["forecast_definition"]['confidence_intervals']:
+            fig.add_trace(go.Scatter(marker=dict(color='Blue'), mode="lines",
+                                     x=result_df_2d[test_fd_retail["forecast_definition"]['time_index']],
+                                     y=result_df_2d[
+                                         '{}_h_{}_pred_c_{}'.format(test_fd_retail["forecast_definition"]['target'],
+                                                                    h, i)], name="h_{}_c_{}".format(h, i)))
+        fig.update_traces(fill='tonexty', selector=dict(
+            name="h_{}_c_{}".format(h, test_fd_retail["forecast_definition"]['confidence_intervals'][-1])))
+        fig.add_trace(
+            go.Scatter(marker=dict(color='Black'), mode="lines",
+                       x=test_df_retail_sales[test_fd_retail["forecast_definition"]['time_index']],
+                       y=test_df_retail_sales[test_fd_retail["forecast_definition"]['target']], name="truth"))
+        fig.add_trace(go.Scatter(marker=dict(color='Red'), mode="lines",
+                                 x=result_df_2d[test_fd_retail["forecast_definition"]['time_index']],
+                                 y=result_df_2d[
+                                     '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
+                                                           h)], name="h_{}".format(h)))
+        fig.write_html('plots/test_forecast_retail_h_{}_2d.html'.format(h))
+    fig = go.Figure(
+        layout=go.Layout(
+            title=go.layout.Title(text="A Figure Specified By A Graph Object")
+        )
+    )
+    for h in test_fd_retail["forecast_definition"]['time_horizons']:
+        result_df_3d = result_df[result_df[test_fd_retail["forecast_definition"]['time_index']] >= '08-01-2015']
+        for i in test_fd_retail["forecast_definition"]['confidence_intervals']:
+            fig.add_trace(go.Surface(x=result_df_3d[test_fd_retail["forecast_definition"]['time_index']].unique(),
+                                     z=[result_df_3d[result_df_3d['Promo'] == 0][
+                                         '{}_h_{}_pred_c_{}'.format(test_fd_retail["forecast_definition"]['target'],
+                                                                    h, i)].values, result_df_3d[result_df_3d['Promo'] == 1][
+                                         '{}_h_{}_pred_c_{}'.format(test_fd_retail["forecast_definition"]['target'],
+                                                                    h, i)].values],
+                                     y=result_df_3d['Promo'].unique()))
+        '''fig.add_trace(
+            go.Surface(
+                       x=test_df_retail_sales[test_fd_retail["forecast_definition"]['time_index']],
+                       z=test_df_retail_sales[test_fd_retail["forecast_definition"]['target']], y=result_df_3d['Promo'],
+                       name="truth"))
+        fig.add_trace(go.Surface(
+                                 x=result_df_3d[test_fd_retail["forecast_definition"]['time_index']],
+                                 z=result_df_3d[
+                                     '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
+                                                           h)], y=result_df_3d['Promo'], name="h_{}".format(h)))'''
+        fig.write_html('plots/test_forecast_retail_h_{}_3d.html'.format(h))
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
             os.path.join(
