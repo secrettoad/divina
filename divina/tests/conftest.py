@@ -200,26 +200,20 @@ def test_model_1(test_df_1, random_state, test_fd_1):
     model.coef_ = np.array(params)
     model.intercept_ = intercept
     model._coef = np.array(params + [intercept])
-    return (model, {"params": {f: c for f, c in zip(features, [intercept] + params)}})
+    return (model, {"params": {f: c for f, c in zip(features, params)}})
 
 
 @pytest.fixture()
 def test_model_retail(test_df_1, random_state, test_fd_1):
-    params = [7.590629527751595, -0.4168572808786085, 0.010925907309850878, 0.2799784009152658, 0.41685771462138027,
-              0.559612229671561, 0.6053793270928081, 0.7243317875555008, 0.5257454418529863, -3.706648609469239,
-              0.5727582262743428, 0.041242474438584156, 0.48795463528528316, 0.5346672084741427, 0.751490274495951,
-              0.263377351712863, 0.23346362705895096, 0.5778595049653592, -3.3000175997266337, 0.6876410670504797,
-              0.6322753860791753, 0.4828332692767577, 0.4584858218915188, -3.4403200753143013, 0.588939024932829,
-              0.2667369612563883, 0.5425191970467125, 0.48409241686815374, 0.7163856760343319, 0.5067036598551107,
-              0.6339288839409306, 0.7108781138655268]
-    intercept = -0.1019028186184816
-    features = ["Promo", "SchoolHoliday", "Weekday_0.0", "Weekday_2.0", "Weekday_4.0", "Weekday_6.0",
-                "Weekday_1.0", "Weekday_5.0", "Weekday_3.0", "DayOfMonth_19.0", "DayOfMonth_21.0",
-                "DayOfMonth_23.0", "DayOfMonth_25.0", "DayOfMonth_27.0", "DayOfMonth_28.0", "DayOfMonth_7.0",
-                "DayOfMonth_10.0", "DayOfMonth_13.0", "DayOfMonth_16.0", "DayOfMonth_20.0", "DayOfMonth_22.0",
-                "DayOfMonth_24.0", "DayOfMonth_26.0", "DayOfMonth_29.0", "DayOfMonth_8.0", "DayOfMonth_9.0",
-                "DayOfMonth_11.0", "DayOfMonth_12.0", "DayOfMonth_14.0", "DayOfMonth_15.0", "DayOfMonth_17.0",
-                "DayOfMonth_18.0"]
+    params = [7.037158170969071, 0.4932340350688223, 0.27259342357812283, 0.18940264900594353, -3.6834622221000717,
+              0.4984087190231185, 0.5368146044322767, 0.49909604923189516, 0.487186048658764, 0.6179858352023053,
+              0.5021278348261174, -3.385064917603151, 0.5330286617997554, 0.41455435987080824, 0.18775054632565508,
+              0.15306128463281526, 0.6284985207120164, 0.6795648992676631, 0.40046449375304205, -3.359386388458164,
+              0.4558462123976466, 0.32753112486200764, 0.4047017669158538, 0.7156131294903266, 0.4747486484045316,
+              0.45976607692456334, 0.5064120143313671, 0.6447829633588602, -3.3850649176031515, 0.19104786904854365,
+              0.18940264900594353, 0.6928306163987392, 0.6569387471664435, 0.34607755993840705, 0.41276666500878173]
+    intercept = 0.6542184768053281
+    features = ['Promo', 'SchoolHoliday', 'LastDayOfMonth', 'Weekday_6.0', 'Weekday_3.0', 'Weekday_0.0', 'Weekday_1.0', 'Weekday_2.0', 'Weekday_5.0', 'Weekday_4.0', 'DayOfMonth_19.0', 'DayOfMonth_23.0', 'DayOfMonth_27.0', 'DayOfMonth_28.0', 'DayOfMonth_29.0', 'DayOfMonth_7.0', 'DayOfMonth_8.0', 'DayOfMonth_11.0', 'DayOfMonth_12.0', 'DayOfMonth_14.0', 'DayOfMonth_16.0', 'DayOfMonth_17.0', 'DayOfMonth_20.0', 'DayOfMonth_21.0', 'DayOfMonth_22.0', 'DayOfMonth_24.0', 'DayOfMonth_25.0', 'DayOfMonth_26.0', 'DayOfMonth_30.0', 'DayOfMonth_31.0', 'DayOfMonth_9.0', 'DayOfMonth_10.0', 'DayOfMonth_13.0', 'DayOfMonth_15.0', 'DayOfMonth_18.0']
 
     model = LinearRegression()
     model.fit(
@@ -229,7 +223,7 @@ def test_model_retail(test_df_1, random_state, test_fd_1):
     model.coef_ = np.array(params)
     model.intercept_ = intercept
     model._coef = np.array(params + [intercept])
-    return (model, {"params": {f: c for f, c in zip(features, [intercept] + params)}})
+    return (model, {"params": {f: c for f, c in zip(features, params)}})
 
 
 @pytest.fixture()
@@ -260,75 +254,73 @@ def test_bootstrap_models(test_df_1, random_state, test_fd_1):
         model.coef_ = np.array(p)
         model.intercept_ = i
         model._coef = np.array(p + [i])
-        bootstrap_models[seed] = (model, {"params": {_f: c for _f, c in zip(f, [i] + p)}})
+        bootstrap_models[seed] = (model, {"params": {_f: c for _f, c in zip(f, p)}})
     return bootstrap_models
 
 
 @pytest.fixture()
 def test_bootstrap_models_retail(test_df_1, random_state, test_fd_1):
-    params = [[-0.14506670832768434, -0.23232275952547266, 0.20150285165630455, 0.14507498439276545,
-               0.27713364973522986, 0.10221104900967637, 0.31536809193941906, 0.2559513552431588, -3.647847389506965,
-               0.24163391359012484, 0.04678182659155821, 0.17623818052083737, 0.2435980816885483, 0.18484679078064845,
-               0.10926352998806904, -0.020868422031112856, 0.6447880073419305, -0.1470886134243738,
-               -0.11629242568466953, 0.23033142252793867, 0.2432398543645691, -0.052418195664897096,
-               0.016831361903957214, 0.20470484882999093, 0.10976261331097335, 0.6506371953867083, 0.7309318379046927,
-               -3.647847389506965],
-              [-0.5124427262995791, -0.08463509449707678, 0.3729452233136588, 0.512482198394133,
-               0.700251285100012, 0.7432343973751843, 0.8642724320337655, 0.5721274407425915, -3.5947822924566806,
-               0.5804188589797001, 0.22023738533519752, 0.6244587928831947, 0.8909260462901273, 0.36338890618482605,
-               0.23564072668878885, 0.6098628757819881, -3.2306727274108176, 0.8750282485588204, 0.7173164230322971,
-               -3.2548720060739087, 0.6468777240369674, 0.3955350196607907, 0.7008318773375861, 0.5288791098533079,
-               0.7410065451127075, 0.4995481433768048, 0.8642786287759757, -3.1004973227017407],
-              [-0.5012311643844884, -0.010309484921238118, 0.29809637779981607, 0.5012290452763202,
-               0.7240970671453367, 0.701156677178618, 0.7735826006036559, 0.6156584281412932, -3.618723007857756,
-               0.73312439759998, 0.07810173507541884, 0.45547351794606983, 0.6519865298567203, 0.9257017037648314,
-               0.29809637779981607, 0.7886601211450533, -3.04333665995808, 0.8000492449455986, 0.6724194445407347,
-               0.5436078203751433, 0.4301198776195328, -3.337138895210775, 0.569240384830692, 0.7574571093441058,
-               0.6892663022412002, 0.6867895080402127, 0.7674190413801395, -3.269454831041309],
-              [-0.43227397293312364, 0.2353534850658354, 0.1979529587609676, 0.43228082130422735,
-               0.42416578608176664, 0.46185329853401585, 0.6261674418846083, 0.3947978959571063, -3.6787499819307157,
-               0.4017249835338047, 0.5506298713988833, 0.6144498021665386, 0.7784557872093627, 0.1920004237992822,
-               0.1540607917926774, 0.5938229421076817, -3.463253104832229, 0.11521627310634114, 0.5537318795106152,
-               -3.4854939167571706, 0.39934426636652903, 0.18181977436502267, 0.628049583287984, 0.5019491540789822,
-               0.6916020048263761, 0.4171891181546088, 0.11538258056744165, 0.2614036983649554],
-              [-0.5306287923508407, 0.04733673002955241, 0.3209527028227726, 0.5306273909568222,
-               0.6546546224145695, 0.7341850480214894, 0.8280762774334178, 0.6717468402870133, -3.588280980897007,
-               0.7205369406795783, 0.23451003022802092, 0.7670480251225463, 0.26100074844643906, 0.32202159622159676,
-               0.6566744742530832, -3.1992529110984687, 0.8591872664086128, 0.8136082902750973, 0.6711353284019933,
-               0.655390769272413, -3.1946981526454077, 0.6811744050044131, 0.2728499653511513, 0.6065154613320831,
-               0.5731849734526444, 0.8280762774334178, 0.4993203764774724, 0.8670311184508511]]
-    intercepts = [0.0663407344762792, -0.03477010598530712, -0.24238480956883526, -0.1455366328662099,
-                  -0.008186968767883647]
-    features = [["Promo", "SchoolHoliday", "Weekday_0.0", "Weekday_2.0", "Weekday_4.0", "Weekday_6.0",
-                 "Weekday_1.0", "Weekday_5.0", "Weekday_3.0", "DayOfMonth_19.0", "DayOfMonth_23.0",
-                 "DayOfMonth_25.0", "DayOfMonth_27.0", "DayOfMonth_28.0", "DayOfMonth_7.0", "DayOfMonth_13.0",
-                 "DayOfMonth_20.0", "DayOfMonth_22.0", "DayOfMonth_26.0", "DayOfMonth_29.0", "DayOfMonth_8.0",
-                 "DayOfMonth_9.0", "DayOfMonth_11.0", "DayOfMonth_12.0", "DayOfMonth_14.0", "DayOfMonth_15.0",
-                 "DayOfMonth_17.0", "DayOfMonth_18.0"],
-                ["Promo", "SchoolHoliday", "Weekday_0.0", "Weekday_2.0", "Weekday_4.0", "Weekday_6.0",
-                 "Weekday_1.0", "Weekday_5.0", "Weekday_3.0", "DayOfMonth_19.0", "DayOfMonth_21.0",
-                 "DayOfMonth_25.0", "DayOfMonth_27.0", "DayOfMonth_28.0", "DayOfMonth_7.0", "DayOfMonth_10.0",
-                 "DayOfMonth_16.0", "DayOfMonth_20.0", "DayOfMonth_24.0", "DayOfMonth_26.0", "DayOfMonth_29.0",
-                 "DayOfMonth_8.0", "DayOfMonth_9.0", "DayOfMonth_11.0", "DayOfMonth_12.0", "DayOfMonth_14.0",
-                 "DayOfMonth_17.0", "DayOfMonth_18.0"],
-                ["Promo", "SchoolHoliday", "Weekday_0.0", "Weekday_2.0", "Weekday_4.0", "Weekday_6.0",
-                 "Weekday_1.0", "Weekday_5.0", "Weekday_3.0", "DayOfMonth_19.0", "DayOfMonth_21.0",
-                 "DayOfMonth_23.0", "DayOfMonth_25.0", "DayOfMonth_27.0", "DayOfMonth_7.0", "DayOfMonth_10.0",
-                 "DayOfMonth_13.0", "DayOfMonth_16.0", "DayOfMonth_20.0", "DayOfMonth_22.0", "DayOfMonth_24.0",
-                 "DayOfMonth_26.0", "DayOfMonth_8.0", "DayOfMonth_12.0", "DayOfMonth_14.0", "DayOfMonth_15.0",
-                 "DayOfMonth_17.0", "DayOfMonth_18.0"],
-                ["Promo", "SchoolHoliday", "Weekday_0.0", "Weekday_2.0", "Weekday_4.0", "Weekday_6.0",
-                 "Weekday_1.0", "Weekday_5.0", "Weekday_3.0", "DayOfMonth_21.0", "DayOfMonth_23.0",
-                 "DayOfMonth_25.0", "DayOfMonth_27.0", "DayOfMonth_28.0", "DayOfMonth_7.0", "DayOfMonth_10.0",
-                 "DayOfMonth_16.0", "DayOfMonth_20.0", "DayOfMonth_24.0", "DayOfMonth_26.0", "DayOfMonth_29.0",
-                 "DayOfMonth_8.0", "DayOfMonth_9.0", "DayOfMonth_11.0", "DayOfMonth_12.0", "DayOfMonth_14.0",
-                 "DayOfMonth_15.0", "DayOfMonth_18.0"],
-                ["Promo", "SchoolHoliday", "Weekday_0.0", "Weekday_2.0", "Weekday_4.0", "Weekday_6.0",
-                 "Weekday_1.0", "Weekday_5.0", "Weekday_3.0", "DayOfMonth_19.0", "DayOfMonth_21.0",
-                 "DayOfMonth_27.0", "DayOfMonth_28.0", "DayOfMonth_7.0", "DayOfMonth_10.0", "DayOfMonth_13.0",
-                 "DayOfMonth_16.0", "DayOfMonth_20.0", "DayOfMonth_22.0", "DayOfMonth_24.0", "DayOfMonth_26.0",
-                 "DayOfMonth_29.0", "DayOfMonth_8.0", "DayOfMonth_9.0", "DayOfMonth_11.0", "DayOfMonth_12.0",
-                 "DayOfMonth_15.0", "DayOfMonth_17.0"]]
+    params = [[6.643932953270661, 0.6260364498868285, 0.31918623945495733, 0.23423245984677996, -3.547744343528209,
+               0.5963643382718036, 0.5461500634517222, 0.599524608261714, 0.6256869892244343, 0.7922640044073792,
+               0.564301267830736, -3.196111422680582, 0.4778005895412411, 0.16215693805253273, 0.15712633420359842,
+               0.8892764359349725, 0.865254690614509, 0.5854459099996437, -3.1306691705249476, 0.5578175859834436,
+               0.44678390027838205, 0.6447735626026266, 0.8336877386889633, 0.7659003606714241, -3.196111422680582,
+               0.22863089991643462, 0.23423245984677996, 0.9013229016856845, 0.5570103755595892, 0.4404237454134457],
+              [6.688561227702059, 0.5517670506412442, 0.35321326079971904, 0.1860355789654757, -3.5716807262469623,
+               0.6312114345896419, 0.5749344154496477, 0.6004142467183095, 0.5750982269355176, 0.7683271180577859,
+               0.630062792820489, -3.226265416798491, 0.6708709221395525, 0.5749344154496477, 0.18613624126348308,
+               0.22240616547787925, 0.8591656256802459, 0.8672504393401864, 0.5814917292774523, -3.134619142753566,
+               0.5663293999281276, 0.3733411776795603, 0.4539281460296921, 0.656652627308842, 0.7357478037278692,
+               -3.2262654167984905, 0.2247350368500566, 0.1860355789654757, 0.8572276608371586, 0.8256893360850589],
+              [7.218826725057033, 0.44606980581521916, 0.1934039445686336, -3.7260290898011217, 0.3824849821099785,
+               0.47028028452181536, 0.4132329845511205, 0.4011327981897966, 0.6208722632334958, 0.45547992921194,
+               -3.533626570413229, 0.5504963908320178, 0.15133052926678806, 0.11697390204336387, 0.43925745124993065,
+               0.49028930152094424, -3.5262178280455587, 0.40510108956393864, 0.22534135177343922, 0.39544415418566453,
+               0.5446576863156511, 0.3962542838852929, 0.38151727039285593, 0.3183278938569467, 0.5834979613429083,
+               0.25083289345462256, 0.5088323933964385, 0.3463998876269044, 0.3624043575286703],
+              [7.157878693809477, 0.4166532356186096, 0.2633685685801884, 0.164178471705681, -3.7097936844543056,
+               0.4402550155139545, 0.5157339278355035, 0.4163708721720424, 0.41258713363346466, 0.4897833764933656,
+               0.42595776984871475, 0.4427894415100444, 0.3970143113481576, 0.1170006963015829, 0.1423792862374243,
+               0.5833465393467204, 0.5878464170288371, 0.44149331952488113, -3.4315340053970713, 0.4172853054902338,
+               0.319890581030604, 0.5801682640814287, 0.33113254089743094, 0.38586624762663324, 0.48651979020392255,
+               -3.59754626351183, 0.21905209471883844, 0.164178471705681, 0.5199010738801335, 0.5648785042573997],
+              [6.739881079307763, 0.5124317583959213, 0.32874966824916374, 0.21786124859964803, -3.5971338819678467,
+               0.6571444169347329, 0.6393290714677631, 0.6054418544693634, 0.5723254184047881, 0.7428770450458657,
+               0.5383230421051751, -3.2344106484131645, 0.5529381588508739, 0.45095914279593674, 0.2833780811611728,
+               0.15515672961777646, 0.681587260724348, 0.8524013200132534, 0.5294578008132041, -3.1866509458577976,
+               0.39477883614026943, 0.8416858340931691, 0.6601604448144781, 0.7276077642038079, -3.234410648413166,
+               0.21786124859964803, 0.8161893541158314, 0.8021157665835167, 0.42344123438543696, 0.5286762507902876]]
+    intercepts = [0.7752578052698612, 0.7451052306199654, 0.5928917827900219, 0.32841762794188634, 0.736965206914541]
+    features = [['Promo', 'SchoolHoliday', 'LastDayOfMonth', 'Weekday_6.0', 'Weekday_3.0', 'Weekday_0.0', 'Weekday_1.0',
+                 'Weekday_2.0', 'Weekday_5.0', 'Weekday_4.0', 'DayOfMonth_19.0', 'DayOfMonth_27.0', 'DayOfMonth_28.0',
+                 'DayOfMonth_29.0', 'DayOfMonth_7.0', 'DayOfMonth_8.0', 'DayOfMonth_11.0', 'DayOfMonth_12.0',
+                 'DayOfMonth_14.0', 'DayOfMonth_17.0', 'DayOfMonth_22.0', 'DayOfMonth_24.0', 'DayOfMonth_25.0',
+                 'DayOfMonth_26.0', 'DayOfMonth_30.0', 'DayOfMonth_31.0', 'DayOfMonth_9.0', 'DayOfMonth_13.0',
+                 'DayOfMonth_15.0', 'DayOfMonth_18.0'],
+                ['Promo', 'SchoolHoliday', 'LastDayOfMonth', 'Weekday_6.0', 'Weekday_3.0', 'Weekday_0.0', 'Weekday_1.0',
+                 'Weekday_2.0', 'Weekday_5.0', 'Weekday_4.0', 'DayOfMonth_19.0', 'DayOfMonth_23.0', 'DayOfMonth_27.0',
+                 'DayOfMonth_28.0', 'DayOfMonth_29.0', 'DayOfMonth_7.0', 'DayOfMonth_8.0', 'DayOfMonth_11.0',
+                 'DayOfMonth_12.0', 'DayOfMonth_14.0', 'DayOfMonth_16.0', 'DayOfMonth_17.0', 'DayOfMonth_24.0',
+                 'DayOfMonth_25.0', 'DayOfMonth_26.0', 'DayOfMonth_30.0', 'DayOfMonth_31.0', 'DayOfMonth_9.0',
+                 'DayOfMonth_10.0', 'DayOfMonth_18.0'],
+                ['Promo', 'SchoolHoliday', 'Weekday_6.0', 'Weekday_3.0', 'Weekday_0.0', 'Weekday_1.0', 'Weekday_2.0',
+                 'Weekday_5.0', 'Weekday_4.0', 'DayOfMonth_19.0', 'DayOfMonth_23.0', 'DayOfMonth_28.0',
+                 'DayOfMonth_29.0', 'DayOfMonth_7.0', 'DayOfMonth_8.0', 'DayOfMonth_12.0', 'DayOfMonth_14.0',
+                 'DayOfMonth_16.0', 'DayOfMonth_17.0', 'DayOfMonth_20.0', 'DayOfMonth_21.0', 'DayOfMonth_22.0',
+                 'DayOfMonth_24.0', 'DayOfMonth_25.0', 'DayOfMonth_30.0', 'DayOfMonth_10.0', 'DayOfMonth_13.0',
+                 'DayOfMonth_15.0', 'DayOfMonth_18.0'],
+                ['Promo', 'SchoolHoliday', 'LastDayOfMonth', 'Weekday_6.0', 'Weekday_3.0', 'Weekday_0.0', 'Weekday_1.0',
+                 'Weekday_2.0', 'Weekday_5.0', 'Weekday_4.0', 'DayOfMonth_23.0', 'DayOfMonth_27.0', 'DayOfMonth_28.0',
+                 'DayOfMonth_29.0', 'DayOfMonth_7.0', 'DayOfMonth_8.0', 'DayOfMonth_11.0', 'DayOfMonth_12.0',
+                 'DayOfMonth_14.0', 'DayOfMonth_17.0', 'DayOfMonth_20.0', 'DayOfMonth_22.0', 'DayOfMonth_24.0',
+                 'DayOfMonth_25.0', 'DayOfMonth_26.0', 'DayOfMonth_30.0', 'DayOfMonth_31.0', 'DayOfMonth_9.0',
+                 'DayOfMonth_10.0', 'DayOfMonth_15.0'],
+                ['Promo', 'SchoolHoliday', 'LastDayOfMonth', 'Weekday_6.0', 'Weekday_3.0', 'Weekday_0.0', 'Weekday_1.0',
+                 'Weekday_2.0', 'Weekday_5.0', 'Weekday_4.0', 'DayOfMonth_19.0', 'DayOfMonth_23.0', 'DayOfMonth_27.0',
+                 'DayOfMonth_28.0', 'DayOfMonth_29.0', 'DayOfMonth_7.0', 'DayOfMonth_8.0', 'DayOfMonth_11.0',
+                 'DayOfMonth_12.0', 'DayOfMonth_16.0', 'DayOfMonth_20.0', 'DayOfMonth_21.0', 'DayOfMonth_25.0',
+                 'DayOfMonth_26.0', 'DayOfMonth_31.0', 'DayOfMonth_9.0', 'DayOfMonth_10.0', 'DayOfMonth_13.0',
+                 'DayOfMonth_15.0', 'DayOfMonth_18.0']]
     seeds = range(random_state, random_state + test_fd_1["forecast_definition"]["bootstrap_sample"])
     bootstrap_models = {}
 
@@ -342,7 +334,7 @@ def test_bootstrap_models_retail(test_df_1, random_state, test_fd_1):
         model.coef_ = np.array(p)
         model.intercept_ = i
         model._coef = np.array(p + [i])
-        bootstrap_models[seed] = (model, {"params": {_f: c for _f, c in zip(f, [i] + p)}})
+        bootstrap_models[seed] = (model, {"params": {_f: c for _f, c in zip(f, p)}})
     return bootstrap_models
 
 

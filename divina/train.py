@@ -217,6 +217,6 @@ def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, 
                 pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                 h
             ), random_seed=random_seed,
-                         features=features, target="{}_h_{}".format(forecast_definition["target"], h),
+                         features=features, target=forecast_definition["target"],
                          bootstrap_sample=bootstrap_sample, confidence_intervals=confidence_intervals,
                          link_function=link_function, write_open=write_open, write_path=write_path)
