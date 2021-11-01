@@ -160,4 +160,4 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
     df = df.sort_values(forecast_definition["time_index"])
     df = df.repartition(npartitions=npartitions)
     df = cull_empty_partitions(df)
-    return df
+    return df.persist()

@@ -48,17 +48,19 @@ def set_parameters(s3_fs, model_path, params):
             '{}_params'.format(model_path),
             "rb"
     ) as f:
-        parameters = json.load(f)['params']
-    if not params.keys() <= parameters.keys():
+        parameters = json.load(f)['features']
+    if not params == parameters:
         raise Exception('Parameters {} not found in trained model. Cannot set new values for these parameters'.format(
-            ', '.join(list(set(params.keys()) - set(parameters.keys())))))
+            ', '.join(list(set(params) - set(parameters)))))
     else:
-        parameters.update(params)
+        for p in params:
+            if not p in parameters:
+                parameters.append(p)
         with write_open(
                 '{}_params'.format(model_path),
                 "w"
         ) as f:
-            json.dump({'params': parameters}, f)
+            json.dump({'features': parameters}, f)
 
 
 def compare_sk_models(model1, model2):

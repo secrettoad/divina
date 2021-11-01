@@ -50,7 +50,6 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
             "wb",
     ) as f:
         joblib.dump(model, f)
-
     with write_open(
             "{}/models/{}_params.json".format(
                 write_path,
@@ -58,8 +57,7 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
             ),
             "w",
     ) as f:
-        json.dump({"params": {feature: coef for feature, coef in zip(features, model.coef_)},
-                   "intercept": model.intercept_}, f)
+        json.dump({"features": features}, f)
 
     sys.stdout.write("Model persisted: {}\n".format(model_name))
 
@@ -108,8 +106,7 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
                     "w",
             ) as f:
                 json.dump(
-                    {"params": {feature: coef for feature, coef in zip(features, bootstrap_model.coef_)},
-                     'intercept': model.intercept_}, f)
+                    {"features": bootstrap_features}, f)
 
             sys.stdout.write("Model persisted: {}_r-{}\n".format(model_name, random_seed))
 
@@ -127,7 +124,7 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
                     link_function,
                     model_name)).compute()
 
-        return model, bootstrap_models
+        return (model, features), bootstrap_models
 
 
 @validate_forecast_definition
@@ -172,7 +169,7 @@ def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, 
 
     df = _get_dataset(forecast_definition)
 
-    for h in forecast_definition["time_horizons"]:
+    '''for h in forecast_definition["time_horizons"]:
         if "signal_dimension" in forecast_definition:
             df["{}_h_{}".format(forecast_definition["target"], h)] = df.groupby(
                 forecast_definition["signal_dimensions"]
@@ -180,7 +177,7 @@ def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, 
         else:
             df["{}_h_{}".format(forecast_definition["target"], h)] = df[
                 forecast_definition["target"]
-            ].shift(-h)
+            ].shift(-h)'''
 
     time_min, time_max = (
         pd.to_datetime(str(df[forecast_definition["time_index"]].min().compute())),
