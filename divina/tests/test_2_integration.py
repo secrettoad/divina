@@ -20,7 +20,7 @@ def setup_teardown(setup_teardown_test_bucket_contents):
 
 
 def test_train_small(
-    s3_fs, test_df_1, test_model_1, test_fd_3, dask_client_remote, test_bucket, test_bootstrap_models, random_state
+        s3_fs, test_df_1, test_model_1, test_fd_3, dask_client_remote, test_bucket, test_bootstrap_models, random_state
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
@@ -36,28 +36,29 @@ def test_train_small(
         random_state=random_state
     )
     with s3_fs.open(
-        os.path.join(
-            vision_path,
-            "models",
-            "s-19700101-000007_h-1",
-        ),
-        "rb",
+            os.path.join(
+                vision_path,
+                "models",
+                "h-1",
+            ),
+            "rb",
     ) as f:
         compare_sk_models(joblib.load(f), test_model_1[0])
     for seed in test_bootstrap_models:
         with s3_fs.open(
-                    os.path.join(
-                        vision_path,
-                        "models/bootstrap",
-                        "s-19700101-000007_h-1_r-{}".format(seed),
-                    ),
+                os.path.join(
+                    vision_path,
+                    "models/bootstrap",
+                    "h-1_r-{}".format(seed),
+                ),
                 "rb",
         ) as f:
             compare_sk_models(joblib.load(f), test_bootstrap_models[seed][0])
 
 
 def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
-                           test_model_retail, dask_client_remote, test_bootstrap_models_retail, random_state, test_bucket):
+                           test_model_retail, dask_client_remote, test_bootstrap_models_retail, random_state,
+                           test_bucket):
     vision_path = "{}/vision/test1".format(test_bucket)
     pathlib.Path(
         os.path.join(
@@ -90,37 +91,37 @@ def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, t
     )
 
     with s3_fs.open(
-        os.path.join(
-            vision_path,
-            "models",
-            "s-20150718-000000_h-2",
-        ),
-        "rb",
+            os.path.join(
+                vision_path,
+                "models",
+                "h-2",
+            ),
+            "rb",
     ) as f:
         compare_sk_models(joblib.load(f), test_model_retail[0])
     for seed in test_bootstrap_models_retail:
         with s3_fs.open(
-                    os.path.join(
-                        vision_path,
-                        "models/bootstrap",
-                        "s-20150718-000000_h-2_r-{}".format(seed),
-                    ),
+                os.path.join(
+                    vision_path,
+                    "models/bootstrap",
+                    "h-2_r-{}".format(seed),
+                ),
                 "rb",
         ) as f:
             compare_sk_models(joblib.load(f), test_bootstrap_models_retail[seed][0])
 
 
-def test_predict_small(
-    s3_fs,
-    test_df_1,
-    test_model_1,
-    test_val_predictions_1,
-    test_fd_3,
-    dask_client_remote,
-    test_bucket,
-    test_forecast_1,
-    test_bootstrap_models,
-    random_state
+def test_forecast_small(
+        s3_fs,
+        test_df_1,
+        test_model_1,
+        test_val_predictions_1,
+        test_fd_3,
+        dask_client_remote,
+        test_bucket,
+        test_forecast_1,
+        test_bootstrap_models,
+        random_state
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
@@ -129,10 +130,10 @@ def test_predict_small(
     pathlib.Path(
         "models/bootstrap"
     ).mkdir(parents=True, exist_ok=True)
-    joblib.dump(test_model_1[0], "models/s-19700101-000007_h-1")
+    joblib.dump(test_model_1[0], "models/h-1")
     with open(os.path.join(
             "models",
-            "s-19700101-000007_h-1_params.json",
+            "h-1_params.json",
     ), 'w+') as f:
         json.dump(
             test_model_1[1],
@@ -143,13 +144,13 @@ def test_predict_small(
             test_bootstrap_models[seed][0],
             os.path.join(
                 "models/bootstrap",
-                "s-19700101-000007_h-1_r-{}".format(seed),
+                "h-1_r-{}".format(seed),
             ),
         )
         with open(os.path.join(
                 "models/bootstrap",
-                "s-19700101-000007_h-1_r-{}_params.json".format(seed),
-            ), 'w+') as f:
+                "h-1_r-{}_params.json".format(seed),
+        ), 'w+') as f:
             json.dump(
                 test_bootstrap_models[seed][1],
                 f
@@ -176,33 +177,17 @@ def test_predict_small(
         ddf.read_parquet(
             os.path.join(
                 vision_path,
-                "predictions",
-                "s-19700101-000007",
+                "forecast"
             )
         ).compute().reset_index(drop=True),
-        test_val_predictions_1.reset_index(drop=True),
-    )
-    pd.testing.assert_frame_equal(
-        ddf.read_parquet(
-            os.path.join(
-                vision_path,
-                "predictions",
-                "s-19700101-000007_forecast",
-            )
-        ).compute().reset_index(drop=True),
-        test_forecast_1.reset_index(drop=True),
+        test_forecast_1.reset_index(drop=True), check_dtype=False
     )
 
 
-def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
-                             test_model_retail, test_val_predictions_retail, test_forecast_retail,
-                             test_bootstrap_models_retail, dask_client_remote, test_bucket):
+def test_dask_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
+                              test_model_retail, test_val_predictions_retail, test_forecast_retail,
+                              test_bootstrap_models_retail, dask_client_remote, test_bucket):
     vision_path = "{}/vision/test1".format(test_bucket)
-    pathlib.Path(
-        os.path.join(
-            "models", "bootstrap"
-        )
-    ).mkdir(parents=True, exist_ok=True)
     ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
         os.path.join(
             test_fd_retail_2["forecast_definition"]["dataset_directory"],
@@ -218,46 +203,38 @@ def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores,
             test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
         )
     )
-    joblib.dump(
-        test_model_retail[0],
-        os.path.join(
-            "models",
-            "s-20150718-000000_h-2",
-        ),
-    )
-    with open(os.path.join(
-            "models",
-            "s-20150718-000000_h-2_params.json",
-    ), 'w+') as f:
+    with s3_fs.open("{}/{}/{}".format(vision_path,
+                                      "models",
+                                      "h-2"),
+                    'wb') as f:
+        joblib.dump(test_model_retail[0], f)
+
+    with s3_fs.open("{}/{}/{}".format(vision_path,
+                                      "models",
+                                      "h-2_params.json"), 'w') as f:
         json.dump(
             test_model_retail[1],
             f
         )
     for seed in test_bootstrap_models_retail:
-        joblib.dump(
-            test_bootstrap_models_retail[seed][0],
-            os.path.join(
+        with s3_fs.open(os.path.join(
+                vision_path,
                 "models/bootstrap",
-                "s-20150718-000000_h-2_r-{}".format(seed),
-            ),
-        )
-        with open(os.path.join(
+                "h-2_r-{}".format(seed),
+        ), 'wb') as f:
+            joblib.dump(
+                test_bootstrap_models_retail[seed][0],
+                f,
+            )
+        with s3_fs.open(os.path.join(
+                vision_path,
                 "models/bootstrap",
-                "s-20150718-000000_h-2_r-{}_params.json".format(seed),
-        ), 'w+') as f:
+                "h-2_r-{}_params.json".format(seed),
+        ), 'w') as f:
             json.dump(
                 test_bootstrap_models_retail[seed][1],
                 f
             )
-    s3_fs.put(
-        "models",
-        os.path.join(
-            vision_path,
-            "models"
-        ),
-        recursive=True,
-    )
-    shutil.rmtree('models', ignore_errors=True)
     cli_forecast_vision(
         s3_fs=s3_fs,
         forecast_definition=test_fd_retail_2["forecast_definition"],
@@ -270,45 +247,39 @@ def test_dask_predict_retail(s3_fs, test_df_retail_sales, test_df_retail_stores,
         ddf.read_parquet(
             os.path.join(
                 vision_path,
-                "predictions",
-                "s-20150718-000000",
+                "forecast",
             )
         ).compute().reset_index(drop=True),
-        test_val_predictions_retail.reset_index(drop=True),
-    )
-    pd.testing.assert_frame_equal(
-        ddf.read_parquet(
-            os.path.join(
-                vision_path,
-                "predictions",
-                "s-20150718-000000_forecast",
-            )
-        ).compute().reset_index(drop=True),
-        test_forecast_retail.reset_index(drop=True),
+        test_forecast_retail.reset_index(drop=True), check_dtype=False
     )
 
 
 def test_validate_small(
-    s3_fs,
-    test_fd_3,
-    test_df_1,
-    test_metrics_1,
-    test_val_predictions_1,
-    dask_client_remote,
-    test_bucket,
+        s3_fs,
+        test_fd_3,
+        test_df_1,
+        test_metrics_1,
+        test_val_predictions_1,
+        dask_client_remote,
+        test_bucket,
+        test_bootstrap_models,
+        test_model_1
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
         test_fd_3["forecast_definition"]["dataset_directory"]
     )
-
-    ddf.from_pandas(test_val_predictions_1, npartitions=2).to_parquet(
-        os.path.join(
-            vision_path,
-            "predictions",
-            "s-19700101-000007",
+    with s3_fs.open("{}/{}/{}".format(vision_path,
+                                      "models",
+                                      "s-19700101-000007_h-1"), 'wb') as f:
+        joblib.dump(test_model_1[0], f)
+    with s3_fs.open("{}/{}/{}".format(vision_path,
+                                      "models",
+                                      "s-19700101-000007_h-1_params.json"), 'w') as f:
+        json.dump(
+            test_model_1[1],
+            f
         )
-    )
 
     cli_validate_vision(
         s3_fs=s3_fs,
@@ -320,10 +291,20 @@ def test_validate_small(
         local=False,
         dask_client=dask_client_remote,
     )
+    pd.testing.assert_frame_equal(
+        ddf.read_parquet(
+            os.path.join(
+                vision_path,
+                "validation",
+                "s-19700101-000007",
+            )
+        ).compute().reset_index(drop=True),
+        test_val_predictions_1.reset_index(drop=True),
+    )
 
     with s3_fs.open(
-        os.path.join(vision_path, "metrics.json"),
-        "r",
+            os.path.join(vision_path, "metrics.json"),
+            "r",
     ) as f:
         metrics = json.load(f)
 
@@ -331,7 +312,8 @@ def test_validate_small(
 
 
 def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
-                              test_val_predictions_retail, test_metrics_retail, dask_client_remote, test_bucket):
+                              test_val_predictions_retail, test_metrics_retail, dask_client_remote, test_bucket,
+                              test_model_retail):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
         os.path.join(
@@ -348,13 +330,18 @@ def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores
             test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
         )
     )
-    ddf.from_pandas(test_val_predictions_retail, npartitions=2).to_parquet(
-        os.path.join(
-            vision_path,
-            "predictions",
-            "s-20150718-000000",
+    with s3_fs.open("{}/{}/{}".format(vision_path,
+                                          "models",
+                                          "s-20150718-000000_h-2"), 'wb'
+    ) as f:
+        joblib.dump(test_model_retail[0], f)
+    with s3_fs.open("{}/{}/{}".format(vision_path,
+                                          "models",
+                                          "s-20150718-000000_h-2_params.json"), 'w') as f:
+        json.dump(
+            test_model_retail[1],
+            f
         )
-    )
     cli_validate_vision(
         s3_fs=s3_fs,
         forecast_definition=test_fd_retail_2["forecast_definition"],
@@ -364,6 +351,16 @@ def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores
         keep_instances_alive=False,
         local=False,
         dask_client=dask_client_remote,
+    )
+    pd.testing.assert_frame_equal(
+        ddf.read_parquet(
+            os.path.join(
+                vision_path,
+                "validation",
+                "s-20150718-000000",
+            )
+        ).compute().reset_index(drop=True),
+        test_val_predictions_retail.reset_index(drop=True),
     )
     with s3_fs.open(
             os.path.join(vision_path, "metrics.json"),
