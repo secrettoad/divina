@@ -97,6 +97,14 @@ def test_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_boot
         ),
         test_model_1[0],
     )
+    with open(os.path.abspath(
+            os.path.join(
+                vision_path,
+                "models",
+                "h-1_params.json",
+            )
+    )) as f:
+        assert json.load(f) == test_model_1[1]
     for seed in test_bootstrap_models:
         compare_sk_models(
             joblib.load(
@@ -110,6 +118,14 @@ def test_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_boot
             ),
             test_bootstrap_models[seed][0],
         )
+        with open(os.path.abspath(
+                    os.path.join(
+                        vision_path,
+                        "models/bootstrap",
+                        "h-1_r-{}_params.json".format(seed),
+                    )
+                )) as f:
+            assert json.load(f) == test_bootstrap_models[seed][1]
 
 
 def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
@@ -155,6 +171,14 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
         ),
         test_model_retail[0],
     )
+    with open(os.path.abspath(
+            os.path.join(
+                vision_path,
+                "models",
+                "h-2_params.json",
+            )
+    )) as f:
+        assert json.load(f) == test_model_retail[1]
     for seed in test_bootstrap_models_retail:
         compare_sk_models(
             joblib.load(
@@ -168,6 +192,15 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
             ),
             test_bootstrap_models_retail[seed][0],
         )
+        with open(os.path.abspath(
+                    os.path.join(
+                        vision_path,
+                        "models/bootstrap",
+                        "h-2_r-{}_params.json".format(seed),
+                    )
+                )) as f:
+            features = json.load(f)
+        assert features == test_bootstrap_models_retail[seed][1]
 
 
 def test_forecast(
@@ -233,7 +266,7 @@ def test_forecast(
                 "forecast"
             )
         ).compute().reset_index(drop=True),
-        test_forecast_1.reset_index(drop=True),
+        test_forecast_1.reset_index(drop=True), check_dtype=False
     )
 
 
@@ -309,7 +342,7 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
         )
     ).compute().reset_index(drop=True)
     pathlib.Path(
-        "plots"
+        "docs_src/plots"
     ).mkdir(parents=True, exist_ok=True)
     fig = go.Figure(
         layout=go.Layout(
@@ -335,7 +368,7 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
                                  y=result_df_2d[
                                      '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
                                                            h)], name="h_{}".format(h)))
-        fig.write_html('plots/test_forecast_retail_h_{}_2d.html'.format(h))
+        fig.write_html('docs_src/plots/test_forecast_retail_h_{}_2d.html'.format(h))
     fig = go.Figure(
         layout=go.Layout(
             title=go.layout.Title(text="Forecasted Promo Impact"),
@@ -357,7 +390,7 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
                                          '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
                                                                     h)].values],
                                      y=result_df_3d['Promo'].unique(), opacity=.4))
-    fig.write_html('plots/test_forecast_retail_h_{}_3d.html'.format(h))
+    fig.write_html('docs_src/plots/test_forecast_retail_h_{}_3d.html'.format(h))
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
             os.path.join(
@@ -365,7 +398,7 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
                 "forecast"
             )
         ).compute().reset_index(drop=True),
-        test_forecast_retail.reset_index(drop=True),
+        test_forecast_retail.reset_index(drop=True), check_dtype=False
     )
 
 
@@ -431,7 +464,7 @@ def test_validate(
                 "s-19700101-000007",
             )
         ).compute().reset_index(drop=True),
-        test_val_predictions_1.reset_index(drop=True),
+        test_val_predictions_1.reset_index(drop=True), check_dtype=False
     )
     with open(
             os.path.join(vision_path, "metrics.json"),
@@ -513,13 +546,14 @@ def test_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
                 "s-20150718-000000",
             )
         ).compute().reset_index(drop=True),
-        test_val_predictions_retail.reset_index(drop=True),
+        test_val_predictions_retail.reset_index(drop=True), check_dtype=False
     )
     with open(
             os.path.join(vision_path, "metrics.json"),
             "r",
     ) as f:
-        assert json.loads(f) == test_metrics_retail
+        metrics = json.load(f)
+    assert metrics == test_metrics_retail
 
 
 def test_get_params(
@@ -577,7 +611,7 @@ def test_set_params(
         vision_path,
         "models",
         "s-19700101-000007_h-1",
-    ), params=test_params_2['params'])
+    ), params=test_params_2['features'])
 
     with open(os.path.join(
             vision_path,

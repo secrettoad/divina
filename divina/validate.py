@@ -115,7 +115,7 @@ def _validate(s3_fs, forecast_definition, write_path, read_path):
                     "r",
             ) as f:
                 fit_model_params = json.load(f)
-            features = list(fit_model_params["params"].keys())
+            features = fit_model_params["features"]
             for f in features:
                 if not f in validate_df.columns:
                     validate_df[f] = 0
@@ -155,7 +155,7 @@ def _validate(s3_fs, forecast_definition, write_path, read_path):
                                 "r",
                         ) as f:
                             bootstrap_params = json.load(f)
-                            bootstrap_features = list(bootstrap_params['params'].keys())
+                            bootstrap_features = bootstrap_params['features']
                         if link_function == 'log':
                             df['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i)] = da.expm1(
                                 bootstrap_model.predict(
