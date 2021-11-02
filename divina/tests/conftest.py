@@ -833,7 +833,7 @@ def test_fd_retail():
                           {"feature": "SchoolHoliday", "values": [0], "start": "2015-08-01", "end": "2016-01-01"}],
             "dataset_directory": "dataset/retail/sales2",
             "link_function": "log",
-            "confidence_intervals": [90, 10],
+            "confidence_intervals": [100, 0],
             "joins": [
                 {
                     "dataset_directory": "dataset/time",

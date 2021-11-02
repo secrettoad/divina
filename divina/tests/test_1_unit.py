@@ -352,7 +352,7 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
     for h in test_fd_retail["forecast_definition"]['time_horizons']:
         result_df_2d = result_df.sort_values('Promo').groupby('Date').agg('first').reset_index()
         for i in test_fd_retail["forecast_definition"]['confidence_intervals']:
-            fig.add_trace(go.Scatter(marker=dict(color='Blue'), mode="lines",
+            fig.add_trace(go.Scatter(marker=dict(color='cyan'), mode="lines",
                                      x=result_df_2d[test_fd_retail["forecast_definition"]['time_index']],
                                      y=result_df_2d[
                                          '{}_h_{}_pred_c_{}'.format(test_fd_retail["forecast_definition"]['target'],
@@ -360,14 +360,15 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
         fig.update_traces(fill='tonexty', selector=dict(
             name="h_{}_c_{}".format(h, test_fd_retail["forecast_definition"]['confidence_intervals'][-1])))
         fig.add_trace(
-            go.Scatter(marker=dict(color='Black'), mode="lines",
+            go.Scatter(marker=dict(color='Black'), line=dict(dash='dash'), mode="lines",
                        x=test_df_retail_sales[test_fd_retail["forecast_definition"]['time_index']],
                        y=test_df_retail_sales[test_fd_retail["forecast_definition"]['target']], name="truth"))
-        fig.add_trace(go.Scatter(marker=dict(color='Red'), mode="lines",
+        fig.add_trace(go.Scatter(marker=dict(color='cadetblue'), mode="lines",
                                  x=result_df_2d[test_fd_retail["forecast_definition"]['time_index']],
                                  y=result_df_2d[
                                      '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
                                                            h)], name="h_{}".format(h)))
+        fig.add_vrect(x0=pd.to_datetime('07-31-2015').timestamp() * 1000, x1=pd.to_datetime('08-30-2015').timestamp() * 1000, line_width=2, line_color="deepskyblue", annotation_text='Blind Forecasts with Promo Simulated as False')
         fig.write_html('docs_src/plots/test_forecast_retail_h_{}_2d.html'.format(h))
     fig = go.Figure(
         layout=go.Layout(
