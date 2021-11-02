@@ -111,6 +111,12 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
                             dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(lengths=True))
                 return df
 
+            forecast_df['index'] = 1
+            forecast_df['index'] = forecast_df['index'].cumsum()
+            forecast_df['index'] = forecast_df['index'] - 1
+            forecast_df = forecast_df.set_index('index')
+            forecast_df.index.name = None
+
             if "link_function" in forecast_definition:
                 forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model,
                                                                  bootstrap_model_paths,
@@ -129,11 +135,7 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
                 [i * .01 for i in forecast_definition['confidence_intervals']]).to_dask_array(lengths=True).T)
             df_interval.columns = ['{}_h_{}_pred_c_{}'.format(forecast_definition["target"], h, c) for c in
                                    forecast_definition["confidence_intervals"]]
-            forecast_df['bootstrap_index'] = 1
-            forecast_df['bootstrap_index'] = forecast_df['bootstrap_index'].cumsum()
-            forecast_df['bootstrap_index'] = forecast_df['bootstrap_index'] - 1
-            forecast_df = forecast_df.set_index('bootstrap_index')
-            forecast_df.index.name = None
+
             df_interval = df_interval.repartition(divisions=forecast_df.divisions)
             for c in df_interval.columns:
                 forecast_df[c] = df_interval[c]
