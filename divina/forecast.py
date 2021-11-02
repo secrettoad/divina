@@ -79,9 +79,10 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
             bootstrap_model_paths = [p for p in read_ls("{}/models/bootstrap".format(
                 read_path
             )) if '.' not in p]
+            bootstrap_model_paths.sort()
 
             def load_and_predict_bootstrap_model(paths, link_function, df):
-                for i, path in enumerate(paths):
+                for path in paths:
                     if bootstrap_prefix:
                         model_path = os.path.join(bootstrap_prefix, path)
                     else:
@@ -99,13 +100,14 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
                         bootstrap_params = json.load(f)
                         bootstrap_features = bootstrap_params['features']
                     if link_function == 'log':
-                        df['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i)] = da.expm1(
+                        df['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h,
+                                                      path.split("-")[-1])] = da.expm1(
                             bootstrap_model.predict(
                                 dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(
                                     lengths=True)))
                     else:
                         df['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h,
-                                                      i)] = bootstrap_model.predict(
+                                                      path.split("-")[-1])] = bootstrap_model.predict(
                             dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(lengths=True))
                 return df
 
@@ -118,13 +120,15 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
                                                                  bootstrap_model_paths,
                                                                  None))
 
-            df_interval = dd.from_array(dd.from_array(forecast_df[['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i) for i in
-                                              range(0, len(bootstrap_model_paths))] + [
-                                                 '{}_h_{}_pred'.format(forecast_definition["target"],
-                                                                       h)]].to_dask_array(lengths=True).T).repartition(
+            df_interval = dd.from_array(dd.from_array(
+                forecast_df[['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i.split("-")[-1]) for i in
+                             bootstrap_model_paths] + [
+                                '{}_h_{}_pred'.format(forecast_definition["target"],
+                                                      h)]].to_dask_array(lengths=True).T).repartition(
                 npartitions=forecast_df.npartitions).quantile(
                 [i * .01 for i in forecast_definition['confidence_intervals']]).to_dask_array(lengths=True).T)
-            df_interval.columns = ['{}_h_{}_pred_c_{}'.format(forecast_definition["target"], h, c) for c in forecast_definition["confidence_intervals"]]
+            df_interval.columns = ['{}_h_{}_pred_c_{}'.format(forecast_definition["target"], h, c) for c in
+                                   forecast_definition["confidence_intervals"]]
             forecast_df['bootstrap_index'] = 1
             forecast_df['bootstrap_index'] = forecast_df['bootstrap_index'].cumsum()
             forecast_df['bootstrap_index'] = forecast_df['bootstrap_index'] - 1
