@@ -163,7 +163,6 @@ def test_forecast_small(
         ),
         recursive=True,
     )
-
     shutil.rmtree('models', ignore_errors=True)
     cli_forecast_vision(
         s3_fs=s3_fs,

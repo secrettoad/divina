@@ -80,7 +80,7 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
                 read_path
             )) if '.' not in p]
 
-            def load_and_predict_bootstrap_model(paths, intervals, link_function, df):
+            def load_and_predict_bootstrap_model(paths, link_function, df):
                 for i, path in enumerate(paths):
                     if bootstrap_prefix:
                         model_path = os.path.join(bootstrap_prefix, path)
@@ -107,30 +107,32 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
                         df['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h,
                                                       i)] = bootstrap_model.predict(
                             dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(lengths=True))
-
-                df_agg = df[['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i) for i in
-                             range(0, len(paths))] + ['{}_h_{}_pred'.format(forecast_definition["target"], h)]].T
-                for i in intervals:
-                    if i > 50:
-                        interpolation = 'higher'
-                    elif i < 50:
-                        interpolation = 'lower'
-                    else:
-                        interpolation = 'linear'
-                    df['{}_h_{}_pred_c_{}'.format(forecast_definition["target"], h, i)] = df_agg.quantile(i * .01,
-                                                                                                          interpolation=interpolation).T
                 return df
 
             if "link_function" in forecast_definition:
                 forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model,
                                                                  bootstrap_model_paths,
-                                                                 forecast_definition['confidence_intervals'],
                                                                  forecast_definition['link_function']))
             else:
                 forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model,
                                                                  bootstrap_model_paths,
-                                                                 forecast_definition['confidence_intervals'],
                                                                  None))
+
+            df_interval = dd.from_array(dd.from_array(forecast_df[['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i) for i in
+                                              range(0, len(bootstrap_model_paths))] + [
+                                                 '{}_h_{}_pred'.format(forecast_definition["target"],
+                                                                       h)]].to_dask_array(lengths=True).T).repartition(
+                npartitions=forecast_df.npartitions).quantile(
+                [i * .01 for i in forecast_definition['confidence_intervals']]).to_dask_array(lengths=True).T)
+            df_interval.columns = ['{}_h_{}_pred_c_{}'.format(forecast_definition["target"], h, c) for c in forecast_definition["confidence_intervals"]]
+            forecast_df['bootstrap_index'] = 1
+            forecast_df['bootstrap_index'] = forecast_df['bootstrap_index'].cumsum()
+            forecast_df['bootstrap_index'] = forecast_df['bootstrap_index'] - 1
+            forecast_df = forecast_df.set_index('bootstrap_index')
+            forecast_df.index.name = None
+            df_interval = df_interval.repartition(divisions=forecast_df.divisions)
+            for c in df_interval.columns:
+                forecast_df[c] = df_interval[c]
 
         forecast_df[forecast_definition["time_index"]] = dd.to_datetime(forecast_df[forecast_definition["time_index"]])
 
