@@ -19,6 +19,11 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
         if k in forecast_definition:
             forecast_kwargs.update({k.split('_')[1]: forecast_definition[k]})
     forecast_df = _get_dataset(forecast_definition, pad=True, **forecast_kwargs)
+    forecast_df['index'] = 1
+    forecast_df['index'] = forecast_df['index'].cumsum()
+    forecast_df['index'] = forecast_df['index'] - 1
+    forecast_df = forecast_df.set_index('index')
+    forecast_df.index.name = None
 
     horizon_ranges = [x for x in forecast_definition["time_horizons"] if type(x) == tuple]
     if len(horizon_ranges) > 0:
@@ -75,6 +80,11 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
             ] = fit_model.predict(forecast_df[features].to_dask_array(lengths=True))
             sys.stdout.write("Forecasts made for horizon {}\n".format(h))
 
+        factor_df = dd.from_array(forecast_df[features].to_dask_array(lengths=True) * da.from_array(fit_model.coef_))
+        factor_df.columns = ["factor_{}".format(c) for c in features]
+        for c in factor_df:
+            forecast_df[c] = factor_df[c]
+
         if "confidence_intervals" in forecast_definition:
             bootstrap_model_paths = [p for p in read_ls("{}/models/bootstrap".format(
                 read_path
@@ -110,12 +120,6 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
                                                       path.split("-")[-1])] = bootstrap_model.predict(
                             dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(lengths=True))
                 return df
-
-            forecast_df['index'] = 1
-            forecast_df['index'] = forecast_df['index'].cumsum()
-            forecast_df['index'] = forecast_df['index'] - 1
-            forecast_df = forecast_df.set_index('index')
-            forecast_df.index.name = None
 
             if "link_function" in forecast_definition:
                 forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model,

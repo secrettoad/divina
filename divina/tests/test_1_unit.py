@@ -13,6 +13,7 @@ import dask.dataframe as ddf
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 import plotly.graph_objects as go
+import plotly.colors as colors
 
 
 def test_validate_forecast_definition(
@@ -346,30 +347,44 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
     ).mkdir(parents=True, exist_ok=True)
     fig = go.Figure(
         layout=go.Layout(
-            title=go.layout.Title(text="A Figure Specified By A Graph Object")
+            title=go.layout.Title(text="Insample and Blind Forecasts")
         )
     )
     for h in test_fd_retail["forecast_definition"]['time_horizons']:
         result_df_2d = result_df.sort_values('Promo').groupby('Date').agg('first').reset_index()
         for i in test_fd_retail["forecast_definition"]['confidence_intervals']:
-            fig.add_trace(go.Scatter(marker=dict(color='cyan'), mode="lines",
+            fig.add_trace(go.Scatter(marker=dict(color="cyan"), mode="lines",
                                      x=result_df_2d[test_fd_retail["forecast_definition"]['time_index']],
                                      y=result_df_2d[
                                          '{}_h_{}_pred_c_{}'.format(test_fd_retail["forecast_definition"]['target'],
                                                                     h, i)], name="h_{}_c_{}".format(h, i)))
-        fig.update_traces(fill='tonexty', selector=dict(
+        fig.update_traces(fill='tonexty', name='Confidence Bound', selector=dict(
             name="h_{}_c_{}".format(h, test_fd_retail["forecast_definition"]['confidence_intervals'][-1])))
+        fig.update_traces(showlegend=False, name='Upper Confidence Bound', selector=dict(
+            name="h_{}_c_{}".format(h, test_fd_retail["forecast_definition"]['confidence_intervals'][0])))
         fig.add_trace(
-            go.Scatter(marker=dict(color='Black'), line=dict(dash='dash'), mode="lines",
+            go.Scatter(marker=dict(color='black'), line=dict(dash='dash'), mode="lines",
                        x=test_df_retail_sales[test_fd_retail["forecast_definition"]['time_index']],
-                       y=test_df_retail_sales[test_fd_retail["forecast_definition"]['target']], name="truth"))
-        fig.add_trace(go.Scatter(marker=dict(color='cadetblue'), mode="lines",
+                       y=test_df_retail_sales[test_fd_retail["forecast_definition"]['target']], name=test_fd_retail["forecast_definition"]['target']))
+        fig.add_trace(go.Scatter(marker=dict(color="darkblue"), mode="lines",
                                  x=result_df_2d[test_fd_retail["forecast_definition"]['time_index']],
                                  y=result_df_2d[
                                      '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
-                                                           h)], name="h_{}".format(h)))
-        fig.add_vrect(x0=pd.to_datetime('07-31-2015').timestamp() * 1000, x1=pd.to_datetime('08-30-2015').timestamp() * 1000, line_width=2, line_color="deepskyblue", annotation_text='Blind Forecasts with Promo Simulated as False')
+                                                           h)], name="Horizon {} Forecast".format(h)))
+        fig.add_vrect(x0=pd.to_datetime('07-31-2015').timestamp() * 1000, x1=pd.to_datetime('08-30-2015').timestamp() * 1000, line_width=2, line_color="cadetblue", annotation_text='Blind Forecasts with Promotions Simulated as False')
         fig.write_html('docs_src/plots/test_forecast_retail_h_{}_2d.html'.format(h))
+    fig = go.Figure(
+    )
+    for h in test_fd_retail["forecast_definition"]['time_horizons']:
+        result_df_2d = result_df.sort_values('Promo').groupby('Date').agg('first').reset_index()
+        factors = [c for c in result_df_2d if c.split("_")[0] == "factor"]
+        result_df_2d = result_df_2d[factors + [test_fd_retail["forecast_definition"]['time_index']]]
+        for f in factors:
+            fig.add_trace(go.Bar(x=result_df_2d[test_fd_retail["forecast_definition"]['time_index']],
+                                 y=result_df_2d[
+                                     f], name="_".join(f.split("_")[1:])))
+            fig.update_layout(barmode='relative', title_text='Factor')
+        fig.write_html('docs_src/plots/test_forecast_retail_h_{}_factors.html'.format(h))
     fig = go.Figure(
         layout=go.Layout(
             title=go.layout.Title(text="Forecasted Promo Impact"),
@@ -391,7 +406,7 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
                                          '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
                                                                     h)].values],
                                      y=result_df_3d['Promo'].unique(), opacity=.4))
-    fig.write_html('docs_src/plots/test_forecast_retail_h_{}_3d.html'.format(h))
+        fig.write_html('docs_src/plots/test_forecast_retail_h_{}_3d.html'.format(h))
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
             os.path.join(
