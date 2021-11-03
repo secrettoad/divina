@@ -17,61 +17,43 @@ divina documentation
 `Q&A Support <https://stackoverflow.com/questions/tagged/divina>`__ |
 `Mailing List <mailto:partners@coysu.com>`__
 
-:mod:`divina` is an open source, BSD3-licensed library providing scalable and hyper-interpretable causal forecasting capabilities written in `Python <https://www.python.org/>`__ and consumable either via Bash CLI or the built-in web-app.
+:mod:`divina` is an open source, BSD3-licensed library providing scalable and hyper-interpretable causal forecasting capabilities written in `Python <https://www.python.org/>`__ and consumable via Bash CLI.
 programming language.
 
 The aim of :mod:`divina` is twofold:
 
-1) to reduce the complexity of configuration for causal forecasting at scale. this is accomplished by abstracting all configuration to a single JSON file that lets users configure new experiments easily and safely. Below is an example forecast definition.
+1) to reduce the complexity of configuration for causal forecasting at scale. This is accomplished by abstracting all configuration to a single JSON file that lets users configure new experiments easily and safely.
 
-.. code-block:: json
+2) to deliver scalable and bidirectionally interpretable models that bring transparency and incremental control to the forecasting process. This is done using a variety of coefficient calculation tools, binning and interacting of features and set of link functions that enable a linear model to fit various target distributions.
 
-    {
-        "vision_definition": {
-            "time_index": "index",
-            "target": "passengers",
-            "time_validation_splits": ["1957-01-01"],
-            "time_validation_horizons": [1],
-            "dataset_directory": "s3://divina-public/dataset/airline_sales",
-        }
-    }
 
-2) to deliver scalable and bidirectionally interpretable models that bring transparency and incremental control to the forecasting process. This is done using a variety of coefficient calculation tools for highly-parametric and non-parametric models, binning and interacting of features and and a set of interfaces allowing users to override individual model and forecast coefficients with domain knowledge.
+Experiment Persistence
 
-In a minimal example, divina can be used to create a weather forecast using the below command and forecast definition
-
-.. code-block:: bash
-
-    divina forecast forecast_definition.json --local
-
+Experiment artifacts are persisted either locally or to S3 depending on the use of the `--local` flag when running the experiment command.
 
 and will produce a local output structure as shown below::
 
-    divina-forecast
+    experiment path
       |- models
       |    |
-      |    \- insample
-      |         |
-      |         \- model.joblib
-      |- predictions
+      |    |- h_{forecast horizon}
+      |    \  ...
+      |
+      |- forecast
+      |    |
+      |    |- common_meta.parquet
+      |    |- forecast_partition_0_meta.parquet
+      |    |- forecast_partition_0.parquet
+      |    \  ...
+      |
+      |- validation
       |      |
-      |      \- insample
-      |           |
-      |           \- predictions_partition_0.parquet
-      \- validation
-             |
-             \- insample
-                  |
-                  \- metrics.json
-
-In a more advanced configuration, divina can be used with the following command and forecast definition
-
-to produce an s3 hosted output structure as shown below
-
-
-###TODO - illustrate use of start date, end date and horizon to deliver "best information" forecast
-
-###TODO visualization and interpretation interface
+      |      \- {validation split}
+      |            |- validation_partition_0_meta.parquet
+      |            |- validation_partition_0.parquet
+      |            \  ...
+      |
+      \- metrics.json
 
 .. click:: divina.cli.cli:divina
    :prog: divina
