@@ -386,10 +386,6 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             "forecast"
         )
     ).compute().reset_index(drop=True)
-    pd.testing.assert_frame_equal(
-        result_df,
-        test_forecast_retail.reset_index(drop=True), check_dtype=False
-    )
     pathlib.Path(
         "docs_src/plots"
     ).mkdir(parents=True, exist_ok=True)
@@ -457,6 +453,10 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
                                                               h)].values],
                                  y=result_df_3d['Promo'].unique(), opacity=.4))
         fig.write_html('docs_src/plots/test_forecast_retail_h_{}_3d.html'.format(h))
+    pd.testing.assert_frame_equal(
+        result_df,
+        test_forecast_retail.reset_index(drop=True), check_dtype=False
+    )
 
 
 def test_validate(

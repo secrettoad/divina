@@ -7,6 +7,7 @@ from dask_ml.preprocessing import Categorizer, DummyEncoder
 from sklearn.pipeline import make_pipeline
 import numpy as np
 from itertools import product
+import pathlib
 
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
@@ -167,3 +168,11 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
     df = df.set_index('index')
     df.index.name = None
     return df.persist()
+
+
+def _get_divina_dataset(path):
+    if not path.startswith("divina//:"):
+        raise Exception("Path must begin with 'divina//:'")
+    else:
+        local_path = pathlib.Path(str(pathlib.Path(__file__).parent.parent), 'datasets', path[9:])
+    return dd.read_parquet(local_path)

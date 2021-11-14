@@ -57,7 +57,7 @@ def test_train_small(
 
 
 def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
-                           test_model_retail, dask_client_remote, test_bootstrap_models_retail, random_state,
+                           test_model_retail, dask_client_remote, test_bootstrap_models_retail, test_validation_models_retail, random_state,
                            test_bucket):
     vision_path = "{}/vision/test1".format(test_bucket)
     pathlib.Path(
@@ -109,6 +109,27 @@ def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, t
                 "rb",
         ) as f:
             compare_sk_models(joblib.load(f), test_bootstrap_models_retail[seed][0])
+    for split in test_validation_models_retail:
+        with s3_fs.open(os.path.join(
+                        vision_path,
+                        "models",
+                        "s-{}_h-2".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+                    ), 'rb') as f:
+            compare_sk_models(
+                joblib.load(f
+
+                ),
+                test_validation_models_retail[split][0],
+            )
+        with s3_fs.open(os.path.join(
+                os.path.join(
+                    vision_path,
+                    "models",
+                    "s-{}_h-2_params.json".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+                )
+        )) as f:
+            features = json.load(f)
+        assert features == test_validation_models_retail[split][1]
 
 
 def test_forecast_small(
@@ -261,25 +282,27 @@ def test_validate_small(
         test_val_predictions_1,
         dask_client_remote,
         test_bucket,
-        test_bootstrap_models,
+        test_validation_models,
         test_model_1
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
         test_fd_3["forecast_definition"]["dataset_directory"]
     )
-    with s3_fs.open("{}/{}/{}".format(vision_path,
-                                      "models",
-                                      "s-19700101-000007_h-1"), 'wb') as f:
-        joblib.dump(test_model_1[0], f)
-    with s3_fs.open("{}/{}/{}".format(vision_path,
-                                      "models",
-                                      "s-19700101-000007_h-1_params.json"), 'w') as f:
-        json.dump(
-            test_model_1[1],
-            f
-        )
-
+    for split in test_validation_models:
+        with s3_fs.open("{}/{}/{}".format(vision_path,
+                                          "models",
+                                          "s-{}_h-1".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S"))), 'wb'
+                        ) as f:
+            joblib.dump(test_validation_models[split][0], f)
+        with s3_fs.open("{}/{}/{}".format(vision_path,
+                                          "models",
+                                          "s-{}_h-1_params.json".format(
+                                              pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S"))), 'w') as f:
+            json.dump(
+                test_validation_models[split][1],
+                f
+            )
     cli_validate_vision(
         s3_fs=s3_fs,
         forecast_definition=test_fd_3["forecast_definition"],
@@ -311,7 +334,7 @@ def test_validate_small(
 
 
 def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
-                              test_val_predictions_retail, test_metrics_retail, dask_client_remote, test_bucket,
+                              test_val_predictions_retail, test_validation_models_retail, test_metrics_retail, dask_client_remote, test_bucket,
                               test_model_retail):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
@@ -329,18 +352,19 @@ def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores
             test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
         )
     )
-    with s3_fs.open("{}/{}/{}".format(vision_path,
-                                          "models",
-                                          "s-20150718-000000_h-2"), 'wb'
-    ) as f:
-        joblib.dump(test_model_retail[0], f)
-    with s3_fs.open("{}/{}/{}".format(vision_path,
-                                          "models",
-                                          "s-20150718-000000_h-2_params.json"), 'w') as f:
-        json.dump(
-            test_model_retail[1],
-            f
-        )
+    for split in test_validation_models_retail:
+        with s3_fs.open("{}/{}/{}".format(vision_path,
+                                              "models",
+                                              "s-{}_h-2".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S"))), 'wb'
+        ) as f:
+            joblib.dump(test_validation_models_retail[split][0], f)
+        with s3_fs.open("{}/{}/{}".format(vision_path,
+                                              "models",
+                                              "s-{}_h-2_params.json".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S"))), 'w') as f:
+            json.dump(
+                test_validation_models_retail[split][1],
+                f
+            )
     cli_validate_vision(
         s3_fs=s3_fs,
         forecast_definition=test_fd_retail_2["forecast_definition"],
