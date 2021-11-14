@@ -12,8 +12,10 @@ from .datasets.load import _load
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def _get_dataset(forecast_definition, start=None, end=None, pad=False):
-
-    df = dd.read_parquet("{}/*".format(forecast_definition["dataset_directory"]))
+    if forecast_definition["dataset_directory"].startswith("divina://"):
+        df = _load(forecast_definition["dataset_directory"])
+    else:
+        df = dd.read_parquet("{}/*".format(forecast_definition["dataset_directory"]))
     npartitions = df.npartitions
 
     df[forecast_definition["time_index"]] = dd.to_datetime(df[forecast_definition["time_index"]])
@@ -77,7 +79,7 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
     if "joins" in forecast_definition:
         for i, join in enumerate(forecast_definition["joins"]):
             try:
-                if join["dataset_directory"].startswith("divina//:"):
+                if join["dataset_directory"].startswith("divina://"):
                     join_df = _load(join["dataset_directory"])
                 else:
                     join_df = dd.read_parquet("{}/*".format(join["dataset_directory"]))

@@ -825,19 +825,14 @@ def test_fd_retail():
             "forecast_freq": "D",
             "encode_features": ["Weekday"],
             "scenarios": [{"feature": "Promo", "values": [0, 1], "start": "2015-08-01", "end": "2016-01-01"}],
-            "dataset_directory": "dataset/retail/sales2",
+            "dataset_directory": "divina://retail_sales",
             "link_function": "log",
             "confidence_intervals": [100, 0],
             "joins": [
                 {
-                    "dataset_directory": "dataset/time",
+                    "dataset_directory": "divina://time",
                     "join_on": ["Date", "Date"],
                     "as": "time"
-                },
-                {
-                    "dataset_directory": "dataset/retail/store",
-                    "join_on": ["Store", "Store"],
-                    "as": "store"
                 }
             ]
         }

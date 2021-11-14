@@ -337,21 +337,6 @@ def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores
                               test_val_predictions_retail, test_validation_models_retail, test_metrics_retail, dask_client_remote, test_bucket,
                               test_model_retail):
     vision_path = "{}/vision/test1".format(test_bucket)
-    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail_2["forecast_definition"]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail_2["forecast_definition"]["joins"][1]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
-        )
-    )
     for split in test_validation_models_retail:
         with s3_fs.open("{}/{}/{}".format(vision_path,
                                               "models",
