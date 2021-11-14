@@ -13,7 +13,6 @@ import dask.dataframe as ddf
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 import plotly.graph_objects as go
-import plotly.colors as colors
 
 
 def test_validate_forecast_definition(
@@ -70,7 +69,7 @@ def test_get_composite_dataset(
     pd.testing.assert_frame_equal(df.compute().reset_index(drop=True), test_composite_dataset_1.reset_index(drop=True))
 
 
-def test_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_bootstrap_models, random_state):
+def test_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_bootstrap_models, test_validation_models, random_state):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
         test_fd_1["forecast_definition"]["dataset_directory"],
@@ -120,17 +119,40 @@ def test_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_boot
             test_bootstrap_models[seed][0],
         )
         with open(os.path.abspath(
+                os.path.join(
+                    vision_path,
+                    "models/bootstrap",
+                    "h-1_r-{}_params.json".format(seed),
+                )
+        )) as f:
+            assert json.load(f) == test_bootstrap_models[seed][1]
+    for split in test_validation_models:
+        compare_sk_models(
+            joblib.load(
+                os.path.abspath(
                     os.path.join(
                         vision_path,
-                        "models/bootstrap",
-                        "h-1_r-{}_params.json".format(seed),
+                        "models",
+                        "s-{}_h-1".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
                     )
-                )) as f:
-            assert json.load(f) == test_bootstrap_models[seed][1]
+                )
+            ),
+            test_validation_models[split][0],
+        )
+        with open(os.path.abspath(
+                os.path.join(
+                    vision_path,
+                    "models",
+                    "s-{}_h-1_params.json".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+                )
+        )) as f:
+            features = json.load(f)
+        assert features == test_validation_models[split][1]
 
 
 def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
-                      test_model_retail, dask_client, test_bootstrap_models_retail, random_state):
+                      test_model_retail, dask_client, test_validation_models_retail, test_bootstrap_models_retail,
+                      random_state):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
         os.path.join(
@@ -194,14 +216,36 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
             test_bootstrap_models_retail[seed][0],
         )
         with open(os.path.abspath(
-                    os.path.join(
-                        vision_path,
-                        "models/bootstrap",
-                        "h-2_r-{}_params.json".format(seed),
-                    )
-                )) as f:
+                os.path.join(
+                    vision_path,
+                    "models/bootstrap",
+                    "h-2_r-{}_params.json".format(seed),
+                )
+        )) as f:
             features = json.load(f)
         assert features == test_bootstrap_models_retail[seed][1]
+    for split in test_validation_models_retail:
+        compare_sk_models(
+            joblib.load(
+                os.path.abspath(
+                    os.path.join(
+                        vision_path,
+                        "models",
+                        "s-{}_h-2".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+                    )
+                )
+            ),
+            test_validation_models_retail[split][0],
+        )
+        with open(os.path.abspath(
+                os.path.join(
+                    vision_path,
+                    "models",
+                    "s-{}_h-2_params.json".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+                )
+        )) as f:
+            features = json.load(f)
+        assert features == test_validation_models_retail[split][1]
 
 
 def test_forecast(
@@ -342,6 +386,10 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             "forecast"
         )
     ).compute().reset_index(drop=True)
+    pd.testing.assert_frame_equal(
+        result_df,
+        test_forecast_retail.reset_index(drop=True), check_dtype=False
+    )
     pathlib.Path(
         "docs_src/plots"
     ).mkdir(parents=True, exist_ok=True)
@@ -365,16 +413,18 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
         fig.add_trace(
             go.Scatter(marker=dict(color='black'), line=dict(dash='dash'), mode="lines",
                        x=test_df_retail_sales[test_fd_retail["forecast_definition"]['time_index']],
-                       y=test_df_retail_sales[test_fd_retail["forecast_definition"]['target']], name=test_fd_retail["forecast_definition"]['target']))
+                       y=test_df_retail_sales[test_fd_retail["forecast_definition"]['target']],
+                       name=test_fd_retail["forecast_definition"]['target']))
         fig.add_trace(go.Scatter(marker=dict(color="darkblue"), mode="lines",
                                  x=result_df_2d[test_fd_retail["forecast_definition"]['time_index']],
                                  y=result_df_2d[
                                      '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
                                                            h)], name="Horizon {} Forecast".format(h)))
-        fig.add_vrect(x0=pd.to_datetime('07-31-2015').timestamp() * 1000, x1=pd.to_datetime('08-30-2015').timestamp() * 1000, line_width=2, line_color="cadetblue", annotation_text='Blind Forecasts with Promotions Simulated as False')
+        fig.add_vrect(x0=pd.to_datetime('07-31-2015').timestamp() * 1000,
+                      x1=pd.to_datetime('08-30-2015').timestamp() * 1000, line_width=2, line_color="cadetblue",
+                      annotation_text='Blind Forecasts with Promotions Simulated as False')
         fig.write_html('docs_src/plots/test_forecast_retail_h_{}_2d.html'.format(h))
-    fig = go.Figure(
-    )
+    fig = go.Figure()
     for h in test_fd_retail["forecast_definition"]['time_horizons']:
         result_df_2d = result_df.sort_values('Promo').groupby('Date').agg('first').reset_index()
         factors = [c for c in result_df_2d if c.split("_")[0] == "factor"]
@@ -400,26 +450,17 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
     for h in test_fd_retail["forecast_definition"]['time_horizons']:
         result_df_3d = result_df[result_df[test_fd_retail["forecast_definition"]['time_index']] >= '08-01-2015']
         fig.add_trace(go.Surface(x=result_df_3d[test_fd_retail["forecast_definition"]['time_index']].unique(),
-                                     z=[result_df_3d[result_df_3d['Promo'] == 0][
-                                         '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
-                                                                    h)].values, result_df_3d[result_df_3d['Promo'] == 1][
-                                         '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
-                                                                    h)].values],
-                                     y=result_df_3d['Promo'].unique(), opacity=.4))
+                                 z=[result_df_3d[result_df_3d['Promo'] == 0][
+                                        '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
+                                                              h)].values, result_df_3d[result_df_3d['Promo'] == 1][
+                                        '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
+                                                              h)].values],
+                                 y=result_df_3d['Promo'].unique(), opacity=.4))
         fig.write_html('docs_src/plots/test_forecast_retail_h_{}_3d.html'.format(h))
-    pd.testing.assert_frame_equal(
-        ddf.read_parquet(
-            os.path.join(
-                vision_path,
-                "forecast"
-            )
-        ).compute().reset_index(drop=True),
-        test_forecast_retail.reset_index(drop=True), check_dtype=False
-    )
 
 
 def test_validate(
-        s3_fs, test_fd_1, test_df_1, test_metrics_1, dask_client, test_val_predictions_1, test_model_1,
+        s3_fs, test_fd_1, test_df_1, test_metrics_1, dask_client, test_val_predictions_1, test_validation_models, test_model_1,
         test_bootstrap_models
 ):
     vision_path = "divina-test/vision/test1"
@@ -431,36 +472,38 @@ def test_validate(
             vision_path, "models", "bootstrap"
         )
     ).mkdir(parents=True, exist_ok=True)
-    joblib.dump(
-        test_model_1[0],
-        os.path.join(
-            vision_path,
-            "models",
-            "s-19700101-000007_h-1",
-        ),
-    )
-    with open(os.path.join(
-            vision_path,
-            "models",
-            "s-19700101-000007_h-1_params.json",
-    ), 'w+') as f:
-        json.dump(
-            test_model_1[1],
-            f
+
+    for split in test_validation_models:
+        joblib.dump(
+            test_validation_models[split][0],
+            os.path.join(
+                vision_path,
+                "models",
+                "s-{}_h-1".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+            ),
         )
+        with open(os.path.join(
+                vision_path,
+                "models",
+                "s-{}_h-1_params.json".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+        ), 'w+') as f:
+            json.dump(
+                test_validation_models[split][1],
+                f
+            )
     for seed in test_bootstrap_models:
         joblib.dump(
             test_bootstrap_models[seed][0],
             os.path.join(
                 vision_path,
                 "models/bootstrap",
-                "s-19700101-000007_h-1_r-{}".format(seed),
+                "h-1_r-{}".format(seed),
             ),
         )
         with open(os.path.join(
                 vision_path,
                 "models/bootstrap",
-                "s-19700101-000007_h-1_r-{}_params.json".format(seed),
+                "h-1_r-{}_params.json".format(seed),
         ), 'w+') as f:
             json.dump(
                 test_bootstrap_models[seed][1],
@@ -491,7 +534,7 @@ def test_validate(
 
 def test_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
                          test_val_predictions_retail, test_metrics_retail, test_model_retail,
-                         test_bootstrap_models_retail, dask_client):
+                         test_bootstrap_models_retail, test_validation_models_retail, dask_client):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
         os.path.join(
@@ -513,23 +556,24 @@ def test_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             test_fd_retail["forecast_definition"]["joins"][0]["dataset_directory"],
         )
     )
-    joblib.dump(
-        test_model_retail[0],
-        os.path.join(
-            vision_path,
-            "models",
-            "s-20150718-000000_h-2",
-        ),
-    )
-    with open(os.path.join(
-            vision_path,
-            "models",
-            "s-20150718-000000_h-2_params.json",
-    ), 'w+') as f:
-        json.dump(
-            test_model_retail[1],
-            f
+    for split in test_fd_retail["forecast_definition"]["time_validation_splits"]:
+        joblib.dump(
+            test_validation_models_retail[split][0],
+            os.path.join(
+                vision_path,
+                "models",
+                "s-{}_h-2".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+            ),
         )
+        with open(os.path.join(
+                vision_path,
+                "models",
+                "s-{}_h-2_params.json".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+        ), 'w+') as f:
+            json.dump(
+                test_validation_models_retail[split][1],
+                f
+            )
     for seed in test_bootstrap_models_retail:
         joblib.dump(
             test_bootstrap_models_retail[seed][0],

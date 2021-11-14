@@ -1,25 +1,14 @@
-.. divina documentation master file, created by
-
-.. module:: divina
+:noindex:
 
 ********************
-divina
+quickstart
 ********************
 
 **Date**: |today| **Version**: |version|
 
-**Useful links**:
-`Binary Installers <https://pypi.org/project/divina>`__ |
-`Source Repository <https://github.com/secrettoad/divina>`__ |
-`Issues & Ideas <https://github.com/secrettoad/divina/issues>`__ |
-`Q&A Support <https://stackoverflow.com/questions/tagged/divina>`__
+divina in 5 minutes
 
-.. toctree::
-   :maxdepth: 1
-
-   cli
-
-:mod:`divina` is an open source, BSD3-licensed library providing scalable and hyper-interpretable causal forecasting capabilities written in `Python <https://www.python.org/>`__ and consumable via CLI.
+In order to perform your first forecast with divina,
 
 The aim of :mod:`divina` is twofold:
 
