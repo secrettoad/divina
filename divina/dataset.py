@@ -11,6 +11,7 @@ from itertools import product
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def _get_dataset(forecast_definition, start=None, end=None, pad=False):
+
     df = dd.read_parquet("{}/*".format(forecast_definition["dataset_directory"]))
     npartitions = df.npartitions
 
@@ -160,4 +161,9 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
     df = df.sort_values(forecast_definition["time_index"])
     df = df.repartition(npartitions=npartitions)
     df = cull_empty_partitions(df)
+    df['index'] = 1
+    df['index'] = df['index'].cumsum()
+    df['index'] = df['index'] - 1
+    df = df.set_index('index')
+    df.index.name = None
     return df.persist()

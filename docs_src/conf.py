@@ -5,6 +5,8 @@ sys.path.insert(0, pathlib.Path(__file__).parent.parent)
 
 extensions = ["sphinx_click"]
 
+project="divina"
+
 autodoc_member_order = "bysource"
 
 html_static_path = ["_static"]
