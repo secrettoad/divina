@@ -159,21 +159,6 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
             test_fd_retail["forecast_definition"]["dataset_directory"],
         )
     ).mkdir(parents=True, exist_ok=True)
-    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["joins"][1]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["joins"][0]["dataset_directory"],
-        )
-    )
     _train(
         s3_fs=s3_fs,
         dask_model=LinearRegression,
@@ -324,21 +309,6 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             vision_path, "models", "bootstrap"
         )
     ).mkdir(parents=True, exist_ok=True)
-    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["joins"][1]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["joins"][0]["dataset_directory"],
-        )
-    )
     joblib.dump(
         test_model_retail[0],
         os.path.join(
@@ -541,21 +511,6 @@ def test_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             vision_path, "models", "bootstrap"
         )
     ).mkdir(parents=True, exist_ok=True)
-    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["joins"][1]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["joins"][0]["dataset_directory"],
-        )
-    )
     for split in test_fd_retail["forecast_definition"]["time_validation_splits"]:
         joblib.dump(
             test_validation_models_retail[split][0],
