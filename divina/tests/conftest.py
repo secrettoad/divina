@@ -78,7 +78,7 @@ def dask_client(request):
 
 @pytest.fixture(scope="session")
 def dask_cluster_ip():
-    return "3.145.61.65:8786"
+    return None
 
 
 @pytest.fixture(scope="session")
@@ -97,7 +97,7 @@ def dask_client_remote(request, dask_cluster_ip):
                 "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                 "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
             },
-            auto_shutdown=False,
+            auto_shutdown=True,
         )
         cluster.scale(5)
         client = Client(cluster)
@@ -825,19 +825,14 @@ def test_fd_retail():
             "forecast_freq": "D",
             "encode_features": ["Weekday"],
             "scenarios": [{"feature": "Promo", "values": [0, 1], "start": "2015-08-01", "end": "2016-01-01"}],
-            "dataset_directory": "dataset/retail/sales2",
+            "dataset_directory": "divina://retail_sales",
             "link_function": "log",
             "confidence_intervals": [100, 0],
             "joins": [
                 {
-                    "dataset_directory": "dataset/time",
+                    "dataset_directory": "divina://time",
                     "join_on": ["Date", "Date"],
                     "as": "time"
-                },
-                {
-                    "dataset_directory": "dataset/retail/store",
-                    "join_on": ["Store", "Store"],
-                    "as": "store"
                 }
             ]
         }

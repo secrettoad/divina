@@ -7,16 +7,14 @@ import pathlib
 import backoff
 from botocore.exceptions import ClientError
 import json
-import dask.bag as db
 import numpy as np
 from .utils import validate_forecast_definition
 from dask_ml.linear_model import LinearRegression
 import dask.array as da
-from functools import partial
 
 
-def _train_model(df, dask_model, model_name, random_seed, features, target, bootstrap_sample, confidence_intervals,
-                 link_function, write_open, write_path):
+def _train_model(df, dask_model, model_name, random_seed, features, target,
+                 link_function, write_open, write_path, bootstrap_sample=None, confidence_intervals=None):
     if random_seed:
         model = dask_model(random_state=random_seed)
     else:
@@ -113,16 +111,17 @@ def _train_model(df, dask_model, model_name, random_seed, features, target, boot
             return (bootstrap_model, bootstrap_features)
 
         if random_seed:
-            sample_bag = db.from_sequence([x for x in range(random_seed, random_seed + bootstrap_sample)],
-                                          npartitions=10)
+            seeds = [x for x in range(random_seed, random_seed + bootstrap_sample)]
         else:
-            sample_bag = db.from_sequence([x for x in np.random.randint(0, 10000, size=bootstrap_sample)],
-                                          npartitions=10)
-        bootstrap_models = sample_bag.map(
-            partial(train_persist_bootstrap_model, features, df_train,
+            seeds = [x for x in np.random.randint(0, 10000, size=bootstrap_sample)]
+
+        bootstrap_models = []
+        for seed in seeds:
+            bootstrap_models.append(
+                train_persist_bootstrap_model(features, df_train,
                     target,
                     link_function,
-                    model_name)).compute()
+                    model_name, seed))
 
         return (model, features), bootstrap_models
 
@@ -169,16 +168,6 @@ def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, 
 
     df = _get_dataset(forecast_definition)
 
-    '''for h in forecast_definition["time_horizons"]:
-        if "signal_dimension" in forecast_definition:
-            df["{}_h_{}".format(forecast_definition["target"], h)] = df.groupby(
-                forecast_definition["signal_dimensions"]
-            )[forecast_definition["target"]].apply(lambda x: x.shift(-h))
-        else:
-            df["{}_h_{}".format(forecast_definition["target"], h)] = df[
-                forecast_definition["target"]
-            ].shift(-h)'''
-
     time_min, time_max = (
         pd.to_datetime(str(df[forecast_definition["time_index"]].min().compute())),
         pd.to_datetime(str(df[forecast_definition["time_index"]].max().compute())),
@@ -205,15 +194,16 @@ def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, 
                      bootstrap_sample=bootstrap_sample, confidence_intervals=confidence_intervals,
                      link_function=link_function, write_open=write_open, write_path=write_path)
 
+        print(model[0].coef_)
+
         for s in forecast_definition["time_validation_splits"]:
             if pd.to_datetime(str(s)) <= time_min or pd.to_datetime(str(s)) >= time_max:
                 raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
             df_train = df[df[forecast_definition["time_index"]] < s]
 
-            model, bootstrap_models = _train_model(df=df_train, dask_model=dask_model, model_name="s-{}_h-{}".format(
+            model = _train_model(df=df_train, dask_model=dask_model, model_name="s-{}_h-{}".format(
                 pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                 h
             ), random_seed=random_seed,
                          features=features, target=forecast_definition["target"],
-                         bootstrap_sample=bootstrap_sample, confidence_intervals=confidence_intervals,
                          link_function=link_function, write_open=write_open, write_path=write_path)

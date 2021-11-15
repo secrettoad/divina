@@ -154,26 +154,6 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
                       test_model_retail, dask_client, test_validation_models_retail, test_bootstrap_models_retail,
                       random_state):
     vision_path = "divina-test/vision/test1"
-    pathlib.Path(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["dataset_directory"],
-        )
-    ).mkdir(parents=True, exist_ok=True)
-    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["joins"][1]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail["forecast_definition"]["joins"][0]["dataset_directory"],
-        )
-    )
     _train(
         s3_fs=s3_fs,
         dask_model=LinearRegression,
