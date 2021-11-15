@@ -7,14 +7,17 @@ from dask_ml.preprocessing import Categorizer, DummyEncoder
 from sklearn.pipeline import make_pipeline
 import numpy as np
 from itertools import product
-import pathlib
+from .datasets.load import _load
 
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def _get_dataset(forecast_definition, start=None, end=None, pad=False):
-
-    df = dd.read_parquet("{}/*".format(forecast_definition["dataset_directory"]))
-    npartitions = df.npartitions
+    if forecast_definition["dataset_directory"].startswith("divina://"):
+        df = _load(forecast_definition["dataset_directory"])
+    else:
+        df = dd.read_parquet("{}/*".format(forecast_definition["dataset_directory"]))
+    df = df.reset_index()
+    npartitions = (df.memory_usage(deep=True).sum().compute() // 104857600) + 1
 
     df[forecast_definition["time_index"]] = dd.to_datetime(df[forecast_definition["time_index"]])
 
@@ -77,7 +80,10 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
     if "joins" in forecast_definition:
         for i, join in enumerate(forecast_definition["joins"]):
             try:
-                join_df = dd.read_parquet("{}/*".format(join["dataset_directory"]))
+                if join["dataset_directory"].startswith("divina://"):
+                    join_df = _load(join["dataset_directory"])
+                else:
+                    join_df = dd.read_parquet("{}/*".format(join["dataset_directory"]))
             except IndexError:
                 raise Exception("Could not load dataset {}. No parquet files found.".format(join["dataset_directory"]))
             join_df[join["join_on"][0]] = join_df[join["join_on"][0]].astype(df[join["join_on"][1]].dtype)
@@ -168,11 +174,3 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
     df = df.set_index('index')
     df.index.name = None
     return df.persist()
-
-
-def _get_divina_dataset(path):
-    if not path.startswith("divina//:"):
-        raise Exception("Path must begin with 'divina//:'")
-    else:
-        local_path = pathlib.Path(str(pathlib.Path(__file__).parent.parent), 'datasets', path[9:])
-    return dd.read_parquet(local_path)
