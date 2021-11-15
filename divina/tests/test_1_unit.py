@@ -166,7 +166,6 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
         write_path=vision_path,
         random_seed=random_state,
     )
-
     compare_sk_models(
         joblib.load(
             os.path.abspath(

@@ -16,7 +16,9 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
         df = _load(forecast_definition["dataset_directory"])
     else:
         df = dd.read_parquet("{}/*".format(forecast_definition["dataset_directory"]))
-    npartitions = df.npartitions
+    df = df.reset_index()
+    npartitions = max((df.memory_usage(deep=True).sum().compute()//104857600 + 1), 2)
+    df = df.repartition(npartitions=npartitions)
 
     df[forecast_definition["time_index"]] = dd.to_datetime(df[forecast_definition["time_index"]])
 
@@ -26,6 +28,9 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
     )
 
     if "signal_dimensions" in forecast_definition:
+        if "signal_filter" in forecast_definition:
+            for k in forecast_definition["signal_filter"]:
+                df = df[df[k].isin(forecast_definition["signal_filter"][k])]
         df = df.groupby([forecast_definition["time_index"]] + forecast_definition["signal_dimensions"]).agg(
             {**{c: "sum" for c in df.columns if df[c].dtype in [int, float] and c != forecast_definition['time_index']},
              **{c: "first" for c in df.columns if
