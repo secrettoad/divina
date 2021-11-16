@@ -164,8 +164,10 @@ def _get_dataset(forecast_definition, start=None, end=None, pad=False):
                 for c in forecast_definition["interaction_terms"][t]:
                     df['{}-x-{}'.format(t, c)] = df[t] + df[c]
 
+
+    ##TODO determinism disappears somewhere after here and before persist
+
     df[forecast_definition["time_index"]] = dd.to_datetime(df[forecast_definition["time_index"]])
-    df = df.sort_values(forecast_definition["time_index"])
     df = df.repartition(npartitions=npartitions)
     df = cull_empty_partitions(df)
     df['index'] = 1
