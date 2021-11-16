@@ -125,6 +125,10 @@ def _train_model(df, dask_model, model_name, random_seed, features, target,
 
         return (model, features), bootstrap_models
 
+    else:
+
+        return (model, features)
+
 
 @validate_forecast_definition
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
@@ -193,8 +197,6 @@ def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, 
                      features=features, target=forecast_definition["target"],
                      bootstrap_sample=bootstrap_sample, confidence_intervals=confidence_intervals,
                      link_function=link_function, write_open=write_open, write_path=write_path)
-
-        print(model[0].coef_)
 
         for s in forecast_definition["time_validation_splits"]:
             if pd.to_datetime(str(s)) <= time_min or pd.to_datetime(str(s)) >= time_max:

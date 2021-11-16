@@ -56,33 +56,18 @@ def test_train_small(
             compare_sk_models(joblib.load(f), test_bootstrap_models[seed][0])
 
 
-def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
+def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
                            test_model_retail, dask_client_remote, test_bootstrap_models_retail, test_validation_models_retail, random_state,
                            test_bucket):
     vision_path = "{}/vision/test1".format(test_bucket)
     pathlib.Path(
         os.path.join(
-            test_fd_retail_2["forecast_definition"]["dataset_directory"],
+            test_fd_retail["forecast_definition"]["dataset_directory"],
         )
     ).mkdir(parents=True, exist_ok=True)
-    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail_2["forecast_definition"]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail_2["forecast_definition"]["joins"][1]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
-        )
-    )
     cli_train_vision(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_retail_2["forecast_definition"],
+        forecast_definition=test_fd_retail["forecast_definition"],
         write_path=vision_path,
         keep_instances_alive=False,
         dask_client=dask_client_remote,
@@ -204,25 +189,10 @@ def test_forecast_small(
     )
 
 
-def test_dask_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
+def test_dask_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
                               test_model_retail, test_val_predictions_retail, test_forecast_retail,
                               test_bootstrap_models_retail, dask_client_remote, test_bucket):
     vision_path = "{}/vision/test1".format(test_bucket)
-    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail_2["forecast_definition"]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail_2["forecast_definition"]["joins"][1]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
-        )
-    )
     with s3_fs.open("{}/{}/{}".format(vision_path,
                                       "models",
                                       "h-2"),
@@ -257,7 +227,7 @@ def test_dask_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores
             )
     cli_forecast_vision(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_retail_2["forecast_definition"],
+        forecast_definition=test_fd_retail["forecast_definition"],
         write_path=vision_path,
         read_path=vision_path,
         keep_instances_alive=False,
@@ -333,25 +303,10 @@ def test_validate_small(
     assert metrics == test_metrics_1
 
 
-def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail_2,
+def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_df_retail_time, test_fd_retail,
                               test_val_predictions_retail, test_validation_models_retail, test_metrics_retail, dask_client_remote, test_bucket,
                               test_model_retail):
     vision_path = "{}/vision/test1".format(test_bucket)
-    ddf.from_pandas(test_df_retail_sales, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail_2["forecast_definition"]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_stores, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail_2["forecast_definition"]["joins"][1]["dataset_directory"],
-        )
-    )
-    ddf.from_pandas(test_df_retail_time, npartitions=2).to_parquet(
-        os.path.join(
-            test_fd_retail_2["forecast_definition"]["joins"][0]["dataset_directory"],
-        )
-    )
     for split in test_validation_models_retail:
         with s3_fs.open("{}/{}/{}".format(vision_path,
                                               "models",
@@ -367,7 +322,7 @@ def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores
             )
     cli_validate_vision(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_retail_2["forecast_definition"],
+        forecast_definition=test_fd_retail["forecast_definition"],
         write_path=vision_path,
         read_path=vision_path,
         ec2_keypair_name="divina2",
