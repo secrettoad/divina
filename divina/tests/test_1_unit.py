@@ -386,7 +386,7 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
         fig.write_html('docs_src/plots/test_forecast_retail_h_{}_2d.html'.format(h))
     fig = go.Figure()
     for h in test_fd_retail["forecast_definition"]['time_horizons']:
-        result_df_2d = result_df.sort_values('Promo').groupby('Date').agg('first').reset_index()
+        result_df_2d = result_df[(result_df['Promo'] == 1) & (result_df['Store_1.0'] == 1) & (result_df['Date'] >= '2015-08-01')]
         factors = [c for c in result_df_2d if c.split("_")[0] == "factor"]
         result_df_2d = result_df_2d[factors + [test_fd_retail["forecast_definition"]['time_index']]]
         for f in factors:
@@ -408,7 +408,7 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
         )
     )
     for h in test_fd_retail["forecast_definition"]['time_horizons']:
-        result_df_3d = result_df[result_df[test_fd_retail["forecast_definition"]['time_index']] >= '08-01-2015']
+        result_df_3d = result_df[(result_df[test_fd_retail["forecast_definition"]['time_index']] >= '08-01-2015') & (result_df['Store_1.0'] == 1)].sort_values('Date')
         fig.add_trace(go.Surface(x=result_df_3d[test_fd_retail["forecast_definition"]['time_index']].unique(),
                                  z=[result_df_3d[result_df_3d['Promo'] == 0][
                                         '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
