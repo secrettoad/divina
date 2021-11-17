@@ -198,16 +198,6 @@ def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, 
                      bootstrap_sample=bootstrap_sample, confidence_intervals=confidence_intervals,
                      link_function=link_function, write_open=write_open, write_path=write_path)
 
-
-        print(model[1])
-        print(list(model[0].coef_))
-        print(model[0].intercept_)
-
-        print([model[1] for model in bootstrap_models])
-        print([list(model[0].coef_) for model in bootstrap_models])
-        print([model[0].intercept_ for model in bootstrap_models])
-
-
         for s in forecast_definition["time_validation_splits"]:
             if pd.to_datetime(str(s)) <= time_min or pd.to_datetime(str(s)) >= time_max:
                 raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
@@ -219,7 +209,3 @@ def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, 
             ), random_seed=random_seed,
                          features=features, target=forecast_definition["target"],
                          link_function=link_function, write_open=write_open, write_path=write_path)
-
-            print(model[1])
-            print(list(model[0].coef_))
-            print(model[0].intercept_)
