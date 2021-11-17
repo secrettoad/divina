@@ -214,11 +214,9 @@ def test_model_1(test_df_1, random_state, test_fd_1):
 
 @pytest.fixture()
 def test_model_retail(test_df_1, random_state, test_fd_1):
-    params = [6.68625614, 0.03268555, 0.59167019, 0.02222172, 1.30688414, 0.72903089,
-              1.41805076, 1.21956888, 1.08926183, 0.9472792]
-    intercept = -6.736428843262932
-    features = ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_2.0',
-                'Weekday_0.0', 'Weekday_4.0', 'Weekday_6.0']
+    params = [6.686256143578205, 0.032685547216821084, 0.5916701903586106, 0.02222172106394248, 1.306884135786644, 0.7290308875750824, 1.4180507591016962, -6.736428843266202, 0.9472792044529643, 1.0892618267371825]
+    intercept = 1.219568882537158
+    features = ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_6.0', 'Weekday_4.0', 'Weekday_0.0', 'Weekday_2.0']
     model = LinearRegression()
     model.fit(
         ddf.from_pandas(pd.DataFrame([np.array(params) + c for c in range(0, 2)]), npartitions=1).to_dask_array(
@@ -266,28 +264,9 @@ def test_bootstrap_models(test_df_1, random_state, test_fd_1):
 
 @pytest.fixture()
 def test_bootstrap_models_retail(test_df_1, random_state, test_fd_1):
-    params = [[6.714473614451611, 0.04720604182466373, 0.5563634582649397, 0.06913230881860004, 1.334650132753062,
-               0.7835733847504258, 1.3569390468778164, 1.1621894423396184, 1.0815432262612732, 0.9180307674382324],
-              [6.658355609283723, 0.05709632404511155, 0.5790440097816386, -0.07543326459858571, 1.2929587510193763,
-               0.6975620295439486, 1.424378910113566, 1.2161644744243625, 1.037005995833981, 0.8870810870898819],
-              [6.800234073315391, 0.012924093248027246, 0.5533276351446353, -0.13395284584636927, 1.2654221176361673,
-               0.8061274749955895, 1.340668694845026, 1.2739032550429141, 1.0168419847963184, 0.9511373063177099],
-              [6.640558271276224, 0.06813798771789699, 0.5431224171702252, -0.025176350013894025, 1.3207766521339164,
-               0.6946715390110514, 1.4018551024570751, 1.2599632733979642, 1.215043793819877, 0.9437106875136438],
-              [6.711738073807515, 0.0064223846651324384, 0.6190680889258054, 0.002245605638940958, 1.2918748329904857,
-               0.7080886766339756, 1.4355942938530604, 1.2002102454225185, 1.1185704351106132, 0.94716983320502]]
-    intercepts = [-6.787959572273332, -6.7423652503022655, -6.81451326402526, -6.742546469586198, -6.722130068182222]
-    features = [
-        ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_2.0', 'Weekday_0.0',
-         'Weekday_4.0', 'Weekday_6.0'],
-        ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_2.0', 'Weekday_0.0',
-         'Weekday_4.0', 'Weekday_6.0'],
-        ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_2.0', 'Weekday_0.0',
-         'Weekday_4.0', 'Weekday_6.0'],
-        ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_2.0', 'Weekday_0.0',
-         'Weekday_4.0', 'Weekday_6.0'],
-        ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_2.0', 'Weekday_0.0',
-         'Weekday_4.0', 'Weekday_6.0']]
+    params = [[6.695404367669917, 0.052336281969206165, 0.5076918963417277, 0.14567028578992144, 1.3015835853753086, 0.7675792212189431, 1.3605319431554395, -6.777699392686003, 0.9940300131542686, 1.1057844317833811], [6.771804833708587, -0.01433939586791416, 0.6100633084887016, -0.1074560653478315, 1.3047924373843771, 0.7554860536926625, 1.3964006902055066, -6.745725490060152, 0.9138029011311455, 1.1431753168682361], [6.685493116995753, -5.8925273752490595e-05, 0.6262142523538481, -0.025197701091283373, 1.357588044318189, 0.6474069336066723, 1.4655602515215782, -6.685110240752207, 0.9610730736883236, 1.041871293699486], [6.628701777201933, 0.08498423382049118, 0.5378541376257779, -0.0656678623547342, 1.3298394469911017, 0.634283358884861, 1.393862572237635, -6.753289058987492, 0.9825971225483233, 1.1027020592682626], [6.678729544552777, 0.04018443493034582, 0.5682344989940038, 0.1007697416953779, 1.302588241271836, 0.8162359554802198, 1.410319298555125, -6.743205553149599, 0.9644199047024303, 1.1288775705776208]]
+    intercepts = [1.25438266238888, 1.231005646648201, 1.2538028785549118, 1.2933967415420593, 1.1787267527697631]
+    features = [['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_6.0', 'Weekday_4.0', 'Weekday_0.0', 'Weekday_2.0'], ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_6.0', 'Weekday_4.0', 'Weekday_0.0', 'Weekday_2.0'], ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_6.0', 'Weekday_4.0', 'Weekday_0.0', 'Weekday_2.0'], ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_6.0', 'Weekday_4.0', 'Weekday_0.0', 'Weekday_2.0'], ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_6.0', 'Weekday_4.0', 'Weekday_0.0', 'Weekday_2.0']]
     seeds = range(random_state, random_state + test_fd_1["forecast_definition"]["bootstrap_sample"])
     bootstrap_models = {}
 
@@ -330,12 +309,10 @@ def test_validation_models(test_df_1, random_state, test_fd_1):
 
 @pytest.fixture()
 def test_validation_models_retail(test_df_1, random_state, test_fd_retail):
-    params = [[6.68166853, 0.03261012, 0.59622547, 0.01582182, 1.30947671, 0.7225281,
-               1.42348941, 1.21951785, 1.08578114, 0.94398241]]
-    intercepts = [-6.7315024370961645]
+    params = [[6.681668531477845, 0.032610118456406045, 0.5962254699561582, 0.015821817090692004, 1.3094767137463517, 0.722528104289034, 1.4234894054023248, -6.731502437091038, 0.9439824059250222, 1.0857811395137276]]
+    intercepts = [1.2195178531054274]
     features = [
-        ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_2.0', 'Weekday_0.0',
-         'Weekday_4.0', 'Weekday_6.0']]
+        ['Store', 'Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_6.0', 'Weekday_4.0', 'Weekday_0.0', 'Weekday_2.0']]
     splits = test_fd_retail["forecast_definition"]["time_validation_splits"]
     validation_models = {}
 
@@ -8494,7 +8471,7 @@ def test_fd_retail():
             "signal_dimensions": ["Store"],
             "time_horizons": [2],
             "forecast_freq": "D",
-            "encode_features": ["Weekday"],
+            "encode_features": ["Weekday", "Store"],
             "scenarios": [{"feature": "Promo", "values": [0, 1], "start": "2015-08-01", "end": "2016-01-01"}],
             "dataset_directory": "divina://retail_sales",
             "link_function": "log",
