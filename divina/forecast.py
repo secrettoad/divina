@@ -6,25 +6,29 @@ import backoff
 from botocore.exceptions import ClientError
 import os
 from functools import partial
-from .utils import validate_forecast_definition
+from .utils import validate_experiment_definition
 import json
 import dask.array as da
 
 
-@validate_forecast_definition
+@validate_experiment_definition
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-def _forecast(s3_fs, forecast_definition, read_path, write_path):
+def _forecast(s3_fs, experiment_definition, read_path, write_path):
+    if not "time_horizons" in experiment_definition:
+        time_horizons = [0]
+    else:
+        time_horizons = experiment_definition["time_horizons"]
     forecast_kwargs = {}
     for k in ['forecast_start', 'forecast_end']:
-        if k in forecast_definition:
-            forecast_kwargs.update({k.split('_')[1]: forecast_definition[k]})
-    forecast_df = _get_dataset(forecast_definition, pad=True, **forecast_kwargs)
+        if k in experiment_definition:
+            forecast_kwargs.update({k.split('_')[1]: experiment_definition[k]})
+    forecast_df = _get_dataset(experiment_definition, pad=True, **forecast_kwargs)
 
-    horizon_ranges = [x for x in forecast_definition["time_horizons"] if type(x) == tuple]
+    horizon_ranges = [x for x in time_horizons if type(x) == tuple]
     if len(horizon_ranges) > 0:
-        forecast_definition["time_horizons"] = [x for x in forecast_definition["time_horizons"] if type(x) == int]
+        time_horizons = [x for x in time_horizons if type(x) == int]
         for x in horizon_ranges:
-            forecast_definition["time_horizons"] = set(forecast_definition["time_horizons"] + list(range(x[0], x[1])))
+            time_horizons = set(time_horizons + list(range(x[0], x[1])))
 
     if write_path[:5] == "s3://":
         if not s3_fs.exists(write_path):
@@ -44,7 +48,7 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
         read_ls = os.listdir
         bootstrap_prefix = os.path.join(read_path, 'models', 'bootstrap')
 
-    for h in forecast_definition["time_horizons"]:
+    for h in time_horizons:
         with read_open(
                 "{}/models/h-{}".format(
                     read_path,
@@ -63,15 +67,15 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
             fit_model_params = json.load(f)
         features = fit_model_params["features"]
 
-        if "link_function" in forecast_definition:
-            if forecast_definition["link_function"] == 'log':
+        if "link_function" in experiment_definition:
+            if experiment_definition["link_function"] == 'log':
                 forecast_df[
-                    "{}_h_{}_pred".format(forecast_definition["target"], h)
+                    "{}_h_{}_pred".format(experiment_definition["target"], h)
                 ] = da.expm1(fit_model.predict(forecast_df[features].to_dask_array(lengths=True)))
             sys.stdout.write("Forecasts made for horizon {}\n".format(h))
         else:
             forecast_df[
-                "{}_h_{}_pred".format(forecast_definition["target"], h)
+                "{}_h_{}_pred".format(experiment_definition["target"], h)
             ] = fit_model.predict(forecast_df[features].to_dask_array(lengths=True))
             sys.stdout.write("Forecasts made for horizon {}\n".format(h))
 
@@ -80,7 +84,7 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
         for c in factor_df:
             forecast_df[c] = factor_df[c]
 
-        if "confidence_intervals" in forecast_definition:
+        if "confidence_intervals" in experiment_definition:
             bootstrap_model_paths = [p for p in read_ls("{}/models/bootstrap".format(
                 read_path
             )) if '.' not in p]
@@ -105,22 +109,22 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
                         bootstrap_params = json.load(f)
                         bootstrap_features = bootstrap_params['features']
                     if link_function == 'log':
-                        df['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h,
+                        df['{}_h_{}_pred_b_{}'.format(experiment_definition["target"], h,
                                                       path.split("-")[-1])] = da.expm1(
                             bootstrap_model.predict(
                                 dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(
                                     lengths=True)))
                     else:
-                        df['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h,
+                        df['{}_h_{}_pred_b_{}'.format(experiment_definition["target"], h,
                                                       path.split("-")[-1])] = bootstrap_model.predict(
                             dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(lengths=True))
 
                 return df
 
-            if "link_function" in forecast_definition:
+            if "link_function" in experiment_definition:
                 forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model,
                                                                  bootstrap_model_paths,
-                                                                 forecast_definition['link_function']))
+                                                                 experiment_definition['link_function']))
 
             else:
                 forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model,
@@ -128,20 +132,20 @@ def _forecast(s3_fs, forecast_definition, read_path, write_path):
                                                                  None))
 
             df_interval = dd.from_array(dd.from_array(
-                forecast_df[['{}_h_{}_pred_b_{}'.format(forecast_definition["target"], h, i.split("-")[-1]) for i in
+                forecast_df[['{}_h_{}_pred_b_{}'.format(experiment_definition["target"], h, i.split("-")[-1]) for i in
                              bootstrap_model_paths] + [
-                                '{}_h_{}_pred'.format(forecast_definition["target"],
+                                '{}_h_{}_pred'.format(experiment_definition["target"],
                                                       h)]].to_dask_array(lengths=True).T).repartition(
                 npartitions=forecast_df.npartitions).quantile(
-                [i * .01 for i in forecast_definition['confidence_intervals']]).to_dask_array(lengths=True).T)
-            df_interval.columns = ['{}_h_{}_pred_c_{}'.format(forecast_definition["target"], h, c) for c in
-                                   forecast_definition["confidence_intervals"]]
+                [i * .01 for i in experiment_definition['confidence_intervals']]).to_dask_array(lengths=True).T)
+            df_interval.columns = ['{}_h_{}_pred_c_{}'.format(experiment_definition["target"], h, c) for c in
+                                   experiment_definition["confidence_intervals"]]
 
             df_interval = df_interval.repartition(divisions=forecast_df.divisions)
             for c in df_interval.columns:
                 forecast_df[c] = df_interval[c]
 
-        forecast_df[forecast_definition["time_index"]] = dd.to_datetime(forecast_df[forecast_definition["time_index"]])
+        forecast_df[experiment_definition["time_index"]] = dd.to_datetime(forecast_df[experiment_definition["time_index"]])
 
         dd.to_parquet(
             forecast_df,

@@ -96,11 +96,11 @@ def cull_empty_partitions(df):
     return df
 
 
-def validate_forecast_definition(func):
+def validate_experiment_definition(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         with open(pathlib.Path(pathlib.Path(__file__).parent, 'config/fd_schema.json'), 'r') as f:
-            validate(instance={'forecast_definition': kwargs['forecast_definition']}, schema=json.load(f))
+            validate(instance={'experiment_definition': kwargs['experiment_definition']}, schema=json.load(f))
         return func(*args, **kwargs)
 
     return wrapper

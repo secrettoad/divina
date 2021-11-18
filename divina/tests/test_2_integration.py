@@ -24,11 +24,11 @@ def test_train_small(
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_3["forecast_definition"]["dataset_directory"]
+        test_fd_3["experiment_definition"]["data_path"]
     )
     cli_train_vision(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_3["forecast_definition"],
+        experiment_definition=test_fd_3["experiment_definition"],
         write_path=vision_path,
         keep_instances_alive=False,
         dask_client=dask_client_remote,
@@ -62,12 +62,12 @@ def test_dask_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, t
     vision_path = "{}/vision/test1".format(test_bucket)
     pathlib.Path(
         os.path.join(
-            test_fd_retail["forecast_definition"]["dataset_directory"],
+            test_fd_retail["experiment_definition"]["data_path"],
         )
     ).mkdir(parents=True, exist_ok=True)
     cli_train_vision(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_retail["forecast_definition"],
+        experiment_definition=test_fd_retail["experiment_definition"],
         write_path=vision_path,
         keep_instances_alive=False,
         dask_client=dask_client_remote,
@@ -131,7 +131,7 @@ def test_forecast_small(
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_3["forecast_definition"]["dataset_directory"],
+        test_fd_3["experiment_definition"]["data_path"],
     )
     pathlib.Path(
         "models/bootstrap"
@@ -172,7 +172,7 @@ def test_forecast_small(
     shutil.rmtree('models', ignore_errors=True)
     cli_forecast_vision(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_3["forecast_definition"],
+        experiment_definition=test_fd_3["experiment_definition"],
         write_path=vision_path,
         read_path=vision_path,
         keep_instances_alive=False,
@@ -227,7 +227,7 @@ def test_dask_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores
             )
     cli_forecast_vision(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_retail["forecast_definition"],
+        experiment_definition=test_fd_retail["experiment_definition"],
         write_path=vision_path,
         read_path=vision_path,
         keep_instances_alive=False,
@@ -257,7 +257,7 @@ def test_validate_small(
 ):
     vision_path = "{}/vision/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_3["forecast_definition"]["dataset_directory"]
+        test_fd_3["experiment_definition"]["data_path"]
     )
     for split in test_validation_models:
         with s3_fs.open("{}/{}/{}".format(vision_path,
@@ -275,12 +275,11 @@ def test_validate_small(
             )
     cli_validate_vision(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_3["forecast_definition"],
+        experiment_definition=test_fd_3["experiment_definition"],
         write_path=vision_path,
         read_path=vision_path,
         ec2_keypair_name="divina2",
         keep_instances_alive=False,
-        local=False,
         dask_client=dask_client_remote,
     )
     pd.testing.assert_frame_equal(
@@ -322,12 +321,11 @@ def test_dask_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores
             )
     cli_validate_vision(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_retail["forecast_definition"],
+        experiment_definition=test_fd_retail["experiment_definition"],
         write_path=vision_path,
         read_path=vision_path,
         ec2_keypair_name="divina2",
         keep_instances_alive=False,
-        local=False,
         dask_client=dask_client_remote,
     )
     pd.testing.assert_frame_equal(
