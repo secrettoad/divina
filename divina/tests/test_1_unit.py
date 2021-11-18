@@ -4,6 +4,7 @@ from ..train import _train
 from ..forecast import _forecast
 from ..dataset import _get_dataset
 from ..validate import _validate
+from ..experiment import _experiment
 import pathlib
 from dask_ml.linear_model import LinearRegression
 from ..utils import compare_sk_models, get_parameters, set_parameters
@@ -15,12 +16,12 @@ from jsonschema.exceptions import ValidationError
 import plotly.graph_objects as go
 
 
-def test_validate_forecast_definition(
+def test_validate_experiment_definition(
         fd_no_target,
         fd_time_horizons_not_list,
         fd_time_validation_splits_not_list,
         fd_no_time_index,
-        fd_no_dataset_directory,
+        fd_no_data_path,
         fd_invalid_model,
         fd_time_horizons_range_not_tuple
 ):
@@ -29,7 +30,7 @@ def test_validate_forecast_definition(
         fd_no_time_index,
         fd_time_validation_splits_not_list,
         fd_time_horizons_not_list,
-        fd_no_dataset_directory,
+        fd_no_data_path,
         fd_invalid_model,
         fd_time_horizons_range_not_tuple
     ]:
@@ -49,38 +50,39 @@ def test_get_composite_dataset(
         test_composite_dataset_1,
         dask_client,
 ):
-    for dataset in test_fd_2["forecast_definition"]["joins"]:
+    for dataset in test_fd_2["experiment_definition"]["joins"]:
         pathlib.Path(
-            dataset["dataset_directory"]
+            dataset["data_path"]
         ).mkdir(parents=True, exist_ok=True)
     pathlib.Path(
-        test_fd_2["forecast_definition"]["dataset_directory"],
+        test_fd_2["experiment_definition"]["data_path"],
     ).mkdir(parents=True, exist_ok=True)
 
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_2["forecast_definition"]["dataset_directory"]
+        test_fd_2["experiment_definition"]["data_path"]
     )
     ddf.from_pandas(test_df_2, npartitions=2).to_parquet(
 
-        test_fd_2["forecast_definition"]["joins"][0]["dataset_directory"]
+        test_fd_2["experiment_definition"]["joins"][0]["data_path"]
     )
-    df = _get_dataset(test_fd_2["forecast_definition"])
+    df = _get_dataset(test_fd_2["experiment_definition"])
 
     pd.testing.assert_frame_equal(df.compute().reset_index(drop=True), test_composite_dataset_1.reset_index(drop=True))
 
 
-def test_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_bootstrap_models, test_validation_models, random_state):
+def test_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_bootstrap_models, test_validation_models,
+               random_state):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
-        test_fd_1["forecast_definition"]["dataset_directory"],
+        test_fd_1["experiment_definition"]["data_path"],
     ).mkdir(parents=True, exist_ok=True)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_1["forecast_definition"]["dataset_directory"]
+        test_fd_1["experiment_definition"]["data_path"]
     )
     _train(
         s3_fs=s3_fs,
         dask_model=LinearRegression,
-        forecast_definition=test_fd_1["forecast_definition"],
+        experiment_definition=test_fd_1["experiment_definition"],
         write_path=vision_path,
         random_seed=random_state,
     )
@@ -157,7 +159,7 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
     _train(
         s3_fs=s3_fs,
         dask_model=LinearRegression,
-        forecast_definition=test_fd_retail["forecast_definition"],
+        experiment_definition=test_fd_retail["experiment_definition"],
         write_path=vision_path,
         random_seed=random_state,
     )
@@ -233,13 +235,13 @@ def test_forecast(
 ):
     vision_path = "divina-test/vision/test1"
     pathlib.Path(
-        test_fd_1["forecast_definition"]["dataset_directory"]
+        test_fd_1["experiment_definition"]["data_path"]
     ).mkdir(parents=True, exist_ok=True)
     pathlib.Path(os.path.join(vision_path, "models/bootstrap")).mkdir(
         parents=True, exist_ok=True
     )
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_1["forecast_definition"]["dataset_directory"]
+        test_fd_1["experiment_definition"]["data_path"]
     )
     joblib.dump(
         test_model_1[0],
@@ -279,7 +281,7 @@ def test_forecast(
 
     _forecast(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_1["forecast_definition"],
+        experiment_definition=test_fd_1["experiment_definition"],
         read_path=vision_path,
         write_path=vision_path,
     )
@@ -340,7 +342,7 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             )
     _forecast(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_retail["forecast_definition"],
+        experiment_definition=test_fd_retail["experiment_definition"],
         read_path=vision_path,
         write_path=vision_path
     )
@@ -358,39 +360,40 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             title=go.layout.Title(text="Insample and Blind Forecasts")
         )
     )
-    for h in test_fd_retail["forecast_definition"]['time_horizons']:
+    for h in test_fd_retail["experiment_definition"]['time_horizons']:
         result_df_2d = result_df.sort_values('Promo').groupby('Date').agg('first').reset_index()
-        for i in test_fd_retail["forecast_definition"]['confidence_intervals']:
+        for i in test_fd_retail["experiment_definition"]['confidence_intervals']:
             fig.add_trace(go.Scatter(marker=dict(color="cyan"), mode="lines",
-                                     x=result_df_2d[test_fd_retail["forecast_definition"]['time_index']],
+                                     x=result_df_2d[test_fd_retail["experiment_definition"]['time_index']],
                                      y=result_df_2d[
-                                         '{}_h_{}_pred_c_{}'.format(test_fd_retail["forecast_definition"]['target'],
+                                         '{}_h_{}_pred_c_{}'.format(test_fd_retail["experiment_definition"]['target'],
                                                                     h, i)], name="h_{}_c_{}".format(h, i)))
         fig.update_traces(fill='tonexty', name='Confidence Bound', selector=dict(
-            name="h_{}_c_{}".format(h, test_fd_retail["forecast_definition"]['confidence_intervals'][-1])))
+            name="h_{}_c_{}".format(h, test_fd_retail["experiment_definition"]['confidence_intervals'][-1])))
         fig.update_traces(showlegend=False, name='Upper Confidence Bound', selector=dict(
-            name="h_{}_c_{}".format(h, test_fd_retail["forecast_definition"]['confidence_intervals'][0])))
+            name="h_{}_c_{}".format(h, test_fd_retail["experiment_definition"]['confidence_intervals'][0])))
         fig.add_trace(
             go.Scatter(marker=dict(color='black'), line=dict(dash='dash'), mode="lines",
-                       x=result_df_2d[test_fd_retail["forecast_definition"]['time_index']],
-                       y=result_df_2d[test_fd_retail["forecast_definition"]['target']],
-                       name=test_fd_retail["forecast_definition"]['target']))
+                       x=result_df_2d[test_fd_retail["experiment_definition"]['time_index']],
+                       y=result_df_2d[test_fd_retail["experiment_definition"]['target']],
+                       name=test_fd_retail["experiment_definition"]['target']))
         fig.add_trace(go.Scatter(marker=dict(color="darkblue"), mode="lines",
-                                 x=result_df_2d[test_fd_retail["forecast_definition"]['time_index']],
+                                 x=result_df_2d[test_fd_retail["experiment_definition"]['time_index']],
                                  y=result_df_2d[
-                                     '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
+                                     '{}_h_{}_pred'.format(test_fd_retail["experiment_definition"]['target'],
                                                            h)], name="Horizon {} Forecast".format(h)))
         fig.add_vrect(x0=pd.to_datetime('07-31-2015').timestamp() * 1000,
                       x1=pd.to_datetime('08-30-2015').timestamp() * 1000, line_width=2, line_color="cadetblue",
                       annotation_text='Blind Forecasts with Promotions Simulated as False')
         fig.write_html('docs_src/plots/test_forecast_retail_h_{}_2d.html'.format(h))
     fig = go.Figure()
-    for h in test_fd_retail["forecast_definition"]['time_horizons']:
-        result_df_2d = result_df[(result_df['Promo'] == 1) & (result_df['Store_1.0'] == 1) & (result_df['Date'] >= '2015-08-01')]
+    for h in test_fd_retail["experiment_definition"]['time_horizons']:
+        result_df_2d = result_df[
+            (result_df['Promo'] == 1) & (result_df['Store_1.0'] == 1) & (result_df['Date'] >= '2015-08-01')]
         factors = [c for c in result_df_2d if c.split("_")[0] == "factor"]
-        result_df_2d = result_df_2d[factors + [test_fd_retail["forecast_definition"]['time_index']]]
+        result_df_2d = result_df_2d[factors + [test_fd_retail["experiment_definition"]['time_index']]]
         for f in factors:
-            fig.add_trace(go.Bar(x=result_df_2d[test_fd_retail["forecast_definition"]['time_index']],
+            fig.add_trace(go.Bar(x=result_df_2d[test_fd_retail["experiment_definition"]['time_index']],
                                  y=result_df_2d[
                                      f], name="_".join(f.split("_")[1:])))
             fig.update_layout(barmode='relative', title_text='Factor')
@@ -407,13 +410,14 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
                     title='Sales'))
         )
     )
-    for h in test_fd_retail["forecast_definition"]['time_horizons']:
-        result_df_3d = result_df[(result_df[test_fd_retail["forecast_definition"]['time_index']] >= '08-01-2015') & (result_df['Store_1.0'] == 1)].sort_values('Date')
-        fig.add_trace(go.Surface(x=result_df_3d[test_fd_retail["forecast_definition"]['time_index']].unique(),
+    for h in test_fd_retail["experiment_definition"]['time_horizons']:
+        result_df_3d = result_df[(result_df[test_fd_retail["experiment_definition"]['time_index']] >= '08-01-2015') & (
+                    result_df['Store_1.0'] == 1)].sort_values('Date')
+        fig.add_trace(go.Surface(x=result_df_3d[test_fd_retail["experiment_definition"]['time_index']].unique(),
                                  z=[result_df_3d[result_df_3d['Promo'] == 0][
-                                        '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
+                                        '{}_h_{}_pred'.format(test_fd_retail["experiment_definition"]['target'],
                                                               h)].values, result_df_3d[result_df_3d['Promo'] == 1][
-                                        '{}_h_{}_pred'.format(test_fd_retail["forecast_definition"]['target'],
+                                        '{}_h_{}_pred'.format(test_fd_retail["experiment_definition"]['target'],
                                                               h)].values],
                                  y=result_df_3d['Promo'].unique(), opacity=.4))
         fig.write_html('docs_src/plots/test_forecast_retail_h_{}_3d.html'.format(h))
@@ -424,12 +428,13 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
 
 
 def test_validate(
-        s3_fs, test_fd_1, test_df_1, test_metrics_1, dask_client, test_val_predictions_1, test_validation_models, test_model_1,
+        s3_fs, test_fd_1, test_df_1, test_metrics_1, dask_client, test_val_predictions_1, test_validation_models,
+        test_model_1,
         test_bootstrap_models
 ):
     vision_path = "divina-test/vision/test1"
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_1["forecast_definition"]["dataset_directory"]
+        test_fd_1["experiment_definition"]["data_path"]
     )
     pathlib.Path(
         os.path.join(
@@ -475,7 +480,7 @@ def test_validate(
             )
     _validate(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_1["forecast_definition"],
+        experiment_definition=test_fd_1["experiment_definition"],
         read_path=vision_path,
         write_path=vision_path,
     )
@@ -505,7 +510,7 @@ def test_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             vision_path, "models", "bootstrap"
         )
     ).mkdir(parents=True, exist_ok=True)
-    for split in test_fd_retail["forecast_definition"]["time_validation_splits"]:
+    for split in test_fd_retail["experiment_definition"]["time_validation_splits"]:
         joblib.dump(
             test_validation_models_retail[split][0],
             os.path.join(
@@ -543,7 +548,7 @@ def test_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             )
     _validate(
         s3_fs=s3_fs,
-        forecast_definition=test_fd_retail["forecast_definition"],
+        experiment_definition=test_fd_retail["experiment_definition"],
         read_path=vision_path,
         write_path=vision_path
     )
@@ -630,3 +635,78 @@ def test_set_params(
         params = json.load(f)
 
     assert params == test_params_2
+
+
+def test_experiment_retail_min(test_fd_retail_min, random_state):
+    vision_path = "divina-test/vision/test1"
+    _experiment(
+        experiment_definition=test_fd_retail_min["experiment_definition"],
+        read_path=vision_path,
+        write_path=vision_path
+    )
+    result_df = ddf.read_parquet(
+        os.path.join(
+            vision_path,
+            "forecast"
+        )
+    ).compute().reset_index(drop=True)
+    fig = go.Figure(
+        layout=go.Layout(
+            title=go.layout.Title(text="Insample and Blind Forecasts")
+        )
+    )
+    test_fd_retail_min["experiment_definition"]['time_horizons'] = [0]
+    test_fd_retail_min["experiment_definition"]['confidence_intervals'] = []
+    for h in test_fd_retail_min["experiment_definition"]['time_horizons']:
+        result_df_2d = result_df.sort_values('Promo').groupby('Date').agg('first').reset_index()
+
+        if len(test_fd_retail_min["experiment_definition"]['confidence_intervals']) > 0:
+            for i in test_fd_retail_min["experiment_definition"]['confidence_intervals']:
+                fig.add_trace(go.Scatter(marker=dict(color="cyan"), mode="lines",
+                                         x=result_df_2d[test_fd_retail_min["experiment_definition"]['time_index']],
+                                         y=result_df_2d[
+                                             '{}_h_{}_pred_c_{}'.format(
+                                                 test_fd_retail_min["experiment_definition"]['target'],
+                                                 h, i)], name="h_{}_c_{}".format(h, i)))
+            fig.update_traces(fill='tonexty', name='Confidence Bound', selector=dict(
+                name="h_{}_c_{}".format(h, test_fd_retail_min["experiment_definition"]['confidence_intervals'][-1])))
+            fig.update_traces(showlegend=False, name='Upper Confidence Bound', selector=dict(
+                name="h_{}_c_{}".format(h, test_fd_retail_min["experiment_definition"]['confidence_intervals'][0])))
+        fig.add_trace(
+            go.Scatter(marker=dict(color='black'), line=dict(dash='dash'), mode="lines",
+                           x=result_df_2d[test_fd_retail_min["experiment_definition"]['time_index']],
+                           y=result_df_2d[test_fd_retail_min["experiment_definition"]['target']],
+                           name=test_fd_retail_min["experiment_definition"]['target']))
+        fig.add_trace(go.Scatter(marker=dict(color="darkblue"), mode="lines",
+                                     x=result_df_2d[test_fd_retail_min["experiment_definition"]['time_index']],
+                                     y=result_df_2d[
+                                         '{}_h_{}_pred'.format(test_fd_retail_min["experiment_definition"]['target'],
+                                                               h)], name="Horizon {} Forecast".format(h)))
+        path = pathlib.Path(pathlib.Path(__file__).parent.parent.parent,
+                                    'docs_src/plots/retail_min/h_{}_2d.html'.format(h))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fig.write_html(path)
+    ###TODO START HERE. GET FACTOR PLOT READY AND IMPLEMENT ASSERTION
+    '''fig = go.Figure()
+    for h in test_fd_retail_min["experiment_definition"]['time_horizons']:
+        result_df_2d = result_df[(result_df['Promo'] == 1) & (result_df['Store_1.0'] == 1) & (result_df['Date'] >= '2015-08-01')]
+        factors = [c for c in result_df_2d if c.split("_")[0] == "factor"]
+        result_df_2d = result_df_2d[factors + [test_fd_retail_min["experiment_definition"]['time_index']]]
+        for f in factors:
+            fig.add_trace(go.Bar(x=result_df_2d[test_fd_retail_min["experiment_definition"]['time_index']],
+                                 y=result_df_2d[
+                                     f], name="_".join(f.split("_")[1:])))
+            fig.update_layout(barmode='relative', title_text='Factor')
+        fig.write_html('docs_src/plots/test_forecast_retail_h_{}_factors.html'.format(h))
+    fig = go.Figure(
+        layout=go.Layout(
+            title=go.layout.Title(text="Forecasted Promo Impact"),
+            scene=dict(
+                xaxis=dict(
+                    title='Date'),
+                yaxis=dict(
+                    title='Promo', tickmode='array', tickvals=[0, 1], ticktext=['No', 'Yes']),
+                zaxis=dict(
+                    title='Sales'))
+        )
+    )'''

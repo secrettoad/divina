@@ -7,7 +7,7 @@
     "default": {},
     "examples": [
         {
-            "forecast_definition": {
+            "experiment_definition": {
                 "time_index": "Date",
                 "target": "Sales",
                 "include_features": [
@@ -80,7 +80,7 @@
                         "end": "2016-01-01"
                     }
                 ],
-                "dataset_directory": "dataset/retail/sales2",
+                "data_path": "dataset/retail/sales2",
                 "link_function": "log",
                 "confidence_intervals": [
                     90,
@@ -88,7 +88,7 @@
                 ],
                 "joins": [
                     {
-                        "dataset_directory": "dataset/time",
+                        "data_path": "dataset/time",
                         "join_on": [
                             "Date",
                             "Date"
@@ -96,7 +96,7 @@
                         "as": "time"
                     },
                     {
-                        "dataset_directory": "dataset/retail/store",
+                        "data_path": "dataset/retail/store",
                         "join_on": [
                             "Store",
                             "Store"
@@ -108,13 +108,13 @@
         }
     ],
     "required": [
-        "forecast_definition"
+        "experiment_definition"
     ],
     "properties": {
-        "forecast_definition": {
-            "$id": "#/properties/forecast_definition",
+        "experiment_definition": {
+            "$id": "#/properties/experiment_definition",
             "type": "object",
-            "title": "The forecast_definition schema",
+            "title": "The experiment_definition schema",
             "description": "An explanation about the purpose of this instance.",
             "default": {},
             "examples": [
@@ -191,7 +191,7 @@
                             "end": "2016-01-01"
                         }
                     ],
-                    "dataset_directory": "dataset/retail/sales2",
+                    "data_path": "dataset/retail/sales2",
                     "link_function": "log",
                     "confidence_intervals": [
                         90,
@@ -199,7 +199,7 @@
                     ],
                     "joins": [
                         {
-                            "dataset_directory": "dataset/time",
+                            "data_path": "dataset/time",
                             "join_on": [
                                 "Date",
                                 "Date"
@@ -207,7 +207,7 @@
                             "as": "time"
                         },
                         {
-                            "dataset_directory": "dataset/retail/store",
+                            "data_path": "dataset/retail/store",
                             "join_on": [
                                 "Store",
                                 "Store"
@@ -220,11 +220,11 @@
             "required": [
                 "time_index",
                 "target",
-                "dataset_directory"
+                "data_path"
             ],
             "properties": {
                 "time_index": {
-                    "$id": "#/properties/forecast_definition/properties/time_index",
+                    "$id": "#/properties/experiment_definition/properties/time_index",
                     "type": "string",
                     "title": "The time_index schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -234,7 +234,7 @@
                     ]
                 },
                 "target": {
-                    "$id": "#/properties/forecast_definition/properties/target",
+                    "$id": "#/properties/experiment_definition/properties/target",
                     "type": "string",
                     "title": "The target schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -244,7 +244,7 @@
                     ]
                 },
                 "include_features": {
-                    "$id": "#/properties/forecast_definition/properties/include_features",
+                    "$id": "#/properties/experiment_definition/properties/include_features",
                     "type": "array",
                     "title": "The include_features schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -257,10 +257,10 @@
                     ],
                     "additionalItems": true,
                     "items": {
-                        "$id": "#/properties/forecast_definition/properties/include_features/items",
+                        "$id": "#/properties/experiment_definition/properties/include_features/items",
                         "anyOf": [
                             {
-                                "$id": "#/properties/forecast_definition/properties/include_features/items/anyOf/0",
+                                "$id": "#/properties/experiment_definition/properties/include_features/items/anyOf/0",
                                 "type": "string",
                                 "title": "The first anyOf schema",
                                 "description": "An explanation about the purpose of this instance.",
@@ -274,7 +274,7 @@
                     }
                 },
                 "time_validation_splits": {
-                    "$id": "#/properties/forecast_definition/properties/time_validation_splits",
+                    "$id": "#/properties/experiment_definition/properties/time_validation_splits",
                     "type": "array",
                     "title": "The time_validation_splits schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -286,10 +286,10 @@
                     ],
                     "additionalItems": true,
                     "items": {
-                        "$id": "#/properties/forecast_definition/properties/time_validation_splits/items",
+                        "$id": "#/properties/experiment_definition/properties/time_validation_splits/items",
                         "anyOf": [
                             {
-                                "$id": "#/properties/forecast_definition/properties/time_validation_splits/items/anyOf/0",
+                                "$id": "#/properties/experiment_definition/properties/time_validation_splits/items/anyOf/0",
                                 "type": "string",
                                 "title": "The first anyOf schema",
                                 "description": "An explanation about the purpose of this instance.",
@@ -302,7 +302,7 @@
                     }
                 },
                 "forecast_end": {
-                    "$id": "#/properties/forecast_definition/properties/forecast_end",
+                    "$id": "#/properties/experiment_definition/properties/forecast_end",
                     "type": "string",
                     "title": "The forecast_end schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -312,7 +312,7 @@
                     ]
                 },
                 "bootstrap_sample": {
-                    "$id": "#/properties/forecast_definition/properties/bootstrap_sample",
+                    "$id": "#/properties/experiment_definition/properties/bootstrap_sample",
                     "type": "integer",
                     "title": "The bootstrap_sample schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -322,7 +322,7 @@
                     ]
                 },
                 "signal_dimensions": {
-                    "$id": "#/properties/forecast_definition/properties/signal_dimensions",
+                    "$id": "#/properties/experiment_definition/properties/signal_dimensions",
                     "type": "array",
                     "title": "The signal_dimensions schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -334,10 +334,10 @@
                     ],
                     "additionalItems": true,
                     "items": {
-                        "$id": "#/properties/forecast_definition/properties/signal_dimensions/items",
+                        "$id": "#/properties/experiment_definition/properties/signal_dimensions/items",
                         "anyOf": [
                             {
-                                "$id": "#/properties/forecast_definition/properties/signal_dimensions/items/anyOf/0",
+                                "$id": "#/properties/experiment_definition/properties/signal_dimensions/items/anyOf/0",
                                 "type": "string",
                                 "title": "The first anyOf schema",
                                 "description": "An explanation about the purpose of this instance.",
@@ -350,7 +350,7 @@
                     }
                 },
                 "time_horizons": {
-                    "$id": "#/properties/forecast_definition/properties/time_horizons",
+                    "$id": "#/properties/experiment_definition/properties/time_horizons",
                     "type": "array",
                     "title": "The time_horizons schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -362,10 +362,10 @@
                     ],
                     "additionalItems": true,
                     "items": {
-                        "$id": "#/properties/forecast_definition/properties/time_horizons/items",
+                        "$id": "#/properties/experiment_definition/properties/time_horizons/items",
                         "anyOf": [
                             {
-                                "$id": "#/properties/forecast_definition/properties/time_horizons/items/anyOf/0",
+                                "$id": "#/properties/experiment_definition/properties/time_horizons/items/anyOf/0",
                                 "type": "integer",
                                 "title": "The first anyOf schema",
                                 "description": "An explanation about the purpose of this instance.",
@@ -378,7 +378,7 @@
                     }
                 },
                 "forecast_freq": {
-                    "$id": "#/properties/forecast_definition/properties/forecast_freq",
+                    "$id": "#/properties/experiment_definition/properties/forecast_freq",
                     "type": "string",
                     "title": "The forecast_freq schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -388,7 +388,7 @@
                     ]
                 },
                 "encode_features": {
-                    "$id": "#/properties/forecast_definition/properties/encode_features",
+                    "$id": "#/properties/experiment_definition/properties/encode_features",
                     "type": "array",
                     "title": "The encode_features schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -401,10 +401,10 @@
                     ],
                     "additionalItems": true,
                     "items": {
-                        "$id": "#/properties/forecast_definition/properties/encode_features/items",
+                        "$id": "#/properties/experiment_definition/properties/encode_features/items",
                         "anyOf": [
                             {
-                                "$id": "#/properties/forecast_definition/properties/encode_features/items/anyOf/0",
+                                "$id": "#/properties/experiment_definition/properties/encode_features/items/anyOf/0",
                                 "type": "string",
                                 "title": "The first anyOf schema",
                                 "description": "An explanation about the purpose of this instance.",
@@ -418,7 +418,7 @@
                     }
                 },
                 "scenarios": {
-                    "$id": "#/properties/forecast_definition/properties/scenarios",
+                    "$id": "#/properties/experiment_definition/properties/scenarios",
                     "type": "array",
                     "title": "The scenarios schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -446,10 +446,10 @@
                     ],
                     "additionalItems": true,
                     "items": {
-                        "$id": "#/properties/forecast_definition/properties/scenarios/items",
+                        "$id": "#/properties/experiment_definition/properties/scenarios/items",
                         "anyOf": [
                             {
-                                "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0",
+                                "$id": "#/properties/experiment_definition/properties/scenarios/items/anyOf/0",
                                 "type": "object",
                                 "title": "The first anyOf schema",
                                 "description": "An explanation about the purpose of this instance.",
@@ -473,7 +473,7 @@
                                 ],
                                 "properties": {
                                     "feature": {
-                                        "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0/properties/feature",
+                                        "$id": "#/properties/experiment_definition/properties/scenarios/items/anyOf/0/properties/feature",
                                         "type": "string",
                                         "title": "The feature schema",
                                         "description": "An explanation about the purpose of this instance.",
@@ -483,7 +483,7 @@
                                         ]
                                     },
                                     "values": {
-                                        "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0/properties/values",
+                                        "$id": "#/properties/experiment_definition/properties/scenarios/items/anyOf/0/properties/values",
                                         "type": "array",
                                         "title": "The values schema",
                                         "description": "An explanation about the purpose of this instance.",
@@ -496,10 +496,10 @@
                                         ],
                                         "additionalItems": true,
                                         "items": {
-                                            "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0/properties/values/items",
+                                            "$id": "#/properties/experiment_definition/properties/scenarios/items/anyOf/0/properties/values/items",
                                             "anyOf": [
                                                 {
-                                                    "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0/properties/values/items/anyOf/0",
+                                                    "$id": "#/properties/experiment_definition/properties/scenarios/items/anyOf/0/properties/values/items/anyOf/0",
                                                     "default": 0,
                                                     "description": "An explanation about the purpose of this instance.",
                                                     "examples": [
@@ -518,7 +518,7 @@
                                         }
                                     },
                                     "start": {
-                                        "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0/properties/start",
+                                        "$id": "#/properties/experiment_definition/properties/scenarios/items/anyOf/0/properties/start",
                                         "type": "string",
                                         "title": "The start schema",
                                         "description": "An explanation about the purpose of this instance.",
@@ -528,7 +528,7 @@
                                         ]
                                     },
                                     "end": {
-                                        "$id": "#/properties/forecast_definition/properties/scenarios/items/anyOf/0/properties/end",
+                                        "$id": "#/properties/experiment_definition/properties/scenarios/items/anyOf/0/properties/end",
                                         "type": "string",
                                         "title": "The end schema",
                                         "description": "An explanation about the purpose of this instance.",
@@ -543,10 +543,10 @@
                         ]
                     }
                 },
-                "dataset_directory": {
-                    "$id": "#/properties/forecast_definition/properties/dataset_directory",
+                "data_path": {
+                    "$id": "#/properties/experiment_definition/properties/data_path",
                     "type": "string",
-                    "title": "The dataset_directory schema",
+                    "title": "The data_path schema",
                     "description": "An explanation about the purpose of this instance.",
                     "default": "",
                     "examples": [
@@ -554,7 +554,7 @@
                     ]
                 },
                 "link_function": {
-                    "$id": "#/properties/forecast_definition/properties/link_function",
+                    "$id": "#/properties/experiment_definition/properties/link_function",
                     "type": "string",
                     "title": "The link_function schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -564,7 +564,7 @@
                     ]
                 },
                 "confidence_intervals": {
-                    "$id": "#/properties/forecast_definition/properties/confidence_intervals",
+                    "$id": "#/properties/experiment_definition/properties/confidence_intervals",
                     "type": "array",
                     "title": "The confidence_intervals schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -577,10 +577,10 @@
                     ],
                     "additionalItems": true,
                     "items": {
-                        "$id": "#/properties/forecast_definition/properties/confidence_intervals/items",
+                        "$id": "#/properties/experiment_definition/properties/confidence_intervals/items",
                         "anyOf": [
                             {
-                                "$id": "#/properties/forecast_definition/properties/confidence_intervals/items/anyOf/0",
+                                "$id": "#/properties/experiment_definition/properties/confidence_intervals/items/anyOf/0",
                                 "type": "integer",
                                 "title": "The first anyOf schema",
                                 "description": "An explanation about the purpose of this instance.",
@@ -594,7 +594,7 @@
                     }
                 },
                 "joins": {
-                    "$id": "#/properties/forecast_definition/properties/joins",
+                    "$id": "#/properties/experiment_definition/properties/joins",
                     "type": "array",
                     "title": "The joins schema",
                     "description": "An explanation about the purpose of this instance.",
@@ -602,7 +602,7 @@
                     "examples": [
                         [
                             {
-                                "dataset_directory": "dataset/time",
+                                "data_path": "dataset/time",
                                 "join_on": [
                                     "Date",
                                     "Date"
@@ -610,7 +610,7 @@
                                 "as": "time"
                             },
                             {
-                                "dataset_directory": "dataset/retail/store",
+                                "data_path": "dataset/retail/store",
                                 "join_on": [
                                     "Store",
                                     "Store"
@@ -621,17 +621,17 @@
                     ],
                     "additionalItems": true,
                     "items": {
-                        "$id": "#/properties/forecast_definition/properties/joins/items",
+                        "$id": "#/properties/experiment_definition/properties/joins/items",
                         "anyOf": [
                             {
-                                "$id": "#/properties/forecast_definition/properties/joins/items/anyOf/0",
+                                "$id": "#/properties/experiment_definition/properties/joins/items/anyOf/0",
                                 "type": "object",
                                 "title": "The first anyOf schema",
                                 "description": "An explanation about the purpose of this instance.",
                                 "default": {},
                                 "examples": [
                                     {
-                                        "dataset_directory": "dataset/time",
+                                        "data_path": "dataset/time",
                                         "join_on": [
                                             "Date",
                                             "Date"
@@ -640,15 +640,15 @@
                                     }
                                 ],
                                 "required": [
-                                    "dataset_directory",
+                                    "data_path",
                                     "join_on",
                                     "as"
                                 ],
                                 "properties": {
-                                    "dataset_directory": {
-                                        "$id": "#/properties/forecast_definition/properties/joins/items/anyOf/0/properties/dataset_directory",
+                                    "data_path": {
+                                        "$id": "#/properties/experiment_definition/properties/joins/items/anyOf/0/properties/data_path",
                                         "type": "string",
-                                        "title": "The dataset_directory schema",
+                                        "title": "The data_path schema",
                                         "description": "An explanation about the purpose of this instance.",
                                         "default": "",
                                         "examples": [
@@ -656,7 +656,7 @@
                                         ]
                                     },
                                     "join_on": {
-                                        "$id": "#/properties/forecast_definition/properties/joins/items/anyOf/0/properties/join_on",
+                                        "$id": "#/properties/experiment_definition/properties/joins/items/anyOf/0/properties/join_on",
                                         "type": "array",
                                         "title": "The join_on schema",
                                         "description": "An explanation about the purpose of this instance.",
@@ -669,10 +669,10 @@
                                         ],
                                         "additionalItems": true,
                                         "items": {
-                                            "$id": "#/properties/forecast_definition/properties/joins/items/anyOf/0/properties/join_on/items",
+                                            "$id": "#/properties/experiment_definition/properties/joins/items/anyOf/0/properties/join_on/items",
                                             "anyOf": [
                                                 {
-                                                    "$id": "#/properties/forecast_definition/properties/joins/items/anyOf/0/properties/join_on/items/anyOf/0",
+                                                    "$id": "#/properties/experiment_definition/properties/joins/items/anyOf/0/properties/join_on/items/anyOf/0",
                                                     "type": "string",
                                                     "title": "The first anyOf schema",
                                                     "description": "An explanation about the purpose of this instance.",
@@ -685,7 +685,7 @@
                                         }
                                     },
                                     "as": {
-                                        "$id": "#/properties/forecast_definition/properties/joins/items/anyOf/0/properties/as",
+                                        "$id": "#/properties/experiment_definition/properties/joins/items/anyOf/0/properties/as",
                                         "type": "string",
                                         "title": "The as schema",
                                         "description": "An explanation about the purpose of this instance.",
@@ -694,15 +694,12 @@
                                             "time"
                                         ]
                                     }
-                                },
-                                "additionalProperties": true
+                                }
                             }
                         ]
                     }
                 }
-            },
-            "additionalProperties": true
+            }
         }
-    },
-    "additionalProperties": true
+    }
 }

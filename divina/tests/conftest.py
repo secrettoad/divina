@@ -12,6 +12,8 @@ import boto3
 from dask_cloudprovider.aws import EC2Cluster
 from pandas import Timestamp
 import fsspec
+import json
+import pathlib
 
 
 @pytest.fixture()
@@ -107,9 +109,9 @@ def dask_client_remote(request, dask_cluster_ip):
 
 
 @pytest.fixture()
-def fd_no_dataset_directory():
+def fd_no_data_path():
     return {
-        "forecast_definition": {
+        "experiment_definition": {
             "target": "c",
             "time_index": "a",
             "time_validation_splits": ["1970-01-01 00:00:08"],
@@ -121,10 +123,10 @@ def fd_no_dataset_directory():
 @pytest.fixture()
 def fd_invalid_model():
     return {
-        "forecast_definition": {
+        "experiment_definition": {
             "target": "c",
             "time_index": "a",
-            "dataset_directory": "divina-test/dataset/test1",
+            "data_path": "divina-test/dataset/test1",
             "model": "scikitlearn.linear_models.linearRegression",
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": [1],
@@ -135,9 +137,9 @@ def fd_invalid_model():
 @pytest.fixture()
 def fd_no_time_index():
     return {
-        "forecast_definition": {
+        "experiment_definition": {
             "target": "c",
-            "dataset_directory": "divina-test/dataset/test1",
+            "data_path": "divina-test/dataset/test1",
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": [1],
         }
@@ -147,9 +149,9 @@ def fd_no_time_index():
 @pytest.fixture()
 def fd_no_target():
     return {
-        "forecast_definition": {
+        "experiment_definition": {
             "time_index": "a",
-            "dataset_directory": "divina-test/dataset/test1",
+            "data_path": "divina-test/dataset/test1",
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": [1],
         }
@@ -159,12 +161,12 @@ def fd_no_target():
 @pytest.fixture()
 def fd_time_validation_splits_not_list():
     return {
-        "forecast_definition": {
+        "experiment_definition": {
             "time_index": "a",
             "target": "c",
             "time_validation_splits": "1970-01-01 00:00:08",
             "time_horizons": [1],
-            "dataset_directory": "divina-test/dataset/test1",
+            "data_path": "divina-test/dataset/test1",
         }
     }
 
@@ -172,12 +174,12 @@ def fd_time_validation_splits_not_list():
 @pytest.fixture()
 def fd_time_horizons_not_list():
     return {
-        "forecast_definition": {
+        "experiment_definition": {
             "time_index": "a",
             "target": "c",
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": 1,
-            "dataset_directory": "divina-test/dataset/test1",
+            "data_path": "divina-test/dataset/test1",
         }
     }
 
@@ -185,12 +187,12 @@ def fd_time_horizons_not_list():
 @pytest.fixture()
 def fd_time_horizons_range_not_tuple():
     return {
-        "forecast_definition": {
+        "experiment_definition": {
             "time_index": "a",
             "target": "c",
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": [[1, 60]],
-            "dataset_directory": "divina-test/dataset/test1",
+            "data_path": "divina-test/dataset/test1",
         }
     }
 
@@ -248,7 +250,7 @@ def test_bootstrap_models(test_df_1, random_state, test_fd_1):
     features = [['b', 'b_(-inf, 5]', 'b_(5, 10]', 'b_(15, inf]'], ['b', 'b_(-inf, 5]', 'b_(5, 10]', 'b_(15, inf]'],
                 ['b', 'b_(-inf, 5]', 'b_(5, 10]', 'b_(15, inf]'], ['b', 'b_(-inf, 5]', 'b_(5, 10]', 'b_(15, inf]'],
                 ['b', 'b_(-inf, 5]', 'b_(5, 10]', 'b_(15, inf]']]
-    seeds = range(random_state, random_state + test_fd_1["forecast_definition"]["bootstrap_sample"])
+    seeds = range(random_state, random_state + test_fd_1["experiment_definition"]["bootstrap_sample"])
     bootstrap_models = {}
 
     for j, i, p, f, seed in zip(range(0, len(seeds)), intercepts, params, features, seeds):
@@ -294,7 +296,7 @@ def test_bootstrap_models_retail(test_df_1, random_state, test_fd_1):
                  'Weekday_0.0', 'Weekday_2.0', 'Store_1.0', 'Store_2.0'],
                 ['Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_6.0', 'Weekday_4.0',
                  'Weekday_0.0', 'Weekday_2.0', 'Store_1.0', 'Store_2.0']]
-    seeds = range(random_state, random_state + test_fd_1["forecast_definition"]["bootstrap_sample"])
+    seeds = range(random_state, random_state + test_fd_1["experiment_definition"]["bootstrap_sample"])
     bootstrap_models = {}
 
     for j, i, p, f, seed in zip(range(0, len(seeds)), intercepts, params, features, seeds):
@@ -316,7 +318,7 @@ def test_validation_models(test_df_1, random_state, test_fd_1):
     params = [[4.08680563, 0.76186394, -1.6591807]]
     intercepts = [1.6591672730002625]
     features = [['b', 'b_(5, 10]', 'b_(15, inf]']]
-    splits = test_fd_1["forecast_definition"]["time_validation_splits"]
+    splits = test_fd_1["experiment_definition"]["time_validation_splits"]
     validation_models = {}
 
     for j, i, p, f, split in zip(range(0, len(splits)), intercepts, params, features, splits):
@@ -342,7 +344,7 @@ def test_validation_models_retail(test_df_1, random_state, test_fd_retail):
     intercepts = [0.016305730597485316]
     features = [['Promo', 'LastDayOfMonth', 'Weekday_1.0', 'Weekday_3.0', 'Weekday_5.0', 'Weekday_6.0', 'Weekday_4.0',
                  'Weekday_0.0', 'Weekday_2.0', 'Store_1.0', 'Store_2.0']]
-    splits = test_fd_retail["forecast_definition"]["time_validation_splits"]
+    splits = test_fd_retail["experiment_definition"]["time_validation_splits"]
     validation_models = {}
 
     for j, i, p, f, split in zip(range(0, len(splits)), intercepts, params, features, splits):
@@ -8496,7 +8498,7 @@ def test_forecast_retail():
 @pytest.fixture()
 def test_fd_1():
     return {
-        "forecast_definition": {
+        "experiment_definition": {
             "time_index": "a",
             "target": "c",
             "time_validation_splits": ["1970-01-01 00:00:07"],
@@ -8504,14 +8506,14 @@ def test_fd_1():
             "validate_end": "1970-01-01 00:00:09",
             "forecast_start": "1970-01-01 00:00:05",
             "forecast_end": "1970-01-01 00:00:14",
-            "forecast_freq": "S",
+            "scenario_freq": "S",
             "confidence_intervals": [90],
             "bootstrap_sample": 5,
             "bin_features": {"b": [5, 10, 15]},
             "scenarios": [
                 {"feature": "b", "values": [[0, 5]], "start": "1970-01-01 00:00:09", "end": "1970-01-01 00:00:14"}],
             "time_horizons": [1],
-            "dataset_directory": "divina-test/dataset/test1",
+            "data_path": "divina-test/dataset/test1",
             "model": "LinearRegression",
         }
     }
@@ -8520,7 +8522,7 @@ def test_fd_1():
 @pytest.fixture()
 def test_fd_retail():
     return {
-        "forecast_definition": {
+        "experiment_definition": {
             "time_index": "Date",
             "target": "Sales",
             "include_features": ["Store", "Promo", "Weekday",
@@ -8528,17 +8530,17 @@ def test_fd_retail():
             "time_validation_splits": ["2015-07-18"],
             "forecast_end": "2015-08-30",
             "bootstrap_sample": 5,
-            "signal_dimensions": ["Store"],
+            "target_dimensions": ["Store"],
             "time_horizons": [2],
-            "forecast_freq": "D",
+            "scenario_freq": "D",
             "encode_features": ["Weekday", "Store"],
             "scenarios": [{"feature": "Promo", "values": [0, 1], "start": "2015-08-01", "end": "2016-01-01"}],
-            "dataset_directory": "divina://retail_sales",
+            "data_path": "divina://retail_sales",
             "link_function": "log",
             "confidence_intervals": [100, 0],
             "joins": [
                 {
-                    "dataset_directory": "divina://time",
+                    "data_path": "divina://time",
                     "join_on": ["Date", "Date"],
                     "as": "time"
                 }
@@ -8548,17 +8550,23 @@ def test_fd_retail():
 
 
 @pytest.fixture()
+def test_fd_retail_min():
+    with open(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/experiment_definitions/retail_minimal.json')) as f:
+        return json.load(f)
+
+
+@pytest.fixture()
 def test_fd_2():
     return {
-        "forecast_definition": {
+        "experiment_definition": {
             "time_index": "a",
             "target": "c",
             "time_validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": [1],
-            "dataset_directory": "divina-test/dataset/test1",
+            "data_path": "divina-test/dataset/test1",
             "joins": [
                 {
-                    "dataset_directory": "dataset/test2",
+                    "data_path": "dataset/test2",
                     "join_on": ("a", "a"),
                     "as": "test2",
                 }
@@ -8570,7 +8578,7 @@ def test_fd_2():
 @pytest.fixture()
 def test_fd_3(test_bucket, test_fd_1):
     test_fd = test_fd_1
-    test_fd["forecast_definition"].update({"dataset_directory": "{}/dataset/test1".format(test_bucket)})
+    test_fd["experiment_definition"].update({"data_path": "{}/dataset/test1".format(test_bucket)})
     return test_fd
 
 

@@ -8,9 +8,10 @@ import backoff
 from botocore.exceptions import ClientError
 import json
 import numpy as np
-from .utils import validate_forecast_definition
+from .utils import validate_experiment_definition
 from dask_ml.linear_model import LinearRegression
 import dask.array as da
+from pandas.api.types import is_numeric_dtype
 
 
 def _train_model(df, dask_model, model_name, random_seed, features, target,
@@ -27,7 +28,7 @@ def _train_model(df, dask_model, model_name, random_seed, features, target,
         c
         for c in features
         if not c
-               in constant_columns
+               in constant_columns and is_numeric_dtype(df_train.dtypes[c])
     ]
 
     if link_function == "log":
@@ -130,23 +131,31 @@ def _train_model(df, dask_model, model_name, random_seed, features, target,
         return (model, features)
 
 
-@validate_forecast_definition
+@validate_experiment_definition
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, random_seed=None):
-    if "model" in forecast_definition:
-        dask_model = globals()[forecast_definition["model"]]
-    if not "confidence_intervals" in forecast_definition:
+def _train(s3_fs, experiment_definition, write_path, dask_model=LinearRegression, random_seed=None):
+    if "model" in experiment_definition:
+        dask_model = globals()[experiment_definition["model"]]
+    if not "confidence_intervals" in experiment_definition:
         confidence_intervals = None
     else:
-        confidence_intervals = forecast_definition["confidence_intervals"]
-    if not "bootstrap_sample" in forecast_definition:
+        confidence_intervals = experiment_definition["confidence_intervals"]
+    if not "bootstrap_sample" in experiment_definition:
         bootstrap_sample = None
     else:
-        bootstrap_sample = forecast_definition["bootstrap_sample"]
-    if not "link_function" in forecast_definition:
+        bootstrap_sample = experiment_definition["bootstrap_sample"]
+    if not "link_function" in experiment_definition:
         link_function = None
     else:
-        link_function = forecast_definition["link_function"]
+        link_function = experiment_definition["link_function"]
+    if not "time_horizons" in experiment_definition:
+        time_horizons = [0]
+    else:
+        time_horizons = experiment_definition["time_horizons"]
+    if not "time_validation_splits" in experiment_definition:
+        time_validation_splits = []
+    else:
+        time_validation_splits = experiment_definition["time_validation_splits"]
     if write_path[:5] == "s3://":
         if not s3_fs.exists(write_path):
             s3_fs.mkdir(
@@ -167,14 +176,14 @@ def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, 
 
     dataset_kwargs = {}
     for k in ['train_start', 'train_end']:
-        if k in forecast_definition:
-            dataset_kwargs.update({k.split('_')[1]: forecast_definition[k]})
+        if k in experiment_definition:
+            dataset_kwargs.update({k.split('_')[1]: experiment_definition[k]})
 
-    df = _get_dataset(forecast_definition)
+    df = _get_dataset(experiment_definition)
 
     time_min, time_max = (
-        pd.to_datetime(str(df[forecast_definition["time_index"]].min().compute())),
-        pd.to_datetime(str(df[forecast_definition["time_index"]].max().compute())),
+        pd.to_datetime(str(df[experiment_definition["time_index"]].min().compute())),
+        pd.to_datetime(str(df[experiment_definition["time_index"]].max().compute())),
     )
 
     features = [
@@ -182,30 +191,30 @@ def _train(s3_fs, forecast_definition, write_path, dask_model=LinearRegression, 
         for c in df.columns
         if not c
                in [
-                   "{}_h_{}".format(forecast_definition["target"], h)
-                   for h in forecast_definition["time_horizons"]
+                   "{}_h_{}".format(experiment_definition["target"], h)
+                   for h in time_horizons
                ]
                + [
-                   forecast_definition["time_index"],
-                   forecast_definition["target"],
+                   experiment_definition["time_index"],
+                   experiment_definition["target"],
                ]
     ]
 
-    for h in forecast_definition["time_horizons"]:
+    for h in time_horizons:
 
         model, bootstrap_models = _train_model(df=df, dask_model=dask_model, model_name="h-{}".format(h), random_seed=random_seed,
-                     features=features, target=forecast_definition["target"],
+                     features=features, target=experiment_definition["target"],
                      bootstrap_sample=bootstrap_sample, confidence_intervals=confidence_intervals,
                      link_function=link_function, write_open=write_open, write_path=write_path)
 
-        for s in forecast_definition["time_validation_splits"]:
+        for s in time_validation_splits:
             if pd.to_datetime(str(s)) <= time_min or pd.to_datetime(str(s)) >= time_max:
                 raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
-            df_train = df[df[forecast_definition["time_index"]] < s]
+            df_train = df[df[experiment_definition["time_index"]] < s]
 
             model = _train_model(df=df_train, dask_model=dask_model, model_name="s-{}_h-{}".format(
                 pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                 h
             ), random_seed=random_seed,
-                         features=features, target=forecast_definition["target"],
+                         features=features, target=experiment_definition["target"],
                          link_function=link_function, write_open=write_open, write_path=write_path)
