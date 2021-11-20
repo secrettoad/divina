@@ -9,6 +9,7 @@ from functools import partial
 from .utils import validate_experiment_definition
 import json
 import dask.array as da
+from pandas.api.types import is_numeric_dtype
 
 
 @validate_experiment_definition
@@ -66,6 +67,13 @@ def _forecast(s3_fs, experiment_definition, read_path, write_path):
         ) as f:
             fit_model_params = json.load(f)
         features = fit_model_params["features"]
+
+        for f in features:
+            if not is_numeric_dtype(forecast_df[f].dtype):
+                try:
+                    forecast_df[f] = forecast_df[f].astype(float)
+                except:
+                    raise ValueError('{} could not be converted to float. Please convert to numeric or encode with "encode_features: {}"'.format(f, f))
 
         if "link_function" in experiment_definition:
             if experiment_definition["link_function"] == 'log':
