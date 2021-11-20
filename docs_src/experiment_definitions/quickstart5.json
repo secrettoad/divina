@@ -1,14 +1,21 @@
 {
   "experiment_definition": {
     "target": "Sales",
+    "link_function": "log",
     "target_dimensions": ["Store"],
     "time_index": "Date",
     "data_path": "divina://retail_sales",
-    "include_features": ["Store", "DayOfWeek", "Promo",
-       "StoreType", "Assortment",
+    "include_features": ["Store", "Promo", "LastDayOfMonth", "Month", "WeekOfYear", "StoreType", "Assortment",
        "CompetitionDistance", "CompetitionOpenSinceMonth",
-       "CompetitionOpenSinceYear"],
-    "encode_features": ["Store", "DayOfWeek", "Assortment"],
-    "bin_features": {"CompetitionDistance": [1000, 5000]}
-  }
+       "CompetitionOpenSinceYear", "Holiday", "HolidayType"],
+    "joins": [
+                {
+                    "data_path": "divina://time",
+                    "join_on": ["Date", "Date"],
+                    "as": "time"
+                }
+            ]
+  },
+    "forecast_end": "01-01-2016",
+    "frequency": "D"
 }

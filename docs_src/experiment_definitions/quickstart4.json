@@ -1,12 +1,15 @@
 {
   "experiment_definition": {
     "target": "Sales",
+    "link_function": "log",
     "target_dimensions": ["Store"],
     "time_index": "Date",
     "data_path": "divina://retail_sales",
-    "include_features": ["Store", "DayOfWeek", "Promo", "StoreType", "Assortment",
+    "include_features": ["Store", "Promo",
+       "StoreType", "Assortment",
        "CompetitionDistance", "CompetitionOpenSinceMonth",
-       "CompetitionOpenSinceYear"],
-    "encode_features": ["Store", "DayOfWeek", "Assortment"]
-  }
+       "CompetitionOpenSinceYear"]
+  },
+    "forecast_end": "01-01-2016",
+    "frequency": "D"
 }
