@@ -147,6 +147,8 @@ def _forecast(s3_fs, experiment_definition, read_path, write_path):
 
         forecast_df[experiment_definition["time_index"]] = dd.to_datetime(forecast_df[experiment_definition["time_index"]])
 
+        forecast_df = forecast_df.sort_values(experiment_definition["time_index"])
+
         dd.to_parquet(
             forecast_df,
             "{}/forecast".format(
