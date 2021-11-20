@@ -51,15 +51,15 @@ def _get_dataset(experiment_definition, start=None, end=None, pad=False):
     if end:
         if pd.to_datetime(end) > time_max:
             if pad:
-                if not "scenario_freq" in experiment_definition:
+                if not "frequency" in experiment_definition:
                     raise Exception(
-                        'Frequency of time series must be supplied. Please supply with "scenario_freq: "D", "M", "s", etc."')
+                        'Frequency of time series must be supplied. Please supply with "frequency: "D", "M", "s", etc."')
                 if start and pd.to_datetime(start) > time_max:
                     new_dates = pd.date_range(pd.to_datetime(str(start)), pd.to_datetime(str(end)),
-                                              freq=experiment_definition["scenario_freq"])
+                                              freq=experiment_definition["frequency"])
                 else:
                     new_dates = pd.date_range(time_max + pd.offsets.Day(), pd.to_datetime(str(end)),
-                                              freq=experiment_definition["scenario_freq"])
+                                              freq=experiment_definition["frequency"])
                 if "target_dimensions" in experiment_definition:
 
                     combinations = list(product(list(new_dates),

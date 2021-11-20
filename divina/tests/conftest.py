@@ -8506,7 +8506,7 @@ def test_fd_1():
             "validate_end": "1970-01-01 00:00:09",
             "forecast_start": "1970-01-01 00:00:05",
             "forecast_end": "1970-01-01 00:00:14",
-            "scenario_freq": "S",
+            "frequency": "S",
             "confidence_intervals": [90],
             "bootstrap_sample": 5,
             "bin_features": {"b": [5, 10, 15]},
@@ -8532,7 +8532,7 @@ def test_fd_retail():
             "bootstrap_sample": 5,
             "target_dimensions": ["Store"],
             "time_horizons": [2],
-            "scenario_freq": "D",
+            "frequency": "D",
             "encode_features": ["Weekday", "Store"],
             "scenarios": [{"feature": "Promo", "values": [0, 1], "start": "2015-08-01", "end": "2016-01-01"}],
             "data_path": "divina://retail_sales",
@@ -8550,9 +8550,12 @@ def test_fd_retail():
 
 
 @pytest.fixture()
-def test_fd_retail_min():
-    with open(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/experiment_definitions/retail_minimal.json')) as f:
-        return json.load(f)
+def test_fds_quickstart():
+    fds = {}
+    for file in sorted(os.listdir(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/experiment_definitions'))):
+        with open(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/experiment_definitions', file)) as f:
+            fds[file.split('.')[0]] = (json.load(f))
+    return fds
 
 
 @pytest.fixture()

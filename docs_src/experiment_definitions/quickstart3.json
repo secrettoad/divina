@@ -1,0 +1,11 @@
+{
+  "experiment_definition": {
+    "target": "Sales",
+    "target_dimensions": ["Store"],
+    "time_index": "Date",
+    "data_path": "divina://retail_sales",
+    "include_features": ["Store", "DayOfWeek", "Promo", "StoreType", "Assortment",
+       "CompetitionDistance", "CompetitionOpenSinceMonth",
+       "CompetitionOpenSinceYear"]
+  }
+}
