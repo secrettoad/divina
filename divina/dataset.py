@@ -69,13 +69,22 @@ def _get_dataset(experiment_definition, start=None, end=None, pad=False):
                                                                columns=[experiment_definition["time_index"]] +
                                                                        experiment_definition["target_dimensions"]),
                                                   npartitions=df.npartitions)
+                    if "ffill" in experiment_definition:
+                        last = df.groupby(experiment_definition["target_dimensions"])[experiment_definition["ffill"]].last().compute()
+                        df = df.drop(columns=experiment_definition["ffill"])
+                        meta = new_dates_df.join(last.reset_index(drop=True), how="right")
+                        new_dates_df = new_dates_df.groupby(experiment_definition["target_dimensions"]).apply(lambda x: x.set_index(experiment_definition["target_dimensions"]).join(last).reset_index().set_index(experiment_definition["time_index"]).reset_index(), meta=meta)
+                    df = df.append(new_dates_df)
 
                 else:
                     new_dates_df = dd.from_pandas(
                         pd.DataFrame(new_dates, columns=[experiment_definition["time_index"]]),
                         npartitions=df.npartitions)
+                    if "ffill" in experiment_definition:
+                        for c in experiment_definition["ffill"]:
+                            new_dates_df[c] = df[c].last().compute()
+                    df = df.append(new_dates_df)
 
-                df = df.append(new_dates_df)
             else:
                 raise Exception(
                     "Bad End: {} | {} Check Dataset Time Range".format(end, time_max))

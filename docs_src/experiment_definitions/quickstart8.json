@@ -20,6 +20,8 @@
     "frequency": "D",
     "encode_features": ["Store", "Month", "WeekOfYear", "StoreType", "Weekday", "HolidayType", "Assortment"],
     "bin_features": {"CompetitionDistance": [1000, 5000]},
-    "scenarios": [{"feature": "Promo", "values": [0, 1], "start": "2015-08-01", "end": "2016-01-01"}]
+    "scenarios": [{"feature": "Promo", "values": [0, 1], "start": "2015-08-01", "end": "2016-01-01"}],
+    "ffill": ["CompetitionDistance", "CompetitionOpenSinceMonth",
+       "CompetitionOpenSinceYear"]
   }
 }
