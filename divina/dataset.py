@@ -10,13 +10,13 @@ from itertools import product
 from .datasets.load import _load
 
 
+
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def _get_dataset(experiment_definition, start=None, end=None, pad=False):
     if experiment_definition["data_path"].startswith("divina://"):
         df = _load(experiment_definition["data_path"])
     else:
         df = dd.read_parquet("{}/*".format(experiment_definition["data_path"]))
-    df = df.reset_index()
     npartitions = (df.memory_usage(deep=True).sum().compute() // 104857600) + 1
 
     df[experiment_definition["time_index"]] = dd.to_datetime(df[experiment_definition["time_index"]])
@@ -50,47 +50,54 @@ def _get_dataset(experiment_definition, start=None, end=None, pad=False):
 
     if end:
         if pd.to_datetime(end) > time_max:
-            if pad:
-                if not "frequency" in experiment_definition:
-                    raise Exception(
-                        'Frequency of time series must be supplied. Please supply with "frequency: "D", "M", "s", etc."')
-                if start and pd.to_datetime(start) > time_max:
-                    new_dates = pd.date_range(pd.to_datetime(str(start)), pd.to_datetime(str(end)),
-                                              freq=experiment_definition["frequency"])
-                else:
-                    new_dates = pd.date_range(time_max + pd.offsets.Day(), pd.to_datetime(str(end)),
-                                              freq=experiment_definition["frequency"])
-                if "target_dimensions" in experiment_definition:
-
-                    combinations = list(product(list(new_dates),
-                                                *[df[s].unique().compute().values for s in
-                                                  experiment_definition["target_dimensions"]]))
-                    new_dates_df = dd.from_pandas(pd.DataFrame(combinations,
-                                                               columns=[experiment_definition["time_index"]] +
-                                                                       experiment_definition["target_dimensions"]),
-                                                  npartitions=df.npartitions)
-                    if "ffill" in experiment_definition:
-                        last = df.groupby(experiment_definition["target_dimensions"])[experiment_definition["ffill"]].last().compute()
-                        df = df.drop(columns=experiment_definition["ffill"])
-                        meta = new_dates_df.join(last.reset_index(drop=True), how="right")
-                        new_dates_df = new_dates_df.groupby(experiment_definition["target_dimensions"]).apply(lambda x: x.set_index(experiment_definition["target_dimensions"]).join(last).reset_index().set_index(experiment_definition["time_index"]).reset_index(), meta=meta)
-                    df = df.append(new_dates_df)
-
-                else:
-                    new_dates_df = dd.from_pandas(
-                        pd.DataFrame(new_dates, columns=[experiment_definition["time_index"]]),
-                        npartitions=df.npartitions)
-                    if "ffill" in experiment_definition:
-                        for c in experiment_definition["ffill"]:
-                            new_dates_df[c] = df[c].last().compute()
-                    df = df.append(new_dates_df)
-
-            else:
+            if not "scenarios" in experiment_definition:
                 raise Exception(
                     "Bad End: {} | {} Check Dataset Time Range".format(end, time_max))
         else:
             df = df[dd.to_datetime(df[experiment_definition["time_index"]]) <= end]
-        time_max = pd.to_datetime(str(end))
+            time_max = pd.to_datetime(str(end))
+
+    if "scenarios" in experiment_definition:
+        if not "frequency" in experiment_definition:
+            raise Exception(
+                'Frequency of time series must be supplied. Please supply with "frequency: "D", "M", "s", etc."')
+        if end:
+            if start and pd.to_datetime(start) > time_max:
+                    new_dates = pd.date_range(pd.to_datetime(str(start)), pd.to_datetime(str(end)),
+                                              freq=experiment_definition["frequency"])
+            else:
+                    new_dates = pd.date_range(time_max + pd.offsets.Day(), pd.to_datetime(str(end)),
+                                              freq=experiment_definition["frequency"])
+            if len(new_dates) > 0:
+
+                combinations = list(new_dates)
+                if "target_dimensions" in experiment_definition:
+                    combinations = [list(x) for x in product(combinations,
+                            *[df[s].unique().compute().values for s in
+                              experiment_definition["target_dimensions"]])]
+                constant_columns = [c for c in experiment_definition["scenarios"] if
+                                    experiment_definition["scenarios"][c]["mode"] == "constant"]
+                for c in constant_columns:
+                    combinations = [x[0] + [x[1]] for x in product(combinations, experiment_definition["scenarios"][c]["constant_values"])]
+                df_scenario = dd.from_pandas(pd.DataFrame(combinations, columns=[experiment_definition["time_index"]] +
+                                                                                experiment_definition[
+                                                                                    "target_dimensions"] + constant_columns),
+                                             npartitions=npartitions)
+                last_columns = [c for c in experiment_definition["scenarios"] if experiment_definition["scenarios"][c]["mode"] == "last"]
+                if len(last_columns) > 0:
+                    if "target_dimensions" in experiment_definition:
+                        last = df.groupby(experiment_definition["target_dimensions"])[last_columns].last().compute()
+                        meta = df_scenario.join(last.reset_index(drop=True), how="right")
+                        df_scenario = df_scenario.groupby(experiment_definition["target_dimensions"]).apply(
+                            lambda x: x.set_index(experiment_definition["target_dimensions"]).join(
+                                last).reset_index().set_index(experiment_definition["time_index"]).reset_index(),
+                            meta=meta).reset_index(drop=True)
+                    else:
+                        last = df[last_columns].tail(1)
+                        for l in last_columns:
+                            df_scenario[l] = last[l]
+
+                df = df.append(df_scenario)
 
     if "joins" in experiment_definition:
         for i, join in enumerate(experiment_definition["joins"]):
@@ -109,29 +116,6 @@ def _get_dataset(experiment_definition, start=None, end=None, pad=False):
                 right_on=join["join_on"][1],
                 suffixes=("", "{}_".format(join["as"])),
             )
-
-    if "scenarios" in experiment_definition:
-        for x in experiment_definition["scenarios"]:
-            scenario_ranges = [c for c in x["values"] if type(c) == list]
-            if len(scenario_ranges) > 0:
-                x["values"] = [c for c in
-                               x["values"] if
-                               type(c) == int]
-                for y in scenario_ranges:
-                    x["values"] = set(
-                        x["values"] + list(range(y[0], y[1] + 1)))
-
-            df_scenario = df[(dd.to_datetime(df[experiment_definition["time_index"]]) <= pd.to_datetime(
-                str(x["end"]))) & (
-                                     dd.to_datetime(df[experiment_definition["time_index"]]) >= pd.to_datetime(
-                                 str(x["start"])))]
-            df = df[(dd.to_datetime(df[experiment_definition["time_index"]]) > pd.to_datetime(
-                str(x["end"]))) | (
-                            dd.to_datetime(df[experiment_definition["time_index"]]) < pd.to_datetime(
-                        str(x["start"])))]
-            for v in x["values"]:
-                df_scenario[x["feature"]] = v
-                df = df.append(df_scenario)
 
     if "bin_features" in experiment_definition:
         for c in experiment_definition["bin_features"]:

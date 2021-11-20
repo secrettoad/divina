@@ -639,6 +639,9 @@ def test_set_params(
 
 def test_quickstart(test_fds_quickstart, random_state):
     ###Date, Customers, Promo2, Open removed on 2
+    test_fds_quickstart = {}
+    with open(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/experiment_definitions', 'quickstart8.json')) as f:
+        test_fds_quickstart['quickstart8'] = (json.load(f))
     for k in test_fds_quickstart:
         fd = test_fds_quickstart[k]
         experiment_path = "divina-test/experiment/test1"
@@ -667,16 +670,16 @@ def test_quickstart(test_fds_quickstart, random_state):
         for s in stores:
             for h in fd["experiment_definition"]['time_horizons']:
                 if not "encode_features" in fd["experiment_definition"]:
-                    result_df = result_df[result_df['Store'] == s]
+                    store_df = result_df[result_df['Store'] == s]
                 else:
-                    result_df = result_df[result_df['Store_{}'.format(float(s))] == 1]
+                    store_df = result_df[result_df['Store_{}'.format(float(s))] == 1]
                 if "scenarios" in fd["experiment_definition"]:
-                    result_df = result_df[(result_df['Date'] < "2015-08-01") | (result_df['Promo'] == 0)]
+                    store_df = store_df[(store_df['Date'] < "2015-08-01") | (result_df['Promo'] == 1)]
                 if len(fd["experiment_definition"]['confidence_intervals']) > 0:
                     for i in fd["experiment_definition"]['confidence_intervals']:
                         fig.add_trace(go.Scatter(marker=dict(color="cyan"), mode="lines",
-                                                 x=result_df[fd["experiment_definition"]['time_index']],
-                                                 y=result_df[
+                                                 x=store_df[fd["experiment_definition"]['time_index']],
+                                                 y=store_df[
                                                      '{}_h_{}_pred_c_{}'.format(
                                                          fd["experiment_definition"]['target'],
                                                          h, i)], name="h_{}_c_{}".format(h, i)))
@@ -686,41 +689,27 @@ def test_quickstart(test_fds_quickstart, random_state):
                         name="h_{}_c_{}".format(h, fd["experiment_definition"]['confidence_intervals'][0])))
                 fig.add_trace(
                     go.Scatter(marker=dict(color='black'), line=dict(dash='dash'), mode="lines",
-                                   x=result_df[fd["experiment_definition"]['time_index']],
-                                   y=result_df[fd["experiment_definition"]['target']],
+                                   x=store_df[fd["experiment_definition"]['time_index']],
+                                   y=store_df[fd["experiment_definition"]['target']],
                                    name=fd["experiment_definition"]['target']))
                 fig.add_trace(go.Scatter(marker=dict(color="darkblue"), mode="lines",
-                                             x=result_df[fd["experiment_definition"]['time_index']],
-                                             y=result_df[
+                                             x=store_df[fd["experiment_definition"]['time_index']],
+                                             y=store_df[
                                                  '{}_h_{}_pred'.format(fd["experiment_definition"]['target'],
                                                                        h)], name="Horizon {} Forecast".format(h)))
                 path = pathlib.Path(pathlib.Path(__file__).parent.parent.parent,
                                             'docs_src/plots/quickstart/{}_h_{}_s_{}_2d.html'.format(k, h, s))
                 path.parent.mkdir(parents=True, exist_ok=True)
                 fig.write_html(path)
-        ###TODO START HERE. GET FACTOR PLOT READY AND IMPLEMENT ASSERTION
-            '''fig = go.Figure()
-            for h in test_fd_retail_min["experiment_definition"]['time_horizons']:
-                result_df = result_df[(result_df['Promo'] == 1) & (result_df['Store_1.0'] == 1) & (result_df['Date'] >= '2015-08-01')]
-                factors = [c for c in result_df if c.split("_")[0] == "factor"]
-                result_df = result_df[factors + [test_fd_retail_min["experiment_definition"]['time_index']]]
+        ###TODO START HERE. IMPLEMENT ASSERTION
+                fig = go.Figure()
+                factors = [c for c in store_df if c.split("_")[0] == "factor"]
+                store_df = store_df[factors + [fd["experiment_definition"]['time_index']]]
                 for f in factors:
-                    fig.add_trace(go.Bar(x=result_df[test_fd_retail_min["experiment_definition"]['time_index']],
-                                         y=result_df[
+                    fig.add_trace(go.Bar(x=store_df[fd["experiment_definition"]['time_index']],
+                                         y=store_df[
                                              f], name="_".join(f.split("_")[1:])))
                     fig.update_layout(barmode='relative', title_text='Factor')
-                fig.write_html('docs_src/plots/test_forecast_retail_h_{}_factors.html'.format(h))
-            fig = go.Figure(
-                layout=go.Layout(
-                    title=go.layout.Title(text="Forecasted Promo Impact"),
-                    scene=dict(
-                        xaxis=dict(
-                            title='Date'),
-                        yaxis=dict(
-                            title='Promo', tickmode='array', tickvals=[0, 1], ticktext=['No', 'Yes']),
-                        zaxis=dict(
-                            title='Sales'))
-                )
-            )'''
+                fig.write_html('docs_src/plots/quickstart/{}_test_forecast_retail_h_{}_s_{}_factors.html'.format(k, h, s))
 
 
