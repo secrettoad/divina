@@ -1,0 +1,7 @@
+{
+  "experiment_definition": {
+    "target": "Sales",
+    "time_index": "Date",
+    "data_path": "divina://retail_sales"
+  }
+}
