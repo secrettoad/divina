@@ -15,9 +15,9 @@ import sys
 @validate_experiment_definition
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
 def _validate(s3_fs, experiment_definition, write_path, read_path):
-    def get_metrics(experiment_definition, df):
+    def get_metrics(experiment_definition, df, time_horizons):
         metrics = {"time_horizons": {}}
-        for h in experiment_definition["time_horizons"]:
+        for h in time_horizons:
             metrics["time_horizons"][h] = {}
             df["resid_h_{}".format(h)] = (
                     df[experiment_definition["target"]].shift(-h)
@@ -202,7 +202,7 @@ def _validate(s3_fs, experiment_definition, write_path, read_path):
                 raise Exception("Bad Validation Split: {} | Check Dataset Time Range".format(s))
 
             validate_df = cull_empty_partitions(validate_df)
-            metrics["splits"][s] = get_metrics(experiment_definition, validate_df)
+            metrics["splits"][s] = get_metrics(experiment_definition, validate_df, time_horizons)
 
             with write_open("{}/metrics.json".format(write_path), "w") as f:
                 json.dump(metrics, f)
@@ -214,7 +214,7 @@ def _validate(s3_fs, experiment_definition, write_path, read_path):
                 [experiment_definition["time_index"]]
                 + [
                     "{}_h_{}_pred".format(experiment_definition["target"], h)
-                    for h in experiment_definition["time_horizons"]
+                    for h in time_horizons
                 ]
                 ],
             "{}/validation/s-{}".format(

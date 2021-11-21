@@ -16,7 +16,8 @@
       "Holiday",
       "HolidayType",
       "StoreType",
-      "Assortment"
+      "Assortment",
+      "LastDayOfMonth"
     ],
     "joins": [
       {
@@ -43,7 +44,7 @@
       0,
       100
     ],
-    "bootstrap_sample": 10,
+    "bootstrap_sample": 5,
     "bin_features": {
       "Month": [
         3,
@@ -51,6 +52,7 @@
         9
       ]
     },
+    "time_validation_splits": ["2015-07-18"],
     "scenarios": {
       "Promo": {
         "mode": "constant",

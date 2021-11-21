@@ -18,6 +18,7 @@ divina
    :maxdepth: 1
 
    cli
+   quickstart
 
 :mod:`divina` is an open source, BSD3-licensed library providing scalable and hyper-interpretable causal forecasting capabilities written in `Python <https://www.python.org/>`__ and consumable via CLI.
 
@@ -139,7 +140,7 @@ To run an experiment with divina, first install it and then create an experiment
 
 **Experiment Persistence**
 
-Experiment artifacts are persisted either locally or to S3 depending on the use of the `--local` flag when running the experiment command and will produce a local output structure as shown below.
+Experiment artifacts are persisted either locally or to S3 depending on the use of the `--aws` flag as structured below.
 
     experiment path
       |- models

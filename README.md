@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://storage.googleapis.com/coysuweb-static/assets/images/logo/divina_logo.png"><br>
+  <img src="https://storage.googleapis.com/coysuweb-static/assets/images/logo/3.png"><br>
 </div>
 
 -----------------
@@ -15,15 +15,15 @@
 
 ## What is it?
 
-**divina** is a Python package that provides scalable, interpretable and accurate forecasting capabilities designed to make causal forecasting modular, efficient and simple.
+**divina** is a Python package that provides scalable, interpretable and performant forecasting capabilities designed to make causal forecasting modular, efficient and simple.
 It aims to reduce the challenge of causal forecasting on datasets of any size to configuration via JSON as opposed to construction and consumption of Python objects. 
-Additionally, divina aims to raise the standard of functionality in forecasting by implementing a dask- and cloud-native model with a built-in two-way interpretability interface.
+At its core, divina aims reduce the complexity and increase the consistency of causal forecasting at scale.
 
 
 ## Main Features
 Here are just a few of the things that divina does well:
 
-  - Abstracted and scalable feature engineering. Encoding, interaction features, normalization, binning and joining of datasets are handled scalably by the Dask back-end with minimal configuration required by the user.
+  - Abstracted and scalable feature engineering. Encoding, interaction, normalization, binning and joining of datasets are handled scalably by the Dask back-end with minimal configuration required by the user.
   - Simulation of user-defined factors in support of forward-looking, multi-signal and decision-enabling causal forecasts.   
   - Automatic persistence of all experiment artifacts, including models, predictions and validation metrics, to s3 for posterity, traceability and easy integration.
   - A user-centric, two-way [**interpretation interface**][interpretation] that allows for granular interpretation of models and predictions while also allowing domain experts to override factors.
@@ -31,7 +31,7 @@ Here are just a few of the things that divina does well:
   [interpretation]: https://github.com/secrettoad/divina
   
 ## Roadmap
-Improvements slated for next and beta release are:
+Current development priorities and improvements slated for next and beta release are:
 
   - Addition of automated experiment summaries as persisted artifacts enabling ease of consumption and increased transparency into the forecasts and models divina produces.
   - Improvement of the core model's performance, with the addition of attention mechanisms and the ability to adapt to signals with dynamic mean and variance.  
