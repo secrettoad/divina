@@ -6,7 +6,7 @@
     "time_index": "Date",
     "data_path": "divina://retail_sales",
     "include_features": ["Store", "Weekday", "Month", "WeekOfYear",
-       "Holiday", "HolidayType", "StoreType", "Assortment"],
+       "Holiday", "HolidayType", "StoreType", "Assortment", "LastDayOfMonth"],
     "encode_features": ["Store", "Month", "WeekOfYear", "StoreType", "Weekday", "HolidayType", "Assortment"],
     "joins": [
                 {
@@ -15,6 +15,8 @@
                     "as": "time"
                 }
             ],
-    "bin_features": {"Month": [3, 6, 9]}
+    "bin_features": {"Month": [3, 6, 9]},
+    "confidence_intervals": [0, 100],
+    "bootstrap_sample": 5
   }
 }

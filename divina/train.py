@@ -212,7 +212,7 @@ def _train(s3_fs, experiment_definition, write_path, dask_model=LinearRegression
                 raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
             df_train = df[df[experiment_definition["time_index"]] < s]
 
-            model = _train_model(df=df_train, dask_model=dask_model, model_name="s-{}_h-{}".format(
+            split_model = _train_model(df=df_train, dask_model=dask_model, model_name="s-{}_h-{}".format(
                 pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                 h
             ), random_seed=random_seed,

@@ -18,6 +18,11 @@ The aim of :mod:`divina` is twofold:
 
 **Experiment Definition**
 
+A minimal experiment definition supplies the path to the dataset, the name of the column that holds the time index and the name of the column that holds the target to predict. Below is a minimal example using the retail sales data included with divina.
+
+.. raw:: html
+    :file: _static/plots/quickstart/quickstart1_h_0_s_6_2d.html
+
 
 **Experiment Persistence**
 
