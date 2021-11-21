@@ -66,7 +66,7 @@ def _get_dataset(experiment_definition, start=None, end=None, pad=False):
                     new_dates = pd.date_range(pd.to_datetime(str(start)), pd.to_datetime(str(end)),
                                               freq=experiment_definition["frequency"])
             else:
-                    new_dates = pd.date_range(time_max + pd.offsets.Day(), pd.to_datetime(str(end)),
+                    new_dates = pd.date_range(time_max + pd.tseries.frequencies.to_offset(experiment_definition["frequency"]), pd.to_datetime(str(end)),
                                               freq=experiment_definition["frequency"])
             if len(new_dates) > 0:
 
@@ -75,13 +75,16 @@ def _get_dataset(experiment_definition, start=None, end=None, pad=False):
                     combinations = [list(x) for x in product(combinations,
                             *[df[s].unique().compute().values for s in
                               experiment_definition["target_dimensions"]])]
+                    scenario_columns = [experiment_definition["time_index"]] + experiment_definition[
+                        "target_dimensions"]
+                else:
+                    combinations = [[x] for x in combinations]
+                    scenario_columns = [experiment_definition["time_index"]]
                 constant_columns = [c for c in experiment_definition["scenarios"] if
                                     experiment_definition["scenarios"][c]["mode"] == "constant"]
                 for c in constant_columns:
                     combinations = [x[0] + [x[1]] for x in product(combinations, experiment_definition["scenarios"][c]["constant_values"])]
-                df_scenario = dd.from_pandas(pd.DataFrame(combinations, columns=[experiment_definition["time_index"]] +
-                                                                                experiment_definition[
-                                                                                    "target_dimensions"] + constant_columns),
+                df_scenario = dd.from_pandas(pd.DataFrame(combinations, columns= scenario_columns + constant_columns),
                                              npartitions=npartitions)
                 last_columns = [c for c in experiment_definition["scenarios"] if experiment_definition["scenarios"][c]["mode"] == "last"]
                 if len(last_columns) > 0:

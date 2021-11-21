@@ -169,7 +169,7 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
                 os.path.join(
                     experiment_path,
                     "models",
-                    "h-2",
+                    "h-0",
                 )
             )
         ),
@@ -179,7 +179,7 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
             os.path.join(
                 experiment_path,
                 "models",
-                "h-2_params.json",
+                "h-0_params.json",
             )
     )) as f:
         assert json.load(f) == test_model_retail[1]
@@ -190,7 +190,7 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
                     os.path.join(
                         experiment_path,
                         "models/bootstrap",
-                        "h-2_r-{}".format(seed),
+                        "h-0_r-{}".format(seed),
                     )
                 )
             ),
@@ -200,7 +200,7 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
                 os.path.join(
                     experiment_path,
                     "models/bootstrap",
-                    "h-2_r-{}_params.json".format(seed),
+                    "h-0_r-{}_params.json".format(seed),
                 )
         )) as f:
             features = json.load(f)
@@ -212,7 +212,7 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
                     os.path.join(
                         experiment_path,
                         "models",
-                        "s-{}_h-2".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+                        "s-{}_h-0".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
                     )
                 )
             ),
@@ -222,7 +222,7 @@ def test_train_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, test_d
                 os.path.join(
                     experiment_path,
                     "models",
-                    "s-{}_h-2_params.json".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+                    "s-{}_h-0_params.json".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
                 )
         )) as f:
             features = json.load(f)
@@ -310,13 +310,13 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
         os.path.join(
             experiment_path,
             "models",
-            "h-2",
+            "h-0",
         ),
     )
     with open(os.path.join(
             experiment_path,
             "models",
-            "h-2_params.json",
+            "h-0_params.json",
     ), 'w+') as f:
         json.dump(
             test_model_retail[1],
@@ -328,13 +328,13 @@ def test_forecast_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             os.path.join(
                 experiment_path,
                 "models/bootstrap",
-                "h-2_r-{}".format(seed),
+                "h-0_r-{}".format(seed),
             ),
         )
         with open(os.path.join(
                 experiment_path,
                 "models/bootstrap",
-                "h-2_r-{}_params.json".format(seed),
+                "h-0_r-{}_params.json".format(seed),
         ), 'w+') as f:
             json.dump(
                 test_bootstrap_models_retail[seed][1],
@@ -516,13 +516,13 @@ def test_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             os.path.join(
                 experiment_path,
                 "models",
-                "s-{}_h-2".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+                "s-{}_h-0".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
             ),
         )
         with open(os.path.join(
                 experiment_path,
                 "models",
-                "s-{}_h-2_params.json".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
+                "s-{}_h-0_params.json".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
         ), 'w+') as f:
             json.dump(
                 test_validation_models_retail[split][1],
@@ -534,13 +534,13 @@ def test_validate_retail(s3_fs, test_df_retail_sales, test_df_retail_stores, tes
             os.path.join(
                 experiment_path,
                 "models/bootstrap",
-                "s-20150718-000000_h-2_r-{}".format(seed),
+                "s-20150718-000000_h-0_r-{}".format(seed),
             ),
         )
         with open(os.path.join(
                 experiment_path,
                 "models/bootstrap",
-                "s-20150718-000000_h-2_r-{}_params.json".format(seed),
+                "s-20150718-000000_h-0_r-{}_params.json".format(seed),
         ), 'w+') as f:
             json.dump(
                 test_bootstrap_models_retail[seed][1],
@@ -639,9 +639,6 @@ def test_set_params(
 
 def test_quickstart(test_fds_quickstart, random_state):
     ###Date, Customers, Promo2, Open removed on 2
-    test_fds_quickstart = {}
-    with open(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/experiment_definitions', 'quickstart8.json')) as f:
-        test_fds_quickstart['quickstart8'] = (json.load(f))
     for k in test_fds_quickstart:
         fd = test_fds_quickstart[k]
         experiment_path = "divina-test/experiment/test1"
@@ -710,6 +707,9 @@ def test_quickstart(test_fds_quickstart, random_state):
                                          y=store_df[
                                              f], name="_".join(f.split("_")[1:])))
                     fig.update_layout(barmode='relative', title_text='Factor')
-                fig.write_html('docs_src/plots/quickstart/{}_test_forecast_retail_h_{}_s_{}_factors.html'.format(k, h, s))
+                path = pathlib.Path(pathlib.Path(__file__).parent.parent.parent,
+                                    'docs_src/plots/quickstart/{}_test_forecast_retail_h_{}_s_{}_factors.html'.format(k, h, s))
+                path.parent.mkdir(parents=True, exist_ok=True)
+                fig.write_html(path)
 
 

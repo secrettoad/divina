@@ -8510,11 +8510,9 @@ def test_fd_1():
             "confidence_intervals": [90],
             "bootstrap_sample": 5,
             "bin_features": {"b": [5, 10, 15]},
-            "scenarios": [
-                {"feature": "b", "values": [[0, 5]], "start": "1970-01-01 00:00:09", "end": "1970-01-01 00:00:14"}],
+            "scenarios": {"b":{"mode":"constant", "constant_values": [0, 1, 2, 3, 4, 5]}},
             "time_horizons": [1],
-            "data_path": "divina-test/dataset/test1",
-            "model": "LinearRegression",
+            "data_path": "divina-test/dataset/test1"
         }
     }
 
@@ -8523,28 +8521,73 @@ def test_fd_1():
 def test_fd_retail():
     return {
         "experiment_definition": {
-            "time_index": "Date",
             "target": "Sales",
-            "include_features": ["Store", "Promo", "Weekday",
-                                 "LastDayOfMonth"],
-            "time_validation_splits": ["2015-07-18"],
-            "forecast_end": "2015-08-30",
-            "bootstrap_sample": 5,
-            "target_dimensions": ["Store"],
-            "time_horizons": [2],
-            "frequency": "D",
-            "encode_features": ["Weekday", "Store"],
-            "scenarios": [{"feature": "Promo", "values": [0, 1], "start": "2015-08-01", "end": "2016-01-01"}],
-            "data_path": "divina://retail_sales",
             "link_function": "log",
-            "confidence_intervals": [100, 0],
+            "target_dimensions": [
+                "Store"
+            ],
+            "time_index": "Date",
+            "data_path": "divina://retail_sales",
+            "include_features": [
+                "Store",
+                "Weekday",
+                "Promo",
+                "Month",
+                "WeekOfYear",
+                "Holiday",
+                "HolidayType",
+                "StoreType",
+                "Assortment"
+            ],
             "joins": [
                 {
                     "data_path": "divina://time",
-                    "join_on": ["Date", "Date"],
+                    "join_on": [
+                        "Date",
+                        "Date"
+                    ],
                     "as": "time"
                 }
-            ]
+            ],
+            "forecast_end": "01-01-2016",
+            "frequency": "D",
+            "encode_features": [
+                "Store",
+                "Month",
+                "WeekOfYear",
+                "StoreType",
+                "Weekday",
+                "HolidayType",
+                "Assortment"
+            ],
+            "confidence_intervals": [
+                0,
+                100
+            ],
+            "bin_features": {
+                "Month": [
+                    3,
+                    6,
+                    9
+                ]
+            },
+            "scenarios": {
+                "Promo": {
+                    "mode": "constant",
+                    "constant_values": [
+                        0,
+                        1
+                    ]
+                },
+                "StoreType": {
+                    "mode": "last"
+                },
+                "Assortment": {
+                    "mode": "last"
+                }
+            },
+            "time_validation_splits": ["2015-07-18"],
+            "bootstrap_sample": 5
         }
     }
 
@@ -8552,8 +8595,10 @@ def test_fd_retail():
 @pytest.fixture()
 def test_fds_quickstart():
     fds = {}
-    for file in sorted(os.listdir(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/experiment_definitions'))):
-        with open(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/experiment_definitions', file)) as f:
+    for file in sorted(
+            os.listdir(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/experiment_definitions'))):
+        with open(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/experiment_definitions',
+                               file)) as f:
             fds[file.split('.')[0]] = (json.load(f))
     return fds
 

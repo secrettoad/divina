@@ -43,6 +43,7 @@
       0,
       100
     ],
+    "bootstrap_sample": 10,
     "bin_features": {
       "Month": [
         3,
