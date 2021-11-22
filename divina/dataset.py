@@ -8,7 +8,7 @@ from sklearn.pipeline import make_pipeline
 import numpy as np
 from itertools import product
 from .datasets.load import _load
-import sys
+
 
 
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
@@ -141,7 +141,6 @@ def _get_dataset(experiment_definition, start=None, end=None, pad=False):
 
     if "encode_features" in experiment_definition:
         for c in experiment_definition["encode_features"]:
-            df["{}_dummy".format(c)] = df[c]
             if df[c].dtype == int:
                 df[c] = df[c].astype(float)
             else:
@@ -154,10 +153,6 @@ def _get_dataset(experiment_definition, start=None, end=None, pad=False):
         pipe.fit(df)
 
         df = pipe.transform(df)
-
-        for c in experiment_definition["encode_features"]:
-            df[c] = df["{}_dummy".format(c)]
-        df = df.drop(columns=["{}_dummy".format(c) for c in experiment_definition["encode_features"]])
 
     if "interaction_terms" in experiment_definition:
         for t in experiment_definition["interaction_terms"]:

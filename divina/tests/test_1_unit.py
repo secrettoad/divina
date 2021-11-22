@@ -160,7 +160,6 @@ def test_forecast(
     pathlib.Path(
         test_fd_1["experiment_definition"]["data_path"]
     ).mkdir(parents=True, exist_ok=True)
-
     pathlib.Path(os.path.join(experiment_path, "models/bootstrap")).mkdir(
         parents=True, exist_ok=True
     )

@@ -16,6 +16,7 @@
                 }
             ],
     "bin_features": {"Month": [3, 6, 9]},
-    "time_validation_splits": ["2015-07-18"]
+    "confidence_intervals": [0, 100],
+    "bootstrap_sample": 5
   }
 }
