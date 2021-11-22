@@ -17,7 +17,7 @@ from pandas.api.types import is_numeric_dtype
 def _train_model(df, dask_model, model_name, random_seed, features, target,
                  link_function, write_open, write_path, bootstrap_sample=None, confidence_intervals=None):
     if random_seed:
-        model = dask_model(random_state=random_seed)
+        model = LinearRegression(random_state=random_seed)
     else:
         model = dask_model()
 
@@ -71,11 +71,12 @@ def _train_model(df, dask_model, model_name, random_seed, features, target,
             else:
                 df_train_bootstrap = df.sample(replace=False, frac=.8)
             if random_seed:
-                bootstrap_model = dask_model(random_state=random_seed)
+                bootstrap_model = LinearRegression(random_state=random_seed)
             else:
                 bootstrap_model = dask_model()
             df_std_bootstrap = df_train_bootstrap[features].std().compute()
             bootstrap_features = [c for c in features if not df_std_bootstrap.loc[c] == 0]
+
             if link_function == 'log':
                 bootstrap_model.fit(
                     df_train_bootstrap[bootstrap_features].to_dask_array(lengths=True),
@@ -133,7 +134,7 @@ def _train_model(df, dask_model, model_name, random_seed, features, target,
 
 @validate_experiment_definition
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-def _train(s3_fs, experiment_definition, write_path, dask_model=LinearRegression, random_seed=None):
+def _train(s3_fs, experiment_definition, write_path, dask_model=None, random_seed=None):
     if "model" in experiment_definition:
         dask_model = globals()[experiment_definition["model"]]
     if not "confidence_intervals" in experiment_definition:

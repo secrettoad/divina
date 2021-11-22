@@ -9,7 +9,6 @@ from functools import partial
 from .utils import validate_experiment_definition
 import json
 import dask.array as da
-from pandas.api.types import is_numeric_dtype
 
 
 @validate_experiment_definition
@@ -68,13 +67,6 @@ def _forecast(s3_fs, experiment_definition, read_path, write_path):
             fit_model_params = json.load(f)
         features = fit_model_params["features"]
 
-        for f in features:
-            if not is_numeric_dtype(forecast_df[f].dtype):
-                try:
-                    forecast_df[f] = forecast_df[f].astype(float)
-                except:
-                    raise ValueError('{} could not be converted to float. Please convert to numeric or encode with "encode_features: {}"'.format(f, f))
-
         if "link_function" in experiment_definition:
             if experiment_definition["link_function"] == 'log':
                 forecast_df[
@@ -89,8 +81,11 @@ def _forecast(s3_fs, experiment_definition, read_path, write_path):
 
         factor_df = dd.from_array(forecast_df[features].to_dask_array(lengths=True) * da.from_array(fit_model.coef_))
         factor_df.columns = ["factor_{}".format(c) for c in features]
+
         for c in factor_df:
             forecast_df[c] = factor_df[c]
+
+        sys.stdout.write("Local factors calculated for horizon {}\n".format(h))
 
         if "confidence_intervals" in experiment_definition:
             bootstrap_model_paths = [p for p in read_ls("{}/models/bootstrap".format(
@@ -116,6 +111,7 @@ def _forecast(s3_fs, experiment_definition, read_path, write_path):
                     ) as f:
                         bootstrap_params = json.load(f)
                         bootstrap_features = bootstrap_params['features']
+
                     if link_function == 'log':
                         df['{}_h_{}_pred_b_{}'.format(experiment_definition["target"], h,
                                                       path.split("-")[-1])] = da.expm1(
@@ -126,7 +122,6 @@ def _forecast(s3_fs, experiment_definition, read_path, write_path):
                         df['{}_h_{}_pred_b_{}'.format(experiment_definition["target"], h,
                                                       path.split("-")[-1])] = bootstrap_model.predict(
                             dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(lengths=True))
-
                 return df
 
             if "link_function" in experiment_definition:
@@ -148,6 +143,8 @@ def _forecast(s3_fs, experiment_definition, read_path, write_path):
                 [i * .01 for i in experiment_definition['confidence_intervals']]).to_dask_array(lengths=True).T)
             df_interval.columns = ['{}_h_{}_pred_c_{}'.format(experiment_definition["target"], h, c) for c in
                                    experiment_definition["confidence_intervals"]]
+
+            sys.stdout.write("Confidence intervals calculated for horizon {}\n".format(h))
 
             df_interval = df_interval.repartition(divisions=forecast_df.divisions)
             for c in df_interval.columns:

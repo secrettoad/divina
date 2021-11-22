@@ -141,63 +141,6 @@ def _validate(s3_fs, experiment_definition, write_path, read_path):
                 ] = fit_model.predict(validate_df[features].to_dask_array(lengths=True))
                 sys.stdout.write("Validation predictions made for split {}\n".format(s))
 
-            if "confidence_intervals" in experiment_definition:
-                bootstrap_model_paths = [p for p in read_ls("{}/models/bootstrap".format(
-                    read_path
-                )) if '.' not in p]
-
-                def load_and_predict_bootstrap_model(paths, intervals, link_function, df):
-                    for i, path in enumerate(paths):
-                        if bootstrap_prefix:
-                            model_path = os.path.join(bootstrap_prefix, path)
-                        else:
-                            model_path = path
-                        with read_open(
-                                model_path,
-                                "rb",
-                        ) as f:
-                            bootstrap_model = joblib.load(f)
-                        with read_open(
-                                "{}_params.json".format(
-                                    model_path),
-                                "r",
-                        ) as f:
-                            bootstrap_params = json.load(f)
-                            bootstrap_features = bootstrap_params['features']
-                        if link_function == 'log':
-                            df['{}_h_{}_pred_b_{}'.format(experiment_definition["target"], h, i)] = da.expm1(
-                                bootstrap_model.predict(
-                                    dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(
-                                        lengths=True)))
-                        else:
-                            df['{}_h_{}_pred_b_{}'.format(experiment_definition["target"], h,
-                                                          i)] = bootstrap_model.predict(
-                                dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(lengths=True))
-
-                    df_agg = df[['{}_h_{}_pred_b_{}'.format(experiment_definition["target"], h, i) for i in
-                                 range(0, len(paths))] + ['{}_h_{}_pred'.format(experiment_definition["target"], h)]].T
-                    for i in intervals:
-                        if i > 50:
-                            interpolation = 'higher'
-                        elif i < 50:
-                            interpolation = 'lower'
-                        else:
-                            interpolation = 'linear'
-                        df['{}_h_{}_pred_c_{}'.format(experiment_definition["target"], h, i)] = df_agg.quantile(i * .01,
-                                                                                                              interpolation=interpolation).T
-                    return df
-
-                if "link_function" in experiment_definition:
-                    validate_df = validate_df.map_partitions(partial(load_and_predict_bootstrap_model,
-                                                                     bootstrap_model_paths,
-                                                                     experiment_definition['confidence_intervals'],
-                                                                     experiment_definition['link_function']))
-                else:
-                    validate_df = validate_df.map_partitions(partial(load_and_predict_bootstrap_model,
-                                                                     bootstrap_model_paths,
-                                                                     experiment_definition['confidence_intervals'],
-                                                                     None))
-
             if not pd.to_datetime(str(time_min)) < pd.to_datetime(str(s)) < pd.to_datetime(str(time_max)):
                 raise Exception("Bad Validation Split: {} | Check Dataset Time Range".format(s))
 
