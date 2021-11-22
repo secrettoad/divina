@@ -98,7 +98,7 @@ def dask_client(request):
 
 @pytest.fixture(scope="session")
 def dask_cluster_ip():
-    return "3.141.21.73:8786"
+    return "3.133.120.187:8786"
 
 
 @pytest.fixture(scope="session")
@@ -121,8 +121,7 @@ def dask_client_remote(request, dask_cluster_ip):
         )
         cluster.scale(5)
         client = Client(cluster)
-        if not dask_cluster_ip:
-            request.addfinalizer(lambda: client.close())
+        request.addfinalizer(lambda: client.close())
         yield client
         if not dask_cluster_ip:
             client.shutdown()
