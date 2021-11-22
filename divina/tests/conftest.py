@@ -98,7 +98,7 @@ def dask_client(request):
 
 @pytest.fixture(scope="session")
 def dask_cluster_ip():
-    return "3.133.120.187:8786"
+    return None
 
 
 @pytest.fixture(scope="session")
@@ -117,7 +117,7 @@ def dask_client_remote(request, dask_cluster_ip):
                 "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                 "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
             },
-            auto_shutdown=False,
+            auto_shutdown=True,
         )
         cluster.scale(5)
         client = Client(cluster)
