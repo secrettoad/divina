@@ -205,6 +205,4 @@ def test_quickstart(test_fds_quickstart, random_state, dask_client_remote, test_
             )
         ).compute().reset_index(drop=True)
         pd.testing.assert_frame_equal(result_df, pd.read_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
-                               k)).reset_index(drop=True), check_exact=False, rtol=.1)
-
-
+                               k)).reset_index(drop=True))
