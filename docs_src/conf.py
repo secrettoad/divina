@@ -3,7 +3,9 @@ import pathlib
 
 sys.path.insert(0, pathlib.Path(__file__).parent.parent)
 
-extensions = ["sphinx_click"]
+extensions = ["sphinx_click", "sphinx.ext.autodoc", "sphinx-jsonschema"]
+
+project = "divina"
 
 autodoc_member_order = "bysource"
 

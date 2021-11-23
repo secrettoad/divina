@@ -1,11 +1,9 @@
-:notoc:
-
 .. divina documentation master file, created by
 
 .. module:: divina
 
 ********************
-divina documentation
+divina
 ********************
 
 **Date**: |today| **Version**: |version|
@@ -14,67 +12,157 @@ divina documentation
 `Binary Installers <https://pypi.org/project/divina>`__ |
 `Source Repository <https://github.com/secrettoad/divina>`__ |
 `Issues & Ideas <https://github.com/secrettoad/divina/issues>`__ |
-`Q&A Support <https://stackoverflow.com/questions/tagged/divina>`__ |
-`Mailing List <mailto:partners@coysu.com>`__
+`Q&A Support <https://stackoverflow.com/questions/tagged/divina>`__
 
-:mod:`divina` is an open source, BSD3-licensed library providing scalable and hyper-interpretable causal forecasting capabilities written in `Python <https://www.python.org/>`__ and consumable either via Bash CLI or the built-in web-app.
-programming language.
+.. toctree::
+   :maxdepth: 1
 
-The aim of :mod:`divina` is twofold:
+   cli
+   quickstart
 
-1) to reduce the complexity of configuration for causal forecasting at scale. this is accomplished by abstracting all configuration to a single JSON file that lets users configure new experiments easily and safely. Below is an example forecast definition.
+:mod:`divina` is an open source, BSD3-licensed library providing scalable and hyper-interpretable causal forecasting capabilities written in `Python <https://www.python.org/>`__ and consumable via CLI.
+
+The aim of :mod:`divina` is to deliver performance-oriented and hypter-interpretable exogenous time series forecasting models by producing accurate and bootstrapped predictions, local and overridable factor summaries and easily configurable feature engineering and experiment management capabilities.
+
+Installation
+************
+
+:mod:`divina` is available via pypi and can be install using the python package manager pip as shown below.
+
+.. code-block:: bash
+
+    pip install divina
+
+Use
+************
+
+:mod:`divina` is consumable via CLI, or command line interface. In order to run an experiment with :mod:`divina`, first create your experiment definition and then run the below command in your console of choice.
+
+.. code-block:: bash
+
+    divina experiment /path/to/my/experiment_definition.json
+
+Experiment Definitions
+************
+
+Experiment configuration with :mod:`divina` has been abstracted completely to a JSON file called the experiment definition that the user supplies to the :mod:`divina` cli. For an exhaustive example of an experiment definition with every available option described in detail, check out the experiment definition documentation. Or if you are new to divina, check out the get started page.
+
+Getting Started
+************
+
+To run an experiment with divina, first install it and then create an experiment definition that describes your experiment. Here we create a minimal experiment definition that allows us to run a forecasting experiment using the retail sales and time data included with divina.
 
 .. code-block:: json
 
     {
-        "vision_definition": {
-            "time_index": "index",
-            "target": "passengers",
-            "time_validation_splits": ["1957-01-01"],
-            "time_validation_horizons": [1],
-            "dataset_directory": "s3://divina-public/dataset/airline_sales",
+      "experiment_definition": {
+        "target": "Sales",
+        "time_index": "Date",
+        "data_path": "divina://retail_sales"
+      }
+    }
+
+
+
+
+
+.. code-block:: json
+
+    {
+      "experiment_definition": {
+        "target": "<string>",
+        "signal_dimensions": ["<string>"],
+        "link_function": "<string>",
+        "time_horizons": ["<integer>"],
+        "time_index": "<string>",
+        "include_features": ["<string>"],
+        "drop_features": ["<string>"],
+        "time_validation_splits": ["<string>"],
+        "train_end": "<string>",
+        "train_end": "<string>",
+        "forecast_end": "<string>",
+        "forecast_end": "<string>",
+        "validation_end": "<string>",
+        "validation_end": "<string>",
+        "encode_features": ["<string>"],
+        "scenarios": [
+            {
+              "feature": "<string>",
+              "values": ["<string, integer, float>"],
+              "start": "<string>",
+              "end": "<string>"
+            }
+        ],
+        "scenario_freq": "<string>",
+        "data_path": "<string>",
+        "confidence_intervals": ["<integer>", "<integer>"],
+        "joins": [
+          {
+            "data_path": "<string>",
+            "join_on": ["<string>", "<string>"],
+            "as": "<string>"
+          }
+        ]
+        "bootstrap_sample": "<integer>",
+      }
+    }
+
+
+
+.. code-block:: json
+
+    {
+        "experiment_definition": {
+            "time_index": "Date",
+            "target": "Sales",
+            "include_features": ["Store", "Promo", "Weekday",
+                                 "LastDayOfMonth"],
+            "time_validation_splits": ["2015-07-18"],
+            "forecast_end": "2015-08-30",
+            "bootstrap_sample": 5,
+            "signal_dimensions": ["Store"],
+            "time_horizons": [2],
+            "forecast_freq": "D",
+            "encode_features": ["Weekday", "Store"],
+            "scenarios": [{"feature": "Promo", "values": [0, 1], "start": "2015-08-01", "end": "2016-01-01"}],
+            "dataset_directory": "divina://retail_sales",
+            "link_function": "log",
+            "confidence_intervals": [100, 0],
+            "joins": [
+                {
+                    "dataset_directory": "divina://time",
+                    "join_on": ["Date", "Date"],
+                    "as": "time"
+                }
+            ]
         }
     }
 
-2) to deliver scalable and bidirectionally interpretable models that bring transparency and incremental control to the forecasting process. This is done using a variety of coefficient calculation tools for highly-parametric and non-parametric models, binning and interacting of features and and a set of interfaces allowing users to override individual model and forecast coefficients with domain knowledge.
+**Experiment Persistence**
 
-In a minimal example, divina can be used to create a weather forecast using the below command and forecast definition
+Experiment artifacts are persisted either locally or to S3 depending on the use of the `--aws` flag as structured below.
 
-.. code-block:: bash
-
-    divina forecast forecast_definition.json --local
-
-
-and will produce a local output structure as shown below::
-
-    divina-forecast
+    experiment path
       |- models
       |    |
-      |    \- insample
-      |         |
-      |         \- model.joblib
-      |- predictions
-      |      |
-      |      \- insample
-      |           |
-      |           \- predictions_partition_0.parquet
-      \- validation
-             |
-             \- insample
+      |    \- h_{forecast horizon}
+      |           |-fit_model.joblib
+      |           |-bootstrap
+      |                |
+      |                |- bootstrap_model_{random seed}
+      |
+      |- forecast
+      |    |
+      |    |- common_meta.parquet
+      |    |- forecast_partition_0_meta.parquet
+      |    |- forecast_partition_0.parquet
+      |    \  ...
+      |
+      |- validation
+           |
+           |- metrics.json
+           \- {validation split}
                   |
-                  \- metrics.json
-
-In a more advanced configuration, divina can be used with the following command and forecast definition
-
-to produce an s3 hosted output structure as shown below
-
-
-###TODO - illustrate use of start date, end date and horizon to deliver "best information" forecast
-
-###TODO visualization and interpretation interface
-
-.. click:: divina.cli.cli:divina
-   :prog: divina
-   :nested: full
-
-
+                  |- validation_partition_0_meta.parquet
+                  |- validation_partition_0.parquet
+                  \  ...

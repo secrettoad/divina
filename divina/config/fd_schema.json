@@ -1,509 +1,388 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema",
-  "$id": "http://example.com/example.json",
-  "type": "object",
-  "title": "The root schema",
-  "description": "The root schema comprises the entire JSON document.",
-  "default": {},
-  "examples": [
-    {
-      "forecast_definition": {
-        "time_index": "a",
-        "target": "c",
-        "time_validation_splits": [
-          "1970-01-01 00:00:07"
-        ],
-        "validate_start": "1970-01-01 00:00:01",
-        "validate_end": "1970-01-01 00:00:09",
-        "forecast_start": "1970-01-01 00:00:05",
-        "forecast_end": "1970-01-01 00:00:14",
-        "forecast_freq": "S",
-        "confidence_intervals": [
-          90
-        ],
-        "bootstrap_sample": 5,
-        "bin_features": [
-          "b"
-        ],
-        "scenarios": {
-          "b": {
-            "values": [
-              [
-                0,
-                5
-              ],
-              7,
-              "red"
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "title": "The root schema",
+    "description": "The root schema comprises the entire JSON document.",
+    "default": {},
+    "required": [
+        "experiment_definition"
+    ],
+    "properties": {
+        "experiment_definition": {
+            "$id": "#/properties/experiment_definition",
+            "default": {},
+            "description": "An explanation about the purpose of this instance.",
+            "required": [
+                "target",
+                "time_index",
+                "data_path"
             ],
-            "start": "1970-01-01 00:00:09",
-            "end": "1970-01-01 00:00:14"
-          }
-        },
-        "time_horizons": [
-          1
-        ],
-        "dataset_directory": "divina-test/dataset/test1",
-        "model": "LinearRegression"
-      }
-    }
-  ],
-  "required": [
-    "forecast_definition"
-  ],
-  "properties": {
-    "forecast_definition": {
-      "$id": "#/properties/forecast_definition",
-      "type": "object",
-      "title": "The forecast_definition schema",
-      "description": "An explanation about the purpose of this instance.",
-      "default": {},
-      "examples": [
-        {
-          "time_index": "a",
-          "target": "c",
-          "time_validation_splits": [
-            "1970-01-01 00:00:07"
-          ],
-          "validate_start": "1970-01-01 00:00:01",
-          "validate_end": "1970-01-01 00:00:09",
-          "forecast_start": "1970-01-01 00:00:05",
-          "forecast_end": "1970-01-01 00:00:14",
-          "forecast_freq": "S",
-          "confidence_intervals": [
-            90
-          ],
-          "bootstrap_sample": 5,
-          "bin_features": [
-            "b"
-          ],
-          "scenarios": {
-            "b": {
-              "values": [
-                [
-                  0,
-                  5
-                ],
-                7,
-                "red"
-              ],
-              "start": "1970-01-01 00:00:09",
-              "end": "1970-01-01 00:00:14"
-            }
-          },
-          "time_horizons": [
-            1
-          ],
-          "dataset_directory": "divina-test/dataset/test1",
-          "model": "LinearRegression"
-        }
-      ],
-      "required": [
-        "time_index",
-        "target",
-        "time_validation_splits",
-        "forecast_start",
-        "forecast_end",
-        "forecast_freq",
-        "time_horizons",
-        "dataset_directory",
-        "model"
-      ],
-      "properties": {
-        "time_index": {
-          "$id": "#/properties/forecast_definition/properties/time_index",
-          "type": "string",
-          "title": "The time_index schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "a"
-          ]
-        },
-        "target": {
-          "$id": "#/properties/forecast_definition/properties/target",
-          "type": "string",
-          "title": "The target schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "c"
-          ]
-        },
-        "time_validation_splits": {
-          "$id": "#/properties/forecast_definition/properties/time_validation_splits",
-          "type": "array",
-          "title": "The time_validation_splits schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": [],
-          "examples": [
-            [
-              "1970-01-01 00:00:07"
-            ]
-          ],
-          "additionalItems": true,
-          "items": {
-            "$id": "#/properties/forecast_definition/properties/time_validation_splits/items",
-            "anyOf": [
-              {
-                "$id": "#/properties/forecast_definition/properties/time_validation_splits/items/anyOf/0",
-                "type": "string",
-                "title": "The first anyOf schema",
-                "description": "An explanation about the purpose of this instance.",
-                "default": "",
-                "examples": [
-                  "1970-01-01 00:00:07"
-                ]
-              }
-            ]
-          }
-        },
-        "validate_start": {
-          "$id": "#/properties/forecast_definition/properties/validate_start",
-          "type": "string",
-          "title": "The validate_start schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "1970-01-01 00:00:01"
-          ]
-        },
-        "validate_end": {
-          "$id": "#/properties/forecast_definition/properties/validate_end",
-          "type": "string",
-          "title": "The validate_end schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "1970-01-01 00:00:09"
-          ]
-        },
-        "forecast_start": {
-          "$id": "#/properties/forecast_definition/properties/forecast_start",
-          "type": "string",
-          "title": "The forecast_start schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "1970-01-01 00:00:05"
-          ]
-        },
-        "forecast_end": {
-          "$id": "#/properties/forecast_definition/properties/forecast_end",
-          "type": "string",
-          "title": "The forecast_end schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "1970-01-01 00:00:14"
-          ]
-        },
-        "forecast_freq": {
-          "$id": "#/properties/forecast_definition/properties/forecast_freq",
-          "type": "string",
-          "title": "The forecast_freq schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "S"
-          ]
-        },
-        "confidence_intervals": {
-          "$id": "#/properties/forecast_definition/properties/confidence_intervals",
-          "type": "array",
-          "title": "The confidence_intervals schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": [],
-          "examples": [
-            [
-              90
-            ]
-          ],
-          "additionalItems": true,
-          "items": {
-            "$id": "#/properties/forecast_definition/properties/confidence_intervals/items",
-            "anyOf": [
-              {
-                "$id": "#/properties/forecast_definition/properties/confidence_intervals/items/anyOf/0",
-                "type": "integer",
-                "title": "The first anyOf schema",
-                "description": "An explanation about the purpose of this instance.",
-                "default": 0,
-                "examples": [
-                  90
-                ]
-              }
-            ]
-          }
-        },
-        "bootstrap_sample": {
-          "$id": "#/properties/forecast_definition/properties/bootstrap_sample",
-          "type": "integer",
-          "title": "The bootstrap_sample schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": 0,
-          "examples": [
-            5
-          ]
-        },
-        "bin_features": {
-          "$id": "#/properties/forecast_definition/properties/bin_features",
-          "type": "object",
-          "title": "The bin_features schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": [],
-          "examples": [
-            [
-              "b"
-            ]
-          ],
-          "additionalItems": true,
-          "items": {
-            "$id": "#/properties/forecast_definition/properties/bin_features/items",
-            "anyOf": [
-              {
-                "$id": "#/properties/forecast_definition/properties/bin_features/items/anyOf/0",
-                "type": "object",
-                "title": "The first anyOf schema",
-                "description": "An explanation about the purpose of this instance.",
-                "default": "",
-                "examples": [
-                  "b"
-                ],
-                "items": {
-                  "$id": "#/properties/forecast_definition/properties/bin_features/anyOf/0/0",
-                  "anyOf": [
-                    {
-                      "$id": "#/properties/forecast_definition/properties/bin_features/items/anyOf/0",
-                      "type": "array",
-                      "title": "The first anyOf schema",
-                      "description": "An explanation about the purpose of this instance.",
-                      "default": "",
-                      "examples": [
-                        "[5, 15, 20]"
-                      ],
-                      "items": {
-                        "$id": "#/properties/forecast_definition/properties/bin_features/anyOf/0/0",
-                        "anyOf": [
-                          {
-                            "$id": "#/properties/forecast_definition/properties/bin_features/items/anyOf/0/0/0",
-                            "type": "number",
-                            "title": "The first anyOf schema",
-                            "description": "An explanation about the purpose of this instance.",
-                            "default": "",
-                            "examples": [
-                              "5"
-                            ]
-                          }
+            "title": "The experiment_definition schema",
+            "type": "object",
+            "properties": {
+                "target": {
+                    "$id": "#/properties/experiment_definition/properties/target",
+                    "type": "string",
+                    "title": "The target schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "Sales"
+                    ]
+                },
+                "link_function": {
+                    "$id": "#/properties/experiment_definition/properties/link_function",
+                    "type": "string",
+                    "title": "The link_function schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "log"
+                    ]
+                },
+                "target_dimensions": {
+                    "$id": "#/properties/experiment_definition/properties/target_dimensions",
+                    "type": "array",
+                    "title": "The target_dimensions schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            "Store"
                         ]
-                      }
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-        },
-        "scenarios": {
-          "$id": "#/properties/forecast_definition/properties/scenarios",
-          "type": "object",
-          "title": "The scenarios schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": {},
-          "examples": [
-            {
-              "b": {
-                "values": [
-                  [
-                    0,
-                    5
-                  ],
-                  7,
-                  "red"
-                ],
-                "start": "1970-01-01 00:00:09",
-                "end": "1970-01-01 00:00:14"
-              }
-            }
-          ],
-          "required": [
-            "b"
-          ],
-          "properties": {
-            "b": {
-              "$id": "#/properties/forecast_definition/properties/scenarios/properties/b",
-              "type": "object",
-              "title": "The b schema",
-              "description": "An explanation about the purpose of this instance.",
-              "default": {},
-              "examples": [
-                {
-                  "values": [
-                    [
-                      0,
-                      5
                     ],
-                    7,
-                    "red"
-                  ],
-                  "start": "1970-01-01 00:00:09",
-                  "end": "1970-01-01 00:00:14"
-                }
-              ],
-              "required": [
-                "values",
-                "start",
-                "end"
-              ],
-              "properties": {
-                "values": {
-                  "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values",
-                  "type": "array",
-                  "title": "The values schema",
-                  "description": "An explanation about the purpose of this instance.",
-                  "default": [],
-                  "examples": [
-                    [
-                      [
-                        0,
-                        5
-                      ],
-                      7
-                    ]
-                  ],
-                  "additionalItems": true,
-                  "items": {
-                    "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items",
-                    "anyOf": [
-                      {
-                        "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/0",
-                        "type": "array",
-                        "title": "The first anyOf schema",
-                        "description": "An explanation about the purpose of this instance.",
-                        "default": [],
-                        "examples": [
-                          [
-                            0,
-                            5
-                          ]
-                        ],
-                        "additionalItems": true,
-                        "items": {
-                          "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/0/items",
-                          "anyOf": [
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/experiment_definition/properties/target_dimensions/items",
+                        "anyOf": [
                             {
-                              "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/0/items/anyOf/0",
-                              "type": "integer",
-                              "title": "The first anyOf schema",
-                              "description": "An explanation about the purpose of this instance.",
-                              "default": 0,
-                              "examples": [
-                                0,
-                                5
-                              ]
+                                "$id": "#/properties/experiment_definition/properties/target_dimensions/items/anyOf/0",
+                                "type": "string",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": "",
+                                "examples": [
+                                    "Store"
+                                ]
                             }
-                          ]
-                        }
-                      },
-                      {
-                        "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/1",
-                        "type": "integer",
-                        "title": "The second anyOf schema",
-                        "description": "An explanation about the purpose of this instance.",
-                        "default": 0,
-                        "examples": [
-                          7
                         ]
-                      },
-                      {
-                        "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/values/items/anyOf/2",
-                        "type": "string",
-                        "title": "The third anyOf schema",
-                        "description": "An explanation about the purpose of this instance.",
-                        "default": "",
-                        "examples": [
-                          "red"
-                        ]
-                      }
+                    }
+                },
+                "time_index": {
+                    "$id": "#/properties/experiment_definition/properties/time_index",
+                    "type": "string",
+                    "title": "The time_index schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "Date"
                     ]
-                  }
                 },
-                "start": {
-                  "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/start",
-                  "type": "string",
-                  "title": "The start schema",
-                  "description": "An explanation about the purpose of this instance.",
-                  "default": "",
-                  "examples": [
-                    "1970-01-01 00:00:09"
-                  ]
+                "data_path": {
+                    "$id": "#/properties/experiment_definition/properties/data_path",
+                    "type": "string",
+                    "title": "The data_path schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "divina://retail_sales"
+                    ]
                 },
-                "end": {
-                  "$id": "#/properties/forecast_definition/properties/scenarios/properties/b/properties/end",
-                  "type": "string",
-                  "title": "The end schema",
-                  "description": "An explanation about the purpose of this instance.",
-                  "default": "",
-                  "examples": [
-                    "1970-01-01 00:00:14"
-                  ]
+                "include_features": {
+                    "$id": "#/properties/experiment_definition/properties/include_features",
+                    "type": "array",
+                    "title": "The include_features schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            "Store",
+                            "Weekday"
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/experiment_definition/properties/include_features/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/experiment_definition/properties/include_features/items/anyOf/0",
+                                "type": "string",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": "",
+                                "examples": [
+                                    "Store",
+                                    "Weekday"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "joins": {
+                    "$id": "#/properties/experiment_definition/properties/joins",
+                    "type": "array",
+                    "title": "The joins schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            {
+                                "data_path": "divina://time",
+                                "join_on": [
+                                    "Date",
+                                    "Date"
+                                ],
+                                "as": "time"
+                            }
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/experiment_definition/properties/joins/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/experiment_definition/properties/joins/items/anyOf/0",
+                                "type": "object",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": {},
+                                "examples": [
+                                    {
+                                        "data_path": "divina://time",
+                                        "join_on": [
+                                            "Date",
+                                            "Date"
+                                        ],
+                                        "as": "time"
+                                    }
+                                ],
+                                "required": [
+                                    "data_path",
+                                    "join_on",
+                                    "as"
+                                ],
+                                "properties": {
+                                    "data_path": {
+                                        "$id": "#/properties/experiment_definition/properties/joins/items/anyOf/0/properties/data_path",
+                                        "type": "string",
+                                        "title": "The data_path schema",
+                                        "description": "An explanation about the purpose of this instance.",
+                                        "default": "",
+                                        "examples": [
+                                            "divina://time"
+                                        ]
+                                    },
+                                    "join_on": {
+                                        "$id": "#/properties/experiment_definition/properties/joins/items/anyOf/0/properties/join_on",
+                                        "type": "array",
+                                        "title": "The join_on schema",
+                                        "description": "An explanation about the purpose of this instance.",
+                                        "default": [],
+                                        "examples": [
+                                            [
+                                                "Date",
+                                                "Date"
+                                            ]
+                                        ],
+                                        "additionalItems": true,
+                                        "items": {
+                                            "$id": "#/properties/experiment_definition/properties/joins/items/anyOf/0/properties/join_on/items",
+                                            "anyOf": [
+                                                {
+                                                    "$id": "#/properties/experiment_definition/properties/joins/items/anyOf/0/properties/join_on/items/anyOf/0",
+                                                    "type": "string",
+                                                    "title": "The first anyOf schema",
+                                                    "description": "An explanation about the purpose of this instance.",
+                                                    "default": "",
+                                                    "examples": [
+                                                        "Date"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "as": {
+                                        "$id": "#/properties/experiment_definition/properties/joins/items/anyOf/0/properties/as",
+                                        "type": "string",
+                                        "title": "The as schema",
+                                        "description": "An explanation about the purpose of this instance.",
+                                        "default": "",
+                                        "examples": [
+                                            "time"
+                                        ]
+                                    }
+                                },
+                                "additionalProperties": true
+                            }
+                        ]
+                    }
+                },
+                "forecast_end": {
+                    "$id": "#/properties/experiment_definition/properties/forecast_end",
+                    "type": "string",
+                    "title": "The forecast_end schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "01-01-2016"
+                    ]
+                },
+                "frequency": {
+                    "$id": "#/properties/experiment_definition/properties/frequency",
+                    "type": "string",
+                    "title": "The frequency schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": "",
+                    "examples": [
+                        "D"
+                    ]
+                },
+                "encode_features": {
+                    "$id": "#/properties/experiment_definition/properties/encode_features",
+                    "type": "array",
+                    "title": "The encode_features schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            "Store",
+                            "Month"
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/experiment_definition/properties/encode_features/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/experiment_definition/properties/encode_features/items/anyOf/0",
+                                "type": "string",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": "",
+                                "examples": [
+                                    "Store",
+                                    "Month"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "confidence_intervals": {
+                    "$id": "#/properties/experiment_definition/properties/confidence_intervals",
+                    "type": "array",
+                    "title": "The confidence_intervals schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            0,
+                            100
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/experiment_definition/properties/confidence_intervals/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/experiment_definition/properties/confidence_intervals/items/anyOf/0",
+                                "type": "integer",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": 0,
+                                "examples": [
+                                    0,
+                                    100
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "bootstrap_sample": {
+                    "$id": "#/properties/experiment_definition/properties/bootstrap_sample",
+                    "type": "integer",
+                    "title": "The bootstrap_sample schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": 0,
+                    "examples": [
+                        10
+                    ]
+                },
+                "bin_features": {
+                    "$id": "#/properties/experiment_definition/properties/bin_features",
+                    "default": {},
+                    "description": "An explanation about the purpose of this instance.",
+                    "examples": [
+                        {
+                            "Month": [
+                                3,
+                                6,
+                                9
+                            ]
+                        }
+                    ],
+                    "required": [],
+                    "title": "The bin_features schema",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "time_validation_splits": {
+                    "$id": "#/properties/experiment_definition/properties/time_validation_splits",
+                    "type": "array",
+                    "title": "The time_validation_splits schema",
+                    "description": "An explanation about the purpose of this instance.",
+                    "default": [],
+                    "examples": [
+                        [
+                            "2015-07-18"
+                        ]
+                    ],
+                    "additionalItems": true,
+                    "items": {
+                        "$id": "#/properties/experiment_definition/properties/time_validation_splits/items",
+                        "anyOf": [
+                            {
+                                "$id": "#/properties/experiment_definition/properties/time_validation_splits/items/anyOf/0",
+                                "type": "string",
+                                "title": "The first anyOf schema",
+                                "description": "An explanation about the purpose of this instance.",
+                                "default": "",
+                                "examples": [
+                                    "2015-07-18"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "scenarios": {
+                    "$id": "#/properties/experiment_definition/properties/scenarios",
+                    "default": {},
+                    "description": "An explanation about the purpose of this instance.",
+                    "examples": [
+                        {
+                            "Promo": {
+                                "mode": "constant",
+                                "constant_values": [
+                                    0,
+                                    1
+                                ]
+                            },
+                            "StoreType": {
+                                "mode": "last"
+                            },
+                            "Assortment": {
+                                "mode": "last"
+                            }
+                        }
+                    ],
+                    "required": [],
+                    "title": "The scenarios schema",
+                    "type": "object",
+                    "additionalProperties": true
                 }
-              },
-              "additionalProperties": true
-            }
-          },
-          "additionalProperties": true
-        },
-        "time_horizons": {
-          "$id": "#/properties/forecast_definition/properties/time_horizons",
-          "type": "array",
-          "title": "The time_horizons schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": [],
-          "examples": [
-            [
-              1
-            ]
-          ],
-          "additionalItems": true,
-          "items": {
-            "$id": "#/properties/forecast_definition/properties/time_horizons/items",
-            "anyOf": [
-              {
-                "$id": "#/properties/forecast_definition/properties/time_horizons/items/anyOf/0",
-                "type": "integer",
-                "title": "The first anyOf schema",
-                "description": "An explanation about the purpose of this instance.",
-                "default": 0,
-                "examples": [
-                  1
-                ]
-              }
-            ]
-          }
-        },
-        "dataset_directory": {
-          "$id": "#/properties/forecast_definition/properties/dataset_directory",
-          "type": "string",
-          "title": "The dataset_directory schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "divina-test/dataset/test1"
-          ]
-        },
-        "model": {
-          "$id": "#/properties/forecast_definition/properties/model",
-          "type": "string",
-          "title": "The model schema",
-          "description": "An explanation about the purpose of this instance.",
-          "default": "",
-          "examples": [
-            "LinearRegression"
-          ]
+            },
+            "additionalProperties": true
         }
-      },
-      "additionalProperties": true
-    }
-  },
-  "additionalProperties": true
+    },
+    "additionalProperties": true
 }

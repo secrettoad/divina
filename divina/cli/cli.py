@@ -1,9 +1,8 @@
 import click
-from ..train import dask_train
-from ..predict import dask_predict
-from ..forecast import get_parameters, set_parameters
-from ..validate import dask_validate
-from ..aws.utils import create_divina_role
+from ..train import _train
+from ..forecast import _forecast
+from ..utils import get_parameters, set_parameters
+from ..validate import _validate
 from dask_cloudprovider.aws import EC2Cluster
 from dask.distributed import Client
 from botocore.exceptions import NoRegionError
@@ -11,14 +10,7 @@ from botocore.exceptions import NoCredentialsError
 import os
 import sys
 import json
-import boto3
 import s3fs
-
-
-def upsert_divina_iam():
-    divina_session = boto3.session.Session()
-    role, instance_profile = create_divina_role(divina_session)
-    return role, instance_profile
 
 
 def cli_get_params(
@@ -36,22 +28,22 @@ def cli_set_params(
     return set_parameters(s3_fs=s3_fs, model_path=model_path, params=params)
 
 
-def cli_train_vision(
+def cli_train_experiment(
         s3_fs,
-        forecast_definition,
+        experiment_definition,
         write_path,
         ec2_keypair_name=None,
         keep_instances_alive=False,
-        local=False,
+        aws=False,
         debug=False,
         dask_client=None,
         random_state=None
 ):
-    if local:
+    if not aws:
         with Client():
-            dask_train(
+            _train(
                 s3_fs=s3_fs,
-                forecast_definition=forecast_definition,
+                experiment_definition=experiment_definition,
                 write_path=write_path,
                 random_seed=random_state
             )
@@ -69,11 +61,11 @@ def cli_train_vision(
                         },
                         auto_shutdown=True,
                 ) as cluster:
-                    cluster.adapt(minimum=0, maximum=10)
+                    cluster.scale(10)
                     with Client(cluster):
-                        dask_train(
+                        _train(
                             s3_fs=s3_fs,
-                            forecast_definition=forecast_definition,
+                            experiment_definition=experiment_definition,
                             write_path=write_path,
                             random_seed=random_state
                         )
@@ -95,40 +87,40 @@ def cli_train_vision(
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                 },
             )
-            cluster.adapt(minimum=0, maximum=10)
+            cluster.scale(10)
             with Client(cluster):
-                dask_train(
+                _train(
                     s3_fs=s3_fs,
-                    forecast_definition=forecast_definition,
+                    experiment_definition=experiment_definition,
                     write_path=write_path,
                     random_seed=random_state
                 )
 
     else:
-        dask_train(
+        _train(
             s3_fs=s3_fs,
-            forecast_definition=forecast_definition,
+            experiment_definition=experiment_definition,
             write_path=write_path,
             random_seed=random_state
         )
 
 
-def cli_predict_vision(
+def cli_forecast_experiment(
         s3_fs,
-        forecast_definition,
+        experiment_definition,
         write_path,
         read_path,
         ec2_keypair_name=None,
         keep_instances_alive=False,
-        local=False,
+        aws=False,
         debug=False,
         dask_client=None
 ):
-    if local:
+    if not aws:
         with Client():
-            dask_predict(
+            _forecast(
                 s3_fs=s3_fs,
-                forecast_definition=forecast_definition,
+                experiment_definition=experiment_definition,
                 write_path=write_path,
                 read_path=read_path
             )
@@ -146,11 +138,11 @@ def cli_predict_vision(
                         },
                         auto_shutdown=True,
                 ) as cluster:
-                    cluster.adapt(minimum=0, maximum=10)
+                    cluster.scale(10)
                     with Client(cluster):
-                        dask_predict(
+                        _forecast(
                             s3_fs=s3_fs,
-                            forecast_definition=forecast_definition,
+                            experiment_definition=experiment_definition,
                             write_path=write_path,
                             read_path=read_path
                         )
@@ -172,40 +164,40 @@ def cli_predict_vision(
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                 },
             )
-            cluster.adapt(minimum=0, maximum=10)
+            cluster.scale(10)
             with Client(cluster):
-                dask_predict(
+                _forecast(
                     s3_fs=s3_fs,
-                    forecast_definition=forecast_definition,
+                    experiment_definition=experiment_definition,
                     write_path=write_path,
                     read_path=read_path
                 )
 
     else:
-        dask_predict(
+        _forecast(
             s3_fs=s3_fs,
-            forecast_definition=forecast_definition,
+            experiment_definition=experiment_definition,
             write_path=write_path,
             read_path=read_path
         )
 
 
-def cli_validate_vision(
+def cli_validate_experiment(
         s3_fs,
-        forecast_definition,
+        experiment_definition,
         write_path,
         read_path,
         ec2_keypair_name=None,
         keep_instances_alive=False,
-        local=False,
+        aws=False,
         debug=False,
         dask_client=None,
 ):
-    if local:
+    if not aws:
         with Client():
-            dask_validate(
+            _validate(
                 s3_fs=s3_fs,
-                forecast_definition=forecast_definition,
+                experiment_definition=experiment_definition,
                 write_path=write_path,
                 read_path=read_path,
             )
@@ -223,11 +215,11 @@ def cli_validate_vision(
                         },
                         auto_shutdown=True,
                 ) as cluster:
-                    cluster.adapt(minimum=0, maximum=10)
+                    cluster.scale(50)
                     with Client(cluster):
-                        dask_validate(
+                        _validate(
                             s3_fs=s3_fs,
-                            forecast_definition=forecast_definition,
+                            experiment_definition=experiment_definition,
                             write_path=write_path,
                             read_path=read_path,
                         )
@@ -249,19 +241,19 @@ def cli_validate_vision(
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                 },
             )
-            cluster.adapt(minimum=0, maximum=10)
+            cluster.scale(50)
             with Client(cluster):
-                dask_validate(
+                _validate(
                     s3_fs=s3_fs,
-                    forecast_definition=forecast_definition,
+                    experiment_definition=experiment_definition,
                     write_path=write_path,
                     read_path=read_path,
                 )
 
     else:
-        dask_validate(
+        _validate(
             s3_fs=s3_fs,
-            forecast_definition=forecast_definition,
+            experiment_definition=experiment_definition,
             write_path=write_path,
             read_path=read_path,
         )
@@ -279,21 +271,22 @@ def divina():
 )
 @click.argument("keep_alive", default=False, required=False)
 @click.argument("write_path", default="divina-forecast", required=False)
-@click.argument("forecast_def", type=click.File("rb"))
-@click.option("-l", "--local", is_flag=True, help="flag to compute results locally")
+@click.argument("experiment_def", type=click.File("rb"))
+@click.option("--aws", is_flag=True, help="flag to compute results awsly")
 @click.option(
     "-d", "--debug", is_flag=True, help="flag to increase verbosity of console output"
 )
 @divina.command()
-def forecast(forecast_def, keep_alive, ec2_key, write_path, local, debug):
-    """:write_path: s3:// or local path to write results to
-    :forecast_def: path to vision definition JSON file
+def experiment(experiment_def, keep_alive, ec2_key, write_path, aws, debug):
+    """:write_path: s3:// or aws path to write results to
+    :experiment_def: path to experiment definition JSON file
     :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging.
+    :--aws: optionally run experiment on EC2 cluster
     :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
-    forecast_def = json.load(forecast_def)['forecast_definition']
+    experiment_def = json.load(experiment_def)['experiment_definition']
     ###TODO create get_dask_client function that accepts ec2key and keep alive
-    if not local:
+    if aws:
         with EC2Cluster(
                 key_name=ec2_key,
                 security=False,
@@ -303,137 +296,139 @@ def forecast(forecast_def, keep_alive, ec2_key, write_path, local, debug):
                     "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
                     "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                 },
-                auto_shutdown=True,
+                auto_shutdown=not keep_alive,
         ) as cluster:
-            cluster.adapt(minimum=0, maximum=10)
-            with Client(cluster):
-                cli_train_vision(
+            cluster.scale(10)
+            with Client(cluster) as client:
+                cli_train_experiment(
                     s3_fs=s3fs.S3FileSystem(),
-                    forecast_definition=forecast_def,
+                    experiment_definition=experiment_def,
                     write_path=write_path,
                     ec2_keypair_name=ec2_key,
                     keep_instances_alive=keep_alive,
-                    local=local,
+                    dask_client=client,
                     debug=debug,
                 )
-                cli_predict_vision(
+                cli_forecast_experiment(
                     s3_fs=s3fs.S3FileSystem(),
-                    forecast_definition=forecast_def,
+                    experiment_definition=experiment_def,
                     write_path=write_path,
                     read_path=write_path,
                     ec2_keypair_name=ec2_key,
                     keep_instances_alive=keep_alive,
-                    local=local,
+                    dask_client=client,
                     debug=debug,
                 )
-                cli_validate_vision(
+                cli_validate_experiment(
                     s3_fs=s3fs.S3FileSystem(),
-                    forecast_definition=forecast_def,
+                    experiment_definition=experiment_def,
                     write_path=write_path,
                     read_path=write_path,
                     ec2_keypair_name=ec2_key,
                     keep_instances_alive=keep_alive,
-                    local=local,
+                    dask_client=client,
                     debug=debug,
                 )
     else:
-        cli_train_vision(
+        cli_train_experiment(
             s3_fs=s3fs.S3FileSystem(),
-            forecast_definition=forecast_def,
+            experiment_definition=experiment_def,
             write_path=write_path,
             ec2_keypair_name=ec2_key,
             keep_instances_alive=keep_alive,
-            local=local,
+            aws=aws,
             debug=debug,
         )
-        cli_predict_vision(
+        cli_forecast_experiment(
             s3_fs=s3fs.S3FileSystem(),
-            forecast_definition=forecast_def,
+            experiment_definition=experiment_def,
             write_path=write_path,
             read_path=write_path,
             ec2_keypair_name=ec2_key,
             keep_instances_alive=keep_alive,
-            local=local,
+            aws=aws,
             debug=debug,
         )
-        cli_validate_vision(
+        cli_validate_experiment(
             s3_fs=s3fs.S3FileSystem(),
-            forecast_definition=forecast_def,
+            experiment_definition=experiment_def,
             write_path=write_path,
             read_path=write_path,
             ec2_keypair_name=ec2_key,
             keep_instances_alive=keep_alive,
-            local=local,
+            aws=aws,
             debug=debug,
         )
 
 
 @click.argument("ec2_keypair_name", default=None, required=False)
 @click.argument("keep_instances_alive", default=False, required=False)
-@click.argument("forecast_definition", type=click.File("rb"))
+@click.argument("experiment_definition", type=click.File("rb"))
 @click.argument("write_path", default="divina-forecast", required=False)
-@click.option("-l", "--local", is_flag=True, help="flag to compute results locally")
+@click.option("-l", "--aws", is_flag=True, help="flag to compute results awsly")
 @click.option(
     "-d", "--debug", is_flag=True, help="flag to increase verbosity of console output"
 )
 @divina.command()
 def train(
-        forecast_def,
+        experiment_def,
         keep_alive,
         ec2_key,
         write_path,
-        local,
+        aws,
         debug,
 ):
-    """:write_path: s3:// or local path to write trained model to
-    :forecast_def: path to vision definition JSON file
-    :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging
-    :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging
+    """:write_path: s3:// or aws path to write results to
+    :experiment_def: path to experiment definition JSON file
+    :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging.
+    :--aws: optionally run experiment on EC2 cluster
+    :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
-    cli_train_vision(
+    cli_train_experiment(
         s3_fs=s3fs.S3FileSystem(),
-        forecast_definition=json.load(forecast_def),
+        experiment_definition=json.load(experiment_def),
         write_path=write_path,
         ec2_keypair_name=ec2_key,
         keep_instances_alive=keep_alive,
-        local=local,
+        aws=aws,
         debug=debug,
     )
 
 
 @click.argument("ec2_key", default=None, required=False)
 @click.argument("keep_alive", default=False, required=False)
-@click.argument("vision_def", type=click.File("rb"))
+@click.argument("experiment_def", type=click.File("rb"))
 @click.argument("write_path", default="divina-forecast", required=False)
 @click.argument("read_path", default="divina-forecast", required=False)
-@click.option("-l", "--local", is_flag=True, help="flag to compute results locally")
+@click.option("-l", "--aws", is_flag=True, help="flag to compute results awsly")
 @click.option(
     "-d", "--debug", is_flag=True, help="flag to increase verbosity of console output"
 )
 @divina.command()
-def predict(
-        forecast_def,
+def forecast(
+        experiment_def,
         keep_alive,
         ec2_key,
         write_path,
         read_path,
-        local,
+        aws,
         debug,
 ):
-    """:read_path: s3:// or local path to read trained model fromn
-    :write_path: s3:// or local path to write results to
-    :forecast_def: path to vision definition JSON file
-    :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging
-    :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging
+    """:read_path: s3:// or aws path to read trained model fromn
+    :write_path: s3:// or aws path to write results to
+    :experiment_def: path to experiment definition JSON file
+    :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging.
+    :--aws: optionally run experiment on EC2 cluster
+    :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
-    cli_predict_vision(
+    cli_forecast_experiment(
         s3_fs=s3fs.S3FileSystem(),
-        forecast_definition=json.load(forecast_def),
+        experiment_definition=json.load(experiment_def),
         write_path=write_path,
         read_path=read_path,
         ec2_keypair_name=ec2_key,
         keep_instances_alive=keep_alive,
-        local=local,
+        aws=aws,
         debug=debug,
     )
 
@@ -444,37 +439,38 @@ def predict(
     required=False,
 )
 @click.argument("keep_alive", default=False, required=False)
-@click.argument("vision_def", type=click.File("rb"))
+@click.argument("experiment_def", type=click.File("rb"))
 @click.argument("write_path", default="divina-forecast", required=False)
 @click.argument("read_path", default="divina-forecast", required=False)
-@click.option("-l", "--local", is_flag=True, help="flag to compute results locally")
+@click.option("-l", "--aws", is_flag=True, help="flag to compute results awsly")
 @click.option(
     "-d", "--debug", is_flag=True, help="flag to increase verbosity of console output"
 )
 @divina.command()
 def validate(
-        forecast_def,
+        experiment_def,
         keep_alive,
         ec2_key,
         write_path,
         read_path,
-        local,
+        aws,
         debug,
 ):
-    """:read_path: s3:// or local path to read predictions from
-    :write_path: s3:// or local path to write results to
-    :forecast_def: path to vision definition JSON file
-    :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging
-    :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging
+    """:read_path: s3:// or aws path to load models from
+    :write_path: s3:// or aws path to write results to
+    :experiment_def: path to experiment definition JSON file
+    :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging.
+    :--aws: optionally run experiment on EC2 cluster
+    :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
-    cli_validate_vision(
+    cli_validate_experiment(
         s3_fs=s3fs.S3FileSystem(),
-        forecast_definition=json.load(forecast_def),
+        experiment_definition=json.load(experiment_def),
         write_path=write_path,
         read_path=read_path,
         ec2_keypair_name=ec2_key,
         keep_instances_alive=keep_alive,
-        local=local,
+        aws=aws,
         debug=debug,
     )
 
@@ -484,7 +480,7 @@ def validate(
 def get_params(
         model_path
 ):
-    """:model_path: s3:// or local path to model to get parameters from
+    """:model_path: s3:// or aws path to model to get parameters from
     """
     cli_get_params(
         s3_fs=s3fs.S3FileSystem(),
@@ -498,7 +494,7 @@ def set_params(
         model_path,
         params
 ):
-    """:model_path: s3:// or local path to model to get parameters from
+    """:model_path: s3:// or aws path to model to get parameters from
     :params: dictionary of trained model parameters to update
     """
     cli_set_params(

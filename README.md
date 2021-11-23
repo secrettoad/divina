@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://storage.googleapis.com/coysuweb-static/assets/images/logo/divina_logo.png"><br>
+  <img src="https://storage.googleapis.com/coysuweb-static/assets/images/logo/3.png"><br>
 </div>
 
 -----------------
@@ -9,29 +9,35 @@
 [![PyPI Latest Release](https://img.shields.io/pypi/v/divina.svg)](https://pypi.org/project/divina/)
 [![Package Status](https://img.shields.io/pypi/status/divina.svg)](https://pypi.org/project/divina/)
 [![License](https://img.shields.io/pypi/l/divina.svg)](https://github.com/secrettoad/divina/blob/master/LICENSE)
-[![Coverage](https://codecov.io/github/secrettoad/divina/coverage.svg?branch=main)](https://codecov.io/gh/secrettoad/divina)
 [![Downloads](https://img.shields.io/pypi/dm/divina.svg)](https://pypi.org/project/divina)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 
 ## What is it?
 
-**divina** is a Python package that provides scalable, interpretable and accurate forecasting capabilities designed to make causal forecasting modular, efficient and simple.
-It aims to be reduce the challenge of causal forecasting on datasets of any size to experiment configuration via JSON and, if the extensive set of pre-implemented models is insufficient, custom ensemble design via scikit-learn.
-More specifically, divina aims to raise the standard of functionality in forecasting by implementing two-way interpretability interfaces for all models.
+**divina** is a Python package that provides scalable, interpretable and performant forecasting capabilities designed to make causal forecasting modular, efficient and simple.
+It aims to reduce the challenge of causal forecasting on datasets of any size to configuration via JSON as opposed to construction and consumption of Python objects. 
+At its core, divina aims reduce the complexity and increase the consistency of causal forecasting at scale.
 
 
 ## Main Features
 Here are just a few of the things that divina does well:
 
-  - Easy construction of parquet-based [**datasets**][datasets] that allow for efficient, scalable modelling and dynamic, JSON-driven definition of multi-dataset experiments.
-  - Abstraction of granular experiment configuration such as cross-validation, regularization and metric selection to a single, simple JSON-based configuration file with sensible defaults.  
+  - Abstracted and scalable feature engineering. Encoding, interaction, normalization, binning and joining of datasets are handled scalably by the Dask back-end with minimal configuration required by the user.
+  - Simulation of user-defined factors in support of forward-looking, multi-signal and decision-enabling causal forecasts.   
   - Automatic persistence of all experiment artifacts, including models, predictions and validation metrics, to s3 for posterity, traceability and easy integration.
   - A user-centric, two-way [**interpretation interface**][interpretation] that allows for granular interpretation of models and predictions while also allowing domain experts to override factors.
+  
+  [interpretation]: https://github.com/secrettoad/divina
+  
+## Roadmap
+Current development priorities and improvements slated for next and beta release are:
 
-
-   [datasets]: https://github.com/secrettoad/divina
-   [interpretation]: https://github.com/secrettoad/divina
+  - Addition of automated experiment summaries as persisted artifacts enabling ease of consumption and increased transparency into the forecasts and models divina produces.
+  - Improvement of the core model's performance, with the addition of attention mechanisms and the ability to adapt to signals with dynamic mean and variance.  
+  - Addition of more realistic test cases, useful error messages and robust documentation.
+  - Cleanup of various pieces of the codebase and addition of convenience features such as filepath validation, signal filtering and a maximum lifespan for all EC2 instances divina creates.
+   
    
 
 ## Where to get it
@@ -57,7 +63,7 @@ pip install divina
 [BSD 3](LICENSE)
 
 ## Documentation
-Robust documentation is currently in the works.
+Divina' documentation is available [here](https://secrettoad.github.io/divina/#). 
 
 ## Background
 Work on ``divina`` started at [Coysu Consulting](https://www.coysu.com/) (a technology consulting firm) in 2020 and

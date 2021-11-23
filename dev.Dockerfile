@@ -1,4 +1,4 @@
-FROM python:latest
+FROM python:3.7
 
 # Env & Arg variables
 ARG USERNAME=divina
@@ -30,6 +30,7 @@ RUN chmod +x /entrypoint.sh
 
 COPY requirements.txt requirements.txt
 RUN python3 -m pip install -r requirements.txt
+
 
 # Create the ssh directory and authorized_keys file 
 USER $USERNAME
