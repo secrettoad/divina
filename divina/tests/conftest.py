@@ -98,7 +98,7 @@ def dask_client(request):
 
 @pytest.fixture(scope="session")
 def dask_cluster_ip():
-    return "3.133.120.187:8786"
+    return None
 
 
 @pytest.fixture(scope="session")

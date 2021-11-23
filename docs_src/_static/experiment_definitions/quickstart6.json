@@ -5,9 +5,11 @@
     "target_dimensions": ["Store"],
     "time_index": "Date",
     "data_path": "divina://retail_sales",
-    "include_features": ["Store", "Weekday", "Month", "WeekOfYear",
-       "Holiday", "HolidayType", "StoreType", "Assortment", "LastDayOfMonth"],
-    "encode_features": ["Store", "Month", "WeekOfYear", "StoreType", "Weekday", "HolidayType", "Assortment"],
+    "include_features": ["Store", "Weekday", "Month",
+       "Holiday", "HolidayType", "StoreType", "Assortment", "LastDayOfMonth", "Promo"],
+    "forecast_end": "01-01-2016",
+    "frequency": "D",
+    "encode_features": ["Store", "Month", "StoreType", "Weekday", "HolidayType", "Assortment"],
     "joins": [
                 {
                     "data_path": "divina://time",
@@ -16,7 +18,24 @@
                 }
             ],
     "bin_features": {"Month": [3, 6, 9]},
-    "confidence_intervals": [0, 100],
-    "bootstrap_sample": 5
+    "interaction_features": {"Store": [
+       "Holiday", "HolidayType"
+    ]},
+    "time_validation_splits": ["2015-07-18"],
+    "scenarios": {
+      "Promo": {
+        "mode": "constant",
+        "constant_values": [
+          0,
+          1
+        ]
+      },
+      "StoreType": {
+        "mode": "last"
+      },
+      "Assortment": {
+        "mode": "last"
+      }
+    }
   }
 }

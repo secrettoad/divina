@@ -14,12 +14,12 @@ import dask.array as da
 from pandas.api.types import is_numeric_dtype
 
 
-def _train_model(df, dask_model, model_name, random_seed, features, target,
+def _train_model(df, model_name, random_seed, features, target,
                  link_function, write_open, write_path, bootstrap_sample=None, confidence_intervals=None):
     if random_seed:
-        model = dask_model(random_state=random_seed)
+        model = LinearRegression(random_state=random_seed)
     else:
-        model = dask_model()
+        model = LinearRegression()
 
     df_train = df[~df[target].isnull()]
     df_std = df_train[features].std().compute()
@@ -71,9 +71,9 @@ def _train_model(df, dask_model, model_name, random_seed, features, target,
             else:
                 df_train_bootstrap = df.sample(replace=False, frac=.8)
             if random_seed:
-                bootstrap_model = dask_model(random_state=random_seed)
+                bootstrap_model = LinearRegression(random_state=random_seed)
             else:
-                bootstrap_model = dask_model()
+                bootstrap_model = LinearRegression()
             df_std_bootstrap = df_train_bootstrap[features].std().compute()
             bootstrap_features = [c for c in features if not df_std_bootstrap.loc[c] == 0]
             if link_function == 'log':
@@ -133,9 +133,7 @@ def _train_model(df, dask_model, model_name, random_seed, features, target,
 
 @validate_experiment_definition
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-def _train(s3_fs, experiment_definition, write_path, dask_model=LinearRegression, random_seed=None):
-    if "model" in experiment_definition:
-        dask_model = globals()[experiment_definition["model"]]
+def _train(s3_fs, experiment_definition, write_path, random_seed=None):
     if not "confidence_intervals" in experiment_definition:
         confidence_intervals = None
     else:
@@ -202,7 +200,7 @@ def _train(s3_fs, experiment_definition, write_path, dask_model=LinearRegression
 
     for h in time_horizons:
 
-        model, bootstrap_models = _train_model(df=df, dask_model=dask_model, model_name="h-{}".format(h), random_seed=random_seed,
+        model, bootstrap_models = _train_model(df=df, model_name="h-{}".format(h), random_seed=random_seed,
                      features=features, target=experiment_definition["target"],
                      bootstrap_sample=bootstrap_sample, confidence_intervals=confidence_intervals,
                      link_function=link_function, write_open=write_open, write_path=write_path)
@@ -212,7 +210,7 @@ def _train(s3_fs, experiment_definition, write_path, dask_model=LinearRegression
                 raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
             df_train = df[df[experiment_definition["time_index"]] < s]
 
-            split_model = _train_model(df=df_train, dask_model=dask_model, model_name="s-{}_h-{}".format(
+            split_model = _train_model(df=df_train, model_name="s-{}_h-{}".format(
                 pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                 h
             ), random_seed=random_seed,

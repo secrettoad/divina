@@ -81,7 +81,6 @@ def test_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_boot
     )
     _train(
         s3_fs=s3_fs,
-        dask_model=LinearRegression,
         experiment_definition=test_fd_1["experiment_definition"],
         write_path=experiment_path,
         random_seed=random_state,
@@ -387,18 +386,14 @@ def test_quickstart(test_fds_quickstart, random_state):
                                k))
         pd.testing.assert_frame_equal(result_df, ddf.read_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
                                k)).compute().reset_index(drop=True))
-        fig = go.Figure(
-            layout=go.Layout(
-                title=go.layout.Title(text="Insample and Blind Forecasts")
-            )
-        )
         fd["experiment_definition"]['time_horizons'] = [0]
-        fd["experiment_definition"]['confidence_intervals'] = []
         if not "target_dimensions" in fd["experiment_definition"]:
             stores = [6]
         else:
             stores = [1, 2, 3]
+        result_df = result_df[result_df['Date'] >= '2015-01-01']
         for s in stores:
+            fig = go.Figure()
             for h in fd["experiment_definition"]['time_horizons']:
                 if not "encode_features" in fd["experiment_definition"]:
                     store_df = result_df[result_df['Store'] == s]
@@ -406,43 +401,48 @@ def test_quickstart(test_fds_quickstart, random_state):
                     store_df = result_df[result_df['Store_{}'.format(float(s))] == 1]
                 if "scenarios" in fd["experiment_definition"]:
                     store_df = store_df[(store_df['Date'] < "2015-08-01") | (result_df['Promo'] == 1)]
-                if len(fd["experiment_definition"]['confidence_intervals']) > 0:
-                    for i in fd["experiment_definition"]['confidence_intervals']:
-                        fig.add_trace(go.Scatter(marker=dict(color="cyan"), mode="lines",
-                                                 x=store_df[fd["experiment_definition"]['time_index']],
-                                                 y=store_df[
-                                                     '{}_h_{}_pred_c_{}'.format(
-                                                         fd["experiment_definition"]['target'],
-                                                         h, i)], name="h_{}_c_{}".format(h, i)))
-                    fig.update_traces(fill='tonexty', name='Confidence Bound', selector=dict(
-                        name="h_{}_c_{}".format(h, fd["experiment_definition"]['confidence_intervals'][-1])))
-                    fig.update_traces(showlegend=False, name='Upper Confidence Bound', selector=dict(
-                        name="h_{}_c_{}".format(h, fd["experiment_definition"]['confidence_intervals'][0])))
+                    fig.add_vrect(x0=pd.to_datetime('07-31-2015').timestamp() * 1000,
+                                  x1=pd.to_datetime('08-30-2015').timestamp() * 1000, line_width=2,
+                                  line_color="cadetblue",
+                                  annotation_text='Blind Forecasts with Promotions Simulated as False')
+                if "confidence_intervals" in fd["experiment_definition"]:
+                    if len(fd["experiment_definition"]['confidence_intervals']) > 0:
+                        for i in fd["experiment_definition"]['confidence_intervals']:
+                            fig.add_trace(go.Scatter(marker=dict(color="cyan"), mode="lines",
+                                                     x=store_df[fd["experiment_definition"]['time_index']],
+                                                     y=store_df[
+                                                         '{}_h_{}_pred_c_{}'.format(
+                                                             fd["experiment_definition"]['target'],
+                                                             h, i)], name="h_{}_c_{}".format(h, i)))
+                        fig.update_traces(fill='tonexty', name='Confidence Bound', selector=dict(
+                            name="h_{}_c_{}".format(h, fd["experiment_definition"]['confidence_intervals'][-1])))
+                        fig.update_traces(showlegend=False, name='Upper Confidence Bound', selector=dict(
+                            name="h_{}_c_{}".format(h, fd["experiment_definition"]['confidence_intervals'][0])))
                 fig.add_trace(
-                    go.Scatter(marker=dict(color='black'), line=dict(dash='dash'), mode="lines",
-                                   x=store_df[fd["experiment_definition"]['time_index']],
-                                   y=store_df[fd["experiment_definition"]['target']],
-                                   name=fd["experiment_definition"]['target']))
+                        go.Scatter(marker=dict(color='black'), line=dict(dash='dash'), mode="lines",
+                                       x=store_df[fd["experiment_definition"]['time_index']],
+                                       y=store_df[fd["experiment_definition"]['target']],
+                                       name=fd["experiment_definition"]['target']))
                 fig.add_trace(go.Scatter(marker=dict(color="darkblue"), mode="lines",
                                              x=store_df[fd["experiment_definition"]['time_index']],
                                              y=store_df[
                                                  '{}_h_{}_pred'.format(fd["experiment_definition"]['target'],
                                                                        h)], name="Horizon {} Forecast".format(h)))
                 path = pathlib.Path(pathlib.Path(__file__).parent.parent.parent,
-                                            'docs_src/plots/quickstart/{}_h_{}_s_{}_2d.html'.format(k, h, s))
+                                            'docs_src/_static/plots/quickstart/{}_h_{}_s_{}_2d.html'.format(k, h, s))
                 path.parent.mkdir(parents=True, exist_ok=True)
                 fig.write_html(path)
-                fig = go.Figure()
+                factor_fig = go.Figure()
                 factors = [c for c in store_df if c.split("_")[0] == "factor"]
                 store_df = store_df[factors + [fd["experiment_definition"]['time_index']]]
                 for f in factors:
-                    fig.add_trace(go.Bar(x=store_df[fd["experiment_definition"]['time_index']],
+                    factor_fig.add_trace(go.Bar(x=store_df[fd["experiment_definition"]['time_index']],
                                          y=store_df[
                                              f], name="_".join(f.split("_")[1:])))
-                    fig.update_layout(barmode='relative', title_text='Factor')
+                    factor_fig.update_layout(barmode='relative')
                 path = pathlib.Path(pathlib.Path(__file__).parent.parent.parent,
-                                    'docs_src/plots/quickstart/{}_test_forecast_retail_h_{}_s_{}_factors.html'.format(k, h, s))
+                                    'docs_src/_static/plots/quickstart/{}_test_forecast_retail_h_{}_s_{}_factors.html'.format(k, h, s))
                 path.parent.mkdir(parents=True, exist_ok=True)
-                fig.write_html(path)
+                factor_fig.write_html(path)
 
 
