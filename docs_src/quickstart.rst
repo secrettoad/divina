@@ -8,47 +8,101 @@ quickstart
 
 divina in 5 minutes
 
-In order to perform your first forecast with divina,
+Getting Started
+###############
 
-The aim of :mod:`divina` is twofold:
+A minimal experiment definition supplies the path to the dataset, the name of the column that holds the time index and the name of the column that holds the target to predict. In the minimal example below, an experiment is conducting using the retail sales data included with divina and using the log link function best suited towards sales data.
 
-1) **to reduce the complexity of configuration for causal forecasting at scale.** This is accomplished by abstracting all configuration to a single JSON file that lets users configure new experiments easily and safely.
 
-2) **to deliver scalable and bidirectionally interpretable causal forcasting models.** These models bring transparency and incremental control to the forecasting process using a variety of coefficient calculation tools, binning and interacting of features and set of link functions that enable a linear model to fit various target distributions.
-
-**Experiment Definition**
-
-A minimal experiment definition supplies the path to the dataset, the name of the column that holds the time index and the name of the column that holds the target to predict. Below is a minimal example using the retail sales data included with divina.
+.. literalinclude:: _static/experiment_definitions/quickstart1.json
+   :language: json
 
 .. raw:: html
     :file: _static/plots/quickstart/quickstart1_h_0_s_6_2d.html
 
+As you can see, Divina automatically uses the non-target data in the file to make insample predictions that are quite accurate. However, the forecast produced is for all stores in aggregate while there are three distinct retail locations in the dataset.
 
-**Experiment Persistence**
+**Target Dimensions**
 
-Experiment artifacts are persisted either locally or to S3 depending on the use of the `--local` flag when running the experiment command and will produce a local output structure as shown below::
+Below we use the target_dimensions option to tell divina to individually aggregate and forecast each retail store in the dataset.
 
-    experiment path
-      |- models
-      |    |
-      |    \- h_{forecast horizon}
-      |           |-fit_model.joblib
-      |           |-bootstrap
-      |                |
-      |                |- bootstrap_model_{random seed}
-      |
-      |- forecast
-      |    |
-      |    |- common_meta.parquet
-      |    |- forecast_partition_0_meta.parquet
-      |    |- forecast_partition_0.parquet
-      |    \  ...
-      |
-      |- validation
-           |
-           |- metrics.json
-           \- {validation split}
-                  |
-                  |- validation_partition_0_meta.parquet
-                  |- validation_partition_0.parquet
-                  \  ...
+.. literalinclude:: _static/experiment_definitions/quickstart2.json
+   :language: json
+   :emphasize-lines: 5-7
+
+.. raw:: html
+    :file: _static/plots/quickstart/quickstart2_h_0_s_1_2d.html
+
+We can see through the interpretability interface what information is influencing the forecasts and how.
+
+.. raw:: html
+    :file: _static/plots/quickstart/quickstart2_test_forecast_retail_h_0_s_1_factors.html
+
+**Joining Datasets**
+
+An important part of forecasting and feature of divina is the ability to work with additional datasets and the below example definition illustrates how to join the built-in time dataset to the retail dataset, allowing for additional information to be used in the predictions.
+
+.. literalinclude:: _static/experiment_definitions/quickstart3.json
+   :language: json
+   :emphasize-lines: 10-19
+
+We can see through the interpretablity interface that the new time information is now informing the forecasts. This is important because in order to make long-range forecasts, datasets with forward-looking information or assumptions present through the forecast period must be used.
+
+.. raw:: html
+    :file: _static/plots/quickstart/quickstart3_test_forecast_retail_h_0_s_1_factors.html
+
+**Feature Engineering**
+
+Information encoding, binning and interaction terms are all powerful features of divina that bring its performance in line with that of tree-based models and neural networks. Here we narrow the information provided to the model to prevent overfitting and add those options to the experiment definition. You can see that the forecasts become more meaningful through the interpretability interface.
+
+.. literalinclude:: _static/experiment_definitions/quickstart4.json
+   :language: json
+   :emphasize-lines: 20-49
+
+.. raw:: html
+    :file: _static/plots/quickstart/quickstart4_h_0_s_1_2d.html
+
+.. raw:: html
+    :file: _static/plots/quickstart/quickstart4_test_forecast_retail_h_0_s_1_factors.html
+
+While visual inspection is a powerful tool for validating a model, programmatic and distributional validation is provided throuogh the time_validation_splits option of divina.
+
+**Cross Validation**
+
+.. literalinclude:: _static/experiment_definitions/quickstart5.json
+   :language: json
+   :emphasize-lines: 4
+
+A key feature of divina is the ability to easily simulate potential future values as information to feed the model. In our retail example, we simulate promotions as both occuring and not every day, so that we have both scenarios to consider during the decision-making process.
+
+**Simulation**
+
+.. literalinclude:: _static/experiment_definitions/quickstart6.json
+   :language: json
+   :emphasize-lines: 4
+
+.. raw:: html
+    :file: _static/plots/quickstart/quickstart6_h_0_s_1_2d.html
+
+.. raw:: html
+    :file: _static/plots/quickstart/quickstart6_test_forecast_retail_h_0_s_1_factors.html
+
+
+**Confidence Intervals**
+
+Confidence intervals provide important insight into how sure divina is of its predictions, further allowing high-quality decisions to be made on top of them. Below we add confidence intervals to the forecasts via the confidence_intervals option.
+
+.. literalinclude:: _static/experiment_definitions/quickstart7.json
+   :language: json
+   :emphasize-lines: 4
+
+.. raw:: html
+    :file: _static/plots/quickstart/quickstart7_h_0_s_1_2d.html
+
+**Forecasting at Scale**
+
+In order to to work with larger datasets, include more features, increase the bootstrap sample of divina's confidence intervals, or otherwise scale your forecasting workload, use the --aws option when running the experiment through the cli.
+
+.. code-block:: bash
+
+    divina experiment /path/to/my/experiment_definition.json -aws_workers=10

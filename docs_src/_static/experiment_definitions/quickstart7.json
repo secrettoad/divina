@@ -38,10 +38,14 @@
       "HolidayType",
       "Assortment"
     ],
-    "time_validation_splits": ["2015-07-18"],
-    "interaction_features": {"Store": [
-       "Holiday", "HolidayType"
-    ]},
+    "time_validation_splits": [
+      "2015-07-18"
+    ],
+    "interaction_features": {
+      "Store": [
+        "Holiday"
+      ]
+    },
     "bin_features": {
       "Month": [
         3,
@@ -64,7 +68,7 @@
         "mode": "last"
       }
     },
-        "confidence_intervals": [
+    "confidence_intervals": [
       0,
       100
     ],

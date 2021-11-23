@@ -2,7 +2,9 @@
   "experiment_definition": {
     "target": "Sales",
     "link_function": "log",
-    "target_dimensions": ["Store"],
+    "target_dimensions": [
+      "Store"
+    ],
     "time_index": "Date",
     "data_path": "divina://retail_sales"
   }

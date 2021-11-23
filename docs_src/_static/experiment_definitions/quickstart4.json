@@ -2,22 +2,50 @@
   "experiment_definition": {
     "target": "Sales",
     "link_function": "log",
-    "target_dimensions": ["Store"],
+    "target_dimensions": [
+      "Store"
+    ],
     "time_index": "Date",
     "data_path": "divina://retail_sales",
     "joins": [
-                {
-                    "data_path": "divina://time",
-                    "join_on": ["Date", "Date"],
-                    "as": "time"
-                }
-            ],
-    "include_features": ["Store", "Weekday", "Month",
-       "Holiday", "HolidayType", "StoreType", "Assortment", "LastDayOfMonth"],
-    "encode_features": ["Store", "Month", "StoreType", "Weekday", "HolidayType", "Assortment"],
-    "bin_features": {"Month": [3, 6, 9]},
-    "interaction_features": {"Store": ["Weekday",
-       "Holiday", "HolidayType"
-    ]}
+      {
+        "data_path": "divina://time",
+        "join_on": [
+          "Date",
+          "Date"
+        ],
+        "as": "time"
+      }
+    ],
+    "include_features": [
+      "Store",
+      "Weekday",
+      "Month",
+      "Holiday",
+      "HolidayType",
+      "StoreType",
+      "Assortment",
+      "LastDayOfMonth"
+    ],
+    "encode_features": [
+      "Store",
+      "Month",
+      "StoreType",
+      "Weekday",
+      "HolidayType",
+      "Assortment"
+    ],
+    "bin_features": {
+      "Month": [
+        3,
+        6,
+        9
+      ]
+    },
+    "interaction_features": {
+      "Store": [
+        "Holiday"
+      ]
+    }
   }
 }
