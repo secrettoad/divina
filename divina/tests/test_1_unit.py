@@ -6,7 +6,6 @@ from ..dataset import _get_dataset
 from ..validate import _validate
 from ..experiment import _experiment
 import pathlib
-from dask_ml.linear_model import LinearRegression
 from ..utils import compare_sk_models, get_parameters, set_parameters
 import joblib
 import pandas as pd
@@ -17,25 +16,25 @@ import plotly.graph_objects as go
 
 
 def test_validate_experiment_definition(
-        fd_no_target,
-        fd_time_horizons_not_list,
-        fd_time_validation_splits_not_list,
-        fd_no_time_index,
-        fd_no_data_path,
-        fd_invalid_model,
-        fd_time_horizons_range_not_tuple
+        ed_no_target,
+        ed_time_horizons_not_list,
+        ed_time_validation_splits_not_list,
+        ed_no_time_index,
+        ed_no_data_path,
+        ed_invalid_model,
+        ed_time_horizons_range_not_tuple
 ):
     for dd in [
-        fd_no_target,
-        fd_no_time_index,
-        fd_time_validation_splits_not_list,
-        fd_time_horizons_not_list,
-        fd_no_data_path,
-        fd_invalid_model,
-        fd_time_horizons_range_not_tuple
+        ed_no_target,
+        ed_no_time_index,
+        ed_time_validation_splits_not_list,
+        ed_time_horizons_not_list,
+        ed_no_data_path,
+        ed_invalid_model,
+        ed_time_horizons_range_not_tuple
     ]:
         try:
-            with open(pathlib.Path(pathlib.Path(__file__).parent.parent, 'config/fd_schema.json'), 'r') as f:
+            with open(pathlib.Path(pathlib.Path(__file__).parent.parent, 'config/ed_schema.json'), 'r') as f:
                 validate(instance=dd, schema=json.load(f))
         except ValidationError:
             return None
@@ -46,44 +45,44 @@ def test_validate_experiment_definition(
 def test_get_composite_dataset(
         test_df_1,
         test_df_2,
-        test_fd_2,
+        test_ed_2,
         test_composite_dataset_1,
         dask_client,
 ):
-    for dataset in test_fd_2["experiment_definition"]["joins"]:
+    for dataset in test_ed_2["experiment_definition"]["joins"]:
         pathlib.Path(
             dataset["data_path"]
         ).mkdir(parents=True, exist_ok=True)
     pathlib.Path(
-        test_fd_2["experiment_definition"]["data_path"],
+        test_ed_2["experiment_definition"]["data_path"],
     ).mkdir(parents=True, exist_ok=True)
 
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_2["experiment_definition"]["data_path"]
+        test_ed_2["experiment_definition"]["data_path"]
     )
     ddf.from_pandas(test_df_2, npartitions=2).to_parquet(
 
-        test_fd_2["experiment_definition"]["joins"][0]["data_path"]
+        test_ed_2["experiment_definition"]["joins"][0]["data_path"]
     )
-    df = _get_dataset(test_fd_2["experiment_definition"])
+    df = _get_dataset(test_ed_2["experiment_definition"])
 
     pd.testing.assert_frame_equal(df.compute().reset_index(drop=True), test_composite_dataset_1.reset_index(drop=True))
 
 
-def test_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_bootstrap_models, test_validation_models,
+def test_train(s3_fs, test_df_1, test_ed_1, test_model_1, dask_client, test_bootstrap_models, test_validation_models,
                random_state):
     experiment_path = "divina-test/experiment/test1"
     pathlib.Path(
-        test_fd_1["experiment_definition"]["data_path"],
+        test_ed_1["experiment_definition"]["data_path"],
     ).mkdir(parents=True, exist_ok=True)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_1["experiment_definition"]["data_path"]
+        test_ed_1["experiment_definition"]["data_path"]
     )
     _train(
         s3_fs=s3_fs,
-        experiment_definition=test_fd_1["experiment_definition"],
+        experiment_definition=test_ed_1["experiment_definition"],
         write_path=experiment_path,
-        random_seed=random_state,
+        random_state=random_state,
     )
 
     compare_sk_models(
@@ -106,27 +105,27 @@ def test_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_boot
             )
     )) as f:
         assert json.load(f) == test_model_1[1]
-    for seed in test_bootstrap_models:
+    for state in test_bootstrap_models:
         compare_sk_models(
             joblib.load(
                 os.path.abspath(
                     os.path.join(
                         experiment_path,
                         "models/bootstrap",
-                        "h-1_r-{}".format(seed),
+                        "h-1_r-{}".format(state),
                     )
                 )
             ),
-            test_bootstrap_models[seed][0],
+            test_bootstrap_models[state][0],
         )
         with open(os.path.abspath(
                 os.path.join(
                     experiment_path,
                     "models/bootstrap",
-                    "h-1_r-{}_params.json".format(seed),
+                    "h-1_r-{}_params.json".format(state),
                 )
         )) as f:
-            assert json.load(f) == test_bootstrap_models[seed][1]
+            assert json.load(f) == test_bootstrap_models[state][1]
     for split in test_validation_models:
         compare_sk_models(
             joblib.load(
@@ -152,18 +151,18 @@ def test_train(s3_fs, test_df_1, test_fd_1, test_model_1, dask_client, test_boot
 
 
 def test_forecast(
-        s3_fs, dask_client, test_df_1, test_fd_1, test_model_1, test_val_predictions_1, test_forecast_1,
+        s3_fs, dask_client, test_df_1, test_ed_1, test_model_1, test_val_predictions_1, test_forecast_1,
         test_bootstrap_models
 ):
     experiment_path = "divina-test/experiment/test1"
     pathlib.Path(
-        test_fd_1["experiment_definition"]["data_path"]
+        test_ed_1["experiment_definition"]["data_path"]
     ).mkdir(parents=True, exist_ok=True)
     pathlib.Path(os.path.join(experiment_path, "models/bootstrap")).mkdir(
         parents=True, exist_ok=True
     )
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_1["experiment_definition"]["data_path"]
+        test_ed_1["experiment_definition"]["data_path"]
     )
     joblib.dump(
         test_model_1[0],
@@ -182,28 +181,28 @@ def test_forecast(
             test_model_1[1],
             f
         )
-    for seed in test_bootstrap_models:
+    for state in test_bootstrap_models:
         joblib.dump(
-            test_bootstrap_models[seed][0],
+            test_bootstrap_models[state][0],
             os.path.join(
                 experiment_path,
                 "models/bootstrap",
-                "h-1_r-{}".format(seed),
+                "h-1_r-{}".format(state),
             ),
         )
         with open(os.path.join(
                 experiment_path,
                 "models/bootstrap",
-                "h-1_r-{}_params.json".format(seed),
+                "h-1_r-{}_params.json".format(state),
         ), 'w+') as f:
             json.dump(
-                test_bootstrap_models[seed][1],
+                test_bootstrap_models[state][1],
                 f
             )
 
     _forecast(
         s3_fs=s3_fs,
-        experiment_definition=test_fd_1["experiment_definition"],
+        experiment_definition=test_ed_1["experiment_definition"],
         read_path=experiment_path,
         write_path=experiment_path,
     )
@@ -219,13 +218,13 @@ def test_forecast(
 
 
 def test_validate(
-        s3_fs, test_fd_1, test_df_1, test_metrics_1, dask_client, test_val_predictions_1, test_validation_models,
+        s3_fs, test_ed_1, test_df_1, test_metrics_1, dask_client, test_val_predictions_1, test_validation_models,
         test_model_1,
         test_bootstrap_models
 ):
     experiment_path = "divina-test/experiment/test1"
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_1["experiment_definition"]["data_path"]
+        test_ed_1["experiment_definition"]["data_path"]
     )
     pathlib.Path(
         os.path.join(
@@ -251,27 +250,27 @@ def test_validate(
                 test_validation_models[split][1],
                 f
             )
-    for seed in test_bootstrap_models:
+    for state in test_bootstrap_models:
         joblib.dump(
-            test_bootstrap_models[seed][0],
+            test_bootstrap_models[state][0],
             os.path.join(
                 experiment_path,
                 "models/bootstrap",
-                "h-1_r-{}".format(seed),
+                "h-1_r-{}".format(state),
             ),
         )
         with open(os.path.join(
                 experiment_path,
                 "models/bootstrap",
-                "h-1_r-{}_params.json".format(seed),
+                "h-1_r-{}_params.json".format(state),
         ), 'w+') as f:
             json.dump(
-                test_bootstrap_models[seed][1],
+                test_bootstrap_models[state][1],
                 f
             )
     _validate(
         s3_fs=s3_fs,
-        experiment_definition=test_fd_1["experiment_definition"],
+        experiment_definition=test_ed_1["experiment_definition"],
         read_path=experiment_path,
         write_path=experiment_path,
     )
@@ -359,13 +358,12 @@ def test_set_params(
     assert params == test_params_2
 
 
-def test_quickstart(test_fds_quickstart, random_state):
-    ###Date, Customers, Promo2, Open, Competition removed on 2
-    for k in test_fds_quickstart:
-        fd = test_fds_quickstart[k]
+def test_quickstart(test_eds_quickstart, random_state):
+    for k in test_eds_quickstart:
+        ed = test_eds_quickstart[k]
         experiment_path = "divina-test/experiment/test1"
         _experiment(
-            experiment_definition=fd["experiment_definition"],
+            experiment_definition=ed["experiment_definition"],
             read_path=experiment_path,
             write_path=experiment_path,
             random_state=11
@@ -377,69 +375,71 @@ def test_quickstart(test_fds_quickstart, random_state):
             )
         ).compute().reset_index(drop=True)
         ###RESET
-        ddf.read_parquet(
+        '''ddf.read_parquet(
             os.path.join(
                 experiment_path,
                 "forecast"
             )
         ).to_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
-                               k))
+                               k))'''
         pd.testing.assert_frame_equal(result_df, ddf.read_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
                                k)).compute().reset_index(drop=True))
-        fd["experiment_definition"]['time_horizons'] = [0]
-        if not "target_dimensions" in fd["experiment_definition"]:
+        ed["experiment_definition"]['time_horizons'] = [0]
+        if not "target_dimensions" in ed["experiment_definition"]:
             stores = [6]
         else:
             stores = [1, 2, 3]
         result_df = result_df[result_df['Date'] >= '2015-01-01']
         for s in stores:
             fig = go.Figure()
-            for h in fd["experiment_definition"]['time_horizons']:
-                if not "encode_features" in fd["experiment_definition"]:
+            for h in ed["experiment_definition"]['time_horizons']:
+                if not "encode_features" in ed["experiment_definition"]:
                     store_df = result_df[result_df['Store'] == s]
                 else:
                     store_df = result_df[result_df['Store_{}'.format(float(s))] == 1]
-                if "scenarios" in fd["experiment_definition"]:
+                if "scenarios" in ed["experiment_definition"]:
                     store_df = store_df[(store_df['Date'] < "2015-08-01") | (result_df['Promo'] == 1)]
                     fig.add_vrect(x0=pd.to_datetime('07-31-2015').timestamp() * 1000,
                                   x1=pd.to_datetime('01-01-2016').timestamp() * 1000, line_width=2,
                                   line_color="cadetblue",
-                                  annotation_text='Blind Forecasts with Constant Assumed Promotions')
-                if "confidence_intervals" in fd["experiment_definition"]:
-                    if len(fd["experiment_definition"]['confidence_intervals']) > 0:
-                        for i in fd["experiment_definition"]['confidence_intervals']:
+                                  annotation_text='Forecasts assuming promotions')
+                if "confidence_intervals" in ed["experiment_definition"]:
+                    if len(ed["experiment_definition"]['confidence_intervals']) > 0:
+                        for i in ed["experiment_definition"]['confidence_intervals']:
                             fig.add_trace(go.Scatter(marker=dict(color="cyan"), mode="lines",
-                                                     x=store_df[fd["experiment_definition"]['time_index']],
+                                                     x=store_df[ed["experiment_definition"]['time_index']],
                                                      y=store_df[
                                                          '{}_h_{}_pred_c_{}'.format(
-                                                             fd["experiment_definition"]['target'],
+                                                             ed["experiment_definition"]['target'],
                                                              h, i)], name="h_{}_c_{}".format(h, i)))
                         fig.update_traces(fill='tonexty', name='Confidence Bound', selector=dict(
-                            name="h_{}_c_{}".format(h, fd["experiment_definition"]['confidence_intervals'][-1])))
+                            name="h_{}_c_{}".format(h, ed["experiment_definition"]['confidence_intervals'][-1])))
                         fig.update_traces(showlegend=False, name='Upper Confidence Bound', selector=dict(
-                            name="h_{}_c_{}".format(h, fd["experiment_definition"]['confidence_intervals'][0])))
+                            name="h_{}_c_{}".format(h, ed["experiment_definition"]['confidence_intervals'][0])))
                 fig.add_trace(
                         go.Scatter(marker=dict(color='black'), line=dict(dash='dash'), mode="lines",
-                                       x=store_df[fd["experiment_definition"]['time_index']],
-                                       y=store_df[fd["experiment_definition"]['target']],
-                                       name=fd["experiment_definition"]['target']))
+                                       x=store_df[ed["experiment_definition"]['time_index']],
+                                       y=store_df[ed["experiment_definition"]['target']],
+                                       name=ed["experiment_definition"]['target']))
                 fig.add_trace(go.Scatter(marker=dict(color="darkblue"), mode="lines",
-                                             x=store_df[fd["experiment_definition"]['time_index']],
+                                             x=store_df[ed["experiment_definition"]['time_index']],
                                              y=store_df[
-                                                 '{}_h_{}_pred'.format(fd["experiment_definition"]['target'],
-                                                                       h)], name="Horizon {} Forecast".format(h)))
+                                                 '{}_h_{}_pred'.format(ed["experiment_definition"]['target'],
+                                                                       h)], name="Forecast".format(h)))
                 path = pathlib.Path(pathlib.Path(__file__).parent.parent.parent,
                                             'docs_src/_static/plots/quickstart/{}_h_{}_s_{}_2d.html'.format(k, h, s))
                 path.parent.mkdir(parents=True, exist_ok=True)
                 fig.write_html(path)
                 factor_fig = go.Figure()
                 factors = [c for c in store_df if c.split("_")[0] == "factor"]
-                store_df = store_df[factors + [fd["experiment_definition"]['time_index']]]
+                if "scenarios" in ed["experiment_definition"]:
+                    store_df = store_df[(store_df['Date'] > "2015-08-01") | (result_df['Promo'] == 1)]
+                store_df = store_df[factors + [ed["experiment_definition"]['time_index']]]
                 for f in factors:
-                    factor_fig.add_trace(go.Bar(x=store_df[fd["experiment_definition"]['time_index']],
+                    factor_fig.add_trace(go.Bar(x=store_df[ed["experiment_definition"]['time_index']],
                                          y=store_df[
-                                             f], name="_".join(f.split("_")[1:])))
-                    factor_fig.update_layout(barmode='relative')
+                                             f], name=("_".join(f.split("_")[1:])[:15] + '..') if len("_".join(f.split("_")[1:])) > 17 else "_".join(f.split("_")[1:])))
+                factor_fig.update_layout(barmode='relative')
                 path = pathlib.Path(pathlib.Path(__file__).parent.parent.parent,
                                     'docs_src/_static/plots/quickstart/{}_test_forecast_retail_h_{}_s_{}_factors.html'.format(k, h, s))
                 path.parent.mkdir(parents=True, exist_ok=True)

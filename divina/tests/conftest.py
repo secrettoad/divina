@@ -128,7 +128,7 @@ def dask_client_remote(request, dask_cluster_ip):
 
 
 @pytest.fixture()
-def fd_no_data_path():
+def ed_no_data_path():
     return {
         "experiment_definition": {
             "target": "c",
@@ -140,7 +140,7 @@ def fd_no_data_path():
 
 
 @pytest.fixture()
-def fd_invalid_model():
+def ed_invalid_model():
     return {
         "experiment_definition": {
             "target": "c",
@@ -154,7 +154,7 @@ def fd_invalid_model():
 
 
 @pytest.fixture()
-def fd_no_time_index():
+def ed_no_time_index():
     return {
         "experiment_definition": {
             "target": "c",
@@ -166,7 +166,7 @@ def fd_no_time_index():
 
 
 @pytest.fixture()
-def fd_no_target():
+def ed_no_target():
     return {
         "experiment_definition": {
             "time_index": "a",
@@ -178,7 +178,7 @@ def fd_no_target():
 
 
 @pytest.fixture()
-def fd_time_validation_splits_not_list():
+def ed_time_validation_splits_not_list():
     return {
         "experiment_definition": {
             "time_index": "a",
@@ -191,7 +191,7 @@ def fd_time_validation_splits_not_list():
 
 
 @pytest.fixture()
-def fd_time_horizons_not_list():
+def ed_time_horizons_not_list():
     return {
         "experiment_definition": {
             "time_index": "a",
@@ -204,7 +204,7 @@ def fd_time_horizons_not_list():
 
 
 @pytest.fixture()
-def fd_time_horizons_range_not_tuple():
+def ed_time_horizons_range_not_tuple():
     return {
         "experiment_definition": {
             "time_index": "a",
@@ -217,7 +217,7 @@ def fd_time_horizons_range_not_tuple():
 
 
 @pytest.fixture()
-def test_model_1(test_df_1, random_state, test_fd_1):
+def test_model_1(test_df_1, random_state, test_ed_1):
     params = [2.5980497162871465, 0.9334212709843847, -2.13558920798334]
     intercept = 2.135585380640592
     features = ['b', 'b_(5, 10]', 'b_(15, inf]']
@@ -239,7 +239,7 @@ def test_params_1(test_model_1):
 
 
 @pytest.fixture()
-def test_bootstrap_models(test_df_1, random_state, test_fd_1):
+def test_bootstrap_models(test_df_1, random_state, test_ed_1):
     params = [[3.5208353651349817, 0.8890968752323547, -3.3105628218449574],
               [1.1717451589768473, 0.9272367214532506, -2.972442774585969],
               [2.5578331046564813, 0.9201254489380151, -2.0817764266201166],
@@ -248,29 +248,29 @@ def test_bootstrap_models(test_df_1, random_state, test_fd_1):
     intercepts = [3.310380317261251, 2.9723833353906963, 2.0817011992723984, 2.0817011992723877, 1.4064614399090596]
     features = [['b', 'b_(5, 10]', 'b_(15, inf]'], ['b', 'b_(5, 10]', 'b_(15, inf]'], ['b', 'b_(5, 10]', 'b_(15, inf]'],
                 ['b', 'b_(5, 10]', 'b_(15, inf]'], ['b', 'b_(5, 10]', 'b_(15, inf]']]
-    seeds = range(random_state, random_state + test_fd_1["experiment_definition"]["bootstrap_sample"])
+    states = range(random_state, random_state + test_ed_1["experiment_definition"]["bootstrap_sample"])
     bootstrap_models = {}
 
-    for j, i, p, f, seed in zip(range(0, len(seeds)), intercepts, params, features, seeds):
+    for j, i, p, f, state in zip(range(0, len(states)), intercepts, params, features, states):
         model = LinearRegression()
         model.fit(
-            ddf.from_pandas(pd.DataFrame([np.array(params[j]) + c for c in range(0, len(seeds))]),
+            ddf.from_pandas(pd.DataFrame([np.array(params[j]) + c for c in range(0, len(states))]),
                             npartitions=1).to_dask_array(
                 lengths=True),
             ddf.from_pandas(pd.Series(intercepts), npartitions=1).to_dask_array(lengths=True))
         model.coef_ = np.array(p)
         model.intercept_ = i
         model._coef = np.array(p + [i])
-        bootstrap_models[seed] = (model, {"features": f})
+        bootstrap_models[state] = (model, {"features": f})
     return bootstrap_models
 
 
 @pytest.fixture()
-def test_validation_models(test_df_1, random_state, test_fd_1):
+def test_validation_models(test_df_1, random_state, test_ed_1):
     params = [[4.086805634357628, 0.7618639411983616, -1.6591807041382545]]
     intercepts = [1.6591672730002625]
     features = [['b', 'b_(5, 10]', 'b_(15, inf]']]
-    splits = test_fd_1["experiment_definition"]["time_validation_splits"]
+    splits = test_ed_1["experiment_definition"]["time_validation_splits"]
     validation_models = {}
 
     for j, i, p, f, split in zip(range(0, len(splits)), intercepts, params, features, splits):
@@ -405,7 +405,7 @@ def test_forecast_1():
 
 
 @pytest.fixture()
-def test_fd_1():
+def test_ed_1():
     return {
         "experiment_definition": {
             "time_index": "a",
@@ -427,18 +427,18 @@ def test_fd_1():
 
 
 @pytest.fixture()
-def test_fds_quickstart():
-    fds = {}
+def test_eds_quickstart():
+    eds = {}
     for file in sorted(
             os.listdir(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/_static/experiment_definitions'))):
         with open(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/_static/experiment_definitions',
                                file)) as f:
-            fds[file.split('.')[0]] = (json.load(f))
-    return fds
+            eds[file.split('.')[0]] = (json.load(f))
+    return eds
 
 
 @pytest.fixture()
-def test_fd_2():
+def test_ed_2():
     return {
         "experiment_definition": {
             "time_index": "a",
@@ -458,10 +458,10 @@ def test_fd_2():
 
 
 @pytest.fixture()
-def test_fd_3(test_bucket, test_fd_1):
-    test_fd = test_fd_1
-    test_fd["experiment_definition"].update({"data_path": "{}/dataset/test1".format(test_bucket)})
-    return test_fd
+def test_ed_3(test_bucket, test_ed_1):
+    test_ed = test_ed_1
+    test_ed["experiment_definition"].update({"data_path": "{}/dataset/test1".format(test_bucket)})
+    return test_ed
 
 
 @pytest.fixture()

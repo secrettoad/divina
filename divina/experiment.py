@@ -10,7 +10,7 @@ def _experiment(experiment_definition, read_path, write_path, random_state=None,
         s3_fs=s3_fs,
         experiment_definition=experiment_definition,
         write_path=write_path,
-        random_seed=random_state
+        random_state=random_state
     )
     _forecast(
         s3_fs=s3_fs,

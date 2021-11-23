@@ -1,9 +1,8 @@
 import os
-from ..cli.cli import (
-    cli_train_experiment,
-    cli_forecast_experiment,
-    cli_validate_experiment,
-)
+from ..train import _train
+from ..forecast import _forecast
+from ..validate import _validate
+from ..experiment import _experiment
 import dask.dataframe as ddf
 import pandas as pd
 import joblib
@@ -12,29 +11,25 @@ import json
 import pytest
 import pathlib
 import shutil
-from ..experiment import _experiment
-import fsspec
+
 
 @pytest.fixture(autouse=True)
 def setup_teardown(setup_teardown_test_bucket_contents):
     pass
 
 
-def test_train_small(
-        s3_fs, test_df_1, test_model_1, test_fd_3, dask_client_remote, test_bucket, test_bootstrap_models, random_state
+def test_train_base(
+        s3_fs, test_df_1, test_model_1, test_ed_3, dask_client_remote, test_bucket, test_bootstrap_models, random_state
 ):
     experiment_path = "{}/experiment/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_3["experiment_definition"]["data_path"]
+        test_ed_3["experiment_definition"]["data_path"]
     )
-    cli_train_experiment(
+    _train(
         s3_fs=s3_fs,
-        experiment_definition=test_fd_3["experiment_definition"],
+        experiment_definition=test_ed_3["experiment_definition"],
         write_path=experiment_path,
-        keep_instances_alive=False,
-        dask_client=dask_client_remote,
-        ec2_keypair_name="divina2",
-        random_state=random_state
+        random_state=random_state,
     )
     with s3_fs.open(
             os.path.join(
@@ -45,23 +40,24 @@ def test_train_small(
             "rb",
     ) as f:
         compare_sk_models(joblib.load(f), test_model_1[0])
-    for seed in test_bootstrap_models:
+    for state in test_bootstrap_models:
         with s3_fs.open(
                 os.path.join(
                     experiment_path,
                     "models/bootstrap",
-                    "h-1_r-{}".format(seed),
+                    "h-1_r-{}".format(state),
                 ),
                 "rb",
         ) as f:
-            compare_sk_models(joblib.load(f), test_bootstrap_models[seed][0])
+            compare_sk_models(joblib.load(f), test_bootstrap_models[state][0])
 
-def test_forecast_small(
+
+def test_forecast_base(
         s3_fs,
         test_df_1,
         test_model_1,
         test_val_predictions_1,
-        test_fd_3,
+        test_ed_3,
         dask_client_remote,
         test_bucket,
         test_forecast_1,
@@ -70,7 +66,7 @@ def test_forecast_small(
 ):
     experiment_path = "{}/experiment/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_3["experiment_definition"]["data_path"],
+        test_ed_3["experiment_definition"]["data_path"],
     )
     pathlib.Path(
         "models/bootstrap"
@@ -84,20 +80,20 @@ def test_forecast_small(
             test_model_1[1],
             f
         )
-    for seed in test_bootstrap_models:
+    for state in test_bootstrap_models:
         joblib.dump(
-            test_bootstrap_models[seed][0],
+            test_bootstrap_models[state][0],
             os.path.join(
                 "models/bootstrap",
-                "h-1_r-{}".format(seed),
+                "h-1_r-{}".format(state),
             ),
         )
         with open(os.path.join(
                 "models/bootstrap",
-                "h-1_r-{}_params.json".format(seed),
+                "h-1_r-{}_params.json".format(state),
         ), 'w+') as f:
             json.dump(
-                test_bootstrap_models[seed][1],
+                test_bootstrap_models[state][1],
                 f
             )
     s3_fs.put(
@@ -109,13 +105,11 @@ def test_forecast_small(
         recursive=True,
     )
     shutil.rmtree('models', ignore_errors=True)
-    cli_forecast_experiment(
+    _forecast(
         s3_fs=s3_fs,
-        experiment_definition=test_fd_3["experiment_definition"],
+        experiment_definition=test_ed_3["experiment_definition"],
         write_path=experiment_path,
         read_path=experiment_path,
-        keep_instances_alive=False,
-        dask_client=dask_client_remote
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
@@ -128,9 +122,9 @@ def test_forecast_small(
     )
 
 
-def test_validate_small(
+def test_validate_base(
         s3_fs,
-        test_fd_3,
+        test_ed_3,
         test_df_1,
         test_metrics_1,
         test_val_predictions_1,
@@ -141,7 +135,7 @@ def test_validate_small(
 ):
     experiment_path = "{}/experiment/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_fd_3["experiment_definition"]["data_path"]
+        test_ed_3["experiment_definition"]["data_path"]
     )
     for split in test_validation_models:
         with s3_fs.open("{}/{}/{}".format(experiment_path,
@@ -157,14 +151,11 @@ def test_validate_small(
                 test_validation_models[split][1],
                 f
             )
-    cli_validate_experiment(
+    _validate(
         s3_fs=s3_fs,
-        experiment_definition=test_fd_3["experiment_definition"],
+        experiment_definition=test_ed_3["experiment_definition"],
         write_path=experiment_path,
-        read_path=experiment_path,
-        ec2_keypair_name="divina2",
-        keep_instances_alive=False,
-        dask_client=dask_client_remote,
+        read_path=experiment_path
     )
     pd.testing.assert_frame_equal(
         ddf.read_parquet(
@@ -186,17 +177,16 @@ def test_validate_small(
     assert metrics == test_metrics_1
 
 
-def test_quickstart(test_fds_quickstart, random_state, dask_client_remote, test_bucket, s3_fs):
-    ###Date, Customers, Promo2, Open, Competition removed on 2
-    for k in test_fds_quickstart:
+def test_quickstart(test_eds_quickstart, random_state, dask_client_remote, test_bucket, s3_fs):
+    for k in test_eds_quickstart:
         experiment_path = "{}/experiment/test1/{}".format(test_bucket, k)
-        fd = test_fds_quickstart[k]
+        ed = test_eds_quickstart[k]
         _experiment(
-            experiment_definition=fd["experiment_definition"],
+            s3_fs=s3_fs,
+            experiment_definition=ed["experiment_definition"],
             read_path=experiment_path,
             write_path=experiment_path,
-            random_state=11,
-            s3_fs=s3_fs
+            random_state=11
         )
         result_df = ddf.read_parquet(
             os.path.join(
