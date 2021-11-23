@@ -377,13 +377,13 @@ def test_quickstart(test_fds_quickstart, random_state):
             )
         ).compute().reset_index(drop=True)
         ###RESET
-        '''ddf.read_parquet(
+        ddf.read_parquet(
             os.path.join(
                 experiment_path,
                 "forecast"
             )
         ).to_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
-                               k))'''
+                               k))
         pd.testing.assert_frame_equal(result_df, ddf.read_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
                                k)).compute().reset_index(drop=True))
         fd["experiment_definition"]['time_horizons'] = [0]
