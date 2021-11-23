@@ -117,7 +117,7 @@ def dask_client_remote(request, dask_cluster_ip):
                 "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
                 "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
             },
-            auto_shutdown=False,
+            auto_shutdown=True,
         )
         cluster.scale(5)
         client = Client(cluster)
