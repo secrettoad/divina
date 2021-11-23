@@ -145,13 +145,12 @@ def _forecast(s3_fs, experiment_definition, read_path, write_path):
                                 '{}_h_{}_pred'.format(experiment_definition["target"],
                                                       h)]].to_dask_array(lengths=True).T).repartition(
                 npartitions=forecast_df.npartitions).quantile(
-                [i * .01 for i in experiment_definition['confidence_intervals']]).to_dask_array(lengths=True).T)
+                [i * .01 for i in experiment_definition['confidence_intervals']]).to_dask_array(lengths=True).T).persist()
             df_interval.columns = ['{}_h_{}_pred_c_{}'.format(experiment_definition["target"], h, c) for c in
                                    experiment_definition["confidence_intervals"]]
 
-            df_interval = df_interval.repartition(divisions=forecast_df.divisions)
-            for c in df_interval.columns:
-                forecast_df[c] = df_interval[c]
+            df_interval = df_interval.repartition(divisions=forecast_df.divisions).reset_index(drop=True)
+            forecast_df = forecast_df.reset_index(drop=True).join(df_interval)
 
         forecast_df[experiment_definition["time_index"]] = dd.to_datetime(forecast_df[experiment_definition["time_index"]])
 

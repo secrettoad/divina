@@ -4,6 +4,13 @@
     "link_function": "log",
     "target_dimensions": ["Store"],
     "time_index": "Date",
-    "data_path": "divina://retail_sales"
+    "data_path": "divina://retail_sales",
+    "joins": [
+                {
+                    "data_path": "divina://time",
+                    "join_on": ["Date", "Date"],
+                    "as": "time"
+                }
+            ]
   }
 }
