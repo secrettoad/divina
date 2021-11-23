@@ -402,9 +402,9 @@ def test_quickstart(test_fds_quickstart, random_state):
                 if "scenarios" in fd["experiment_definition"]:
                     store_df = store_df[(store_df['Date'] < "2015-08-01") | (result_df['Promo'] == 1)]
                     fig.add_vrect(x0=pd.to_datetime('07-31-2015').timestamp() * 1000,
-                                  x1=pd.to_datetime('08-30-2015').timestamp() * 1000, line_width=2,
+                                  x1=pd.to_datetime('01-01-2016').timestamp() * 1000, line_width=2,
                                   line_color="cadetblue",
-                                  annotation_text='Blind Forecasts with Promotions Simulated as False')
+                                  annotation_text='Blind Forecasts with Constant Assumed Promotions')
                 if "confidence_intervals" in fd["experiment_definition"]:
                     if len(fd["experiment_definition"]['confidence_intervals']) > 0:
                         for i in fd["experiment_definition"]['confidence_intervals']:
