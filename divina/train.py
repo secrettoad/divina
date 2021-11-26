@@ -14,10 +14,10 @@ import dask.array as da
 from pandas.api.types import is_numeric_dtype
 
 
-def _train_model(df, model_name, random_seed, features, target,
+def _train_model(df, model_name, random_state, features, target,
                  link_function, write_open, write_path, bootstrap_sample=None, confidence_intervals=None):
-    if random_seed:
-        model = LinearRegression(random_state=random_seed)
+    if random_state:
+        model = LinearRegression(random_state=random_state)
     else:
         model = LinearRegression()
 
@@ -64,14 +64,14 @@ def _train_model(df, model_name, random_seed, features, target,
         if not bootstrap_sample:
             bootstrap_sample = 30
 
-        def train_persist_bootstrap_model(features, df, target, link_function, model_name, random_seed):
+        def train_persist_bootstrap_model(features, df, target, link_function, model_name, random_state):
 
-            if random_seed:
-                df_train_bootstrap = df.sample(replace=False, frac=.8, random_state=random_seed)
+            if random_state:
+                df_train_bootstrap = df.sample(replace=False, frac=.8, random_state=random_state)
             else:
                 df_train_bootstrap = df.sample(replace=False, frac=.8)
-            if random_seed:
-                bootstrap_model = LinearRegression(random_state=random_seed)
+            if random_state:
+                bootstrap_model = LinearRegression(random_state=random_state)
             else:
                 bootstrap_model = LinearRegression()
             df_std_bootstrap = df_train_bootstrap[features].std().compute()
@@ -90,7 +90,7 @@ def _train_model(df, model_name, random_seed, features, target,
                     "{}/models/bootstrap/{}_r-{}".format(
                         write_path,
                         model_name,
-                        random_seed
+                        random_state
                     ),
                     "wb",
             ) as f:
@@ -100,29 +100,29 @@ def _train_model(df, model_name, random_seed, features, target,
                     "{}/models/bootstrap/{}_r-{}_params.json".format(
                         write_path,
                         model_name,
-                        random_seed
+                        random_state
                     ),
                     "w",
             ) as f:
                 json.dump(
                     {"features": bootstrap_features}, f)
 
-            sys.stdout.write("Model persisted: {}_r-{}\n".format(model_name, random_seed))
+            sys.stdout.write("Model persisted: {}_r-{}\n".format(model_name, random_state))
 
             return (bootstrap_model, bootstrap_features)
 
-        if random_seed:
-            seeds = [x for x in range(random_seed, random_seed + bootstrap_sample)]
+        if random_state:
+            states = [x for x in range(random_state, random_state + bootstrap_sample)]
         else:
-            seeds = [x for x in np.random.randint(0, 10000, size=bootstrap_sample)]
+            states = [x for x in np.random.randint(0, 10000, size=bootstrap_sample)]
 
         bootstrap_models = []
-        for seed in seeds:
+        for state in states:
             bootstrap_models.append(
                 train_persist_bootstrap_model(features, df_train,
                     target,
                     link_function,
-                    model_name, seed))
+                    model_name, state))
 
         return (model, features), bootstrap_models
 
@@ -133,7 +133,7 @@ def _train_model(df, model_name, random_seed, features, target,
 
 @validate_experiment_definition
 @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-def _train(s3_fs, experiment_definition, write_path, random_seed=None):
+def _train(s3_fs, experiment_definition, write_path, random_state=None):
     if not "confidence_intervals" in experiment_definition:
         confidence_intervals = None
     else:
@@ -200,7 +200,7 @@ def _train(s3_fs, experiment_definition, write_path, random_seed=None):
 
     for h in time_horizons:
 
-        model, bootstrap_models = _train_model(df=df, model_name="h-{}".format(h), random_seed=random_seed,
+        model, bootstrap_models = _train_model(df=df, model_name="h-{}".format(h), random_state=random_state,
                      features=features, target=experiment_definition["target"],
                      bootstrap_sample=bootstrap_sample, confidence_intervals=confidence_intervals,
                      link_function=link_function, write_open=write_open, write_path=write_path)
@@ -213,6 +213,6 @@ def _train(s3_fs, experiment_definition, write_path, random_seed=None):
             split_model = _train_model(df=df_train, model_name="s-{}_h-{}".format(
                 pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
                 h
-            ), random_seed=random_seed,
+            ), random_state=random_state,
                          features=features, target=experiment_definition["target"],
                          link_function=link_function, write_open=write_open, write_path=write_path)

@@ -1,6 +1,8 @@
 from sklearn.base import BaseEstimator
 from sklearn.pipeline import Pipeline
 import dask.dataframe as dd
+from dask.distributed import Client
+from dask_cloudprovider.aws import EC2Cluster
 from dask_ml.linear_model import LinearRegression
 from jsonschema import validate
 from functools import wraps
@@ -99,8 +101,43 @@ def cull_empty_partitions(df):
 def validate_experiment_definition(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        with open(pathlib.Path(pathlib.Path(__file__).parent, 'config/fd_schema.json'), 'r') as f:
+        with open(pathlib.Path(pathlib.Path(__file__).parent, 'config/ed_schema.json'), 'r') as f:
             validate(instance={'experiment_definition': kwargs['experiment_definition']}, schema=json.load(f))
         return func(*args, **kwargs)
 
     return wrapper
+
+
+def get_dask_client(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not "aws_workers" in kwargs:
+            with Client():
+                return func(*args, **kwargs)
+        else:
+            aws_workers = kwargs["aws_workers"]
+            if not "ec2_key" in kwargs:
+                ec2_key = None
+            else:
+                ec2_key = kwargs["ec2_key"]
+            if not "keep_alive" in kwargs:
+                keep_alive = False
+            else:
+                keep_alive = kwargs["keep_alive"]
+            with EC2Cluster(
+                        key_name=ec2_key,
+                        security=False,
+                        docker_image="jhurdle/divina:latest",
+                        env_vars={
+                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                            "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
+                        },
+                        auto_shutdown=not keep_alive,
+                ) as cluster:
+                    cluster.scale(aws_workers)
+                    with Client(cluster) as client:
+                        return func(*args, **kwargs)
+
+    return wrapper
+

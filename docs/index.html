@@ -16,7 +16,7 @@
     <script src="_static/js/docs.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="CLI documentation" href="cli.html" />
+    <link rel="next" title="quickstart" href="quickstart.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -35,7 +35,7 @@
             
   <span class="target" id="module-divina"></span><div class="section" id="divina">
 <h1>divina<a class="headerlink" href="#divina" title="Permalink to this headline">¶</a></h1>
-<p><strong>Date</strong>: Nov 23, 2021 <strong>Version</strong>: </p>
+<p><strong>Date</strong>: Nov 26, 2021 <strong>Version</strong>: </p>
 <p><strong>Useful links</strong>:
 <a class="reference external" href="https://pypi.org/project/divina">Binary Installers</a> |
 <a class="reference external" href="https://github.com/secrettoad/divina">Source Repository</a> |
@@ -43,8 +43,10 @@
 <a class="reference external" href="https://stackoverflow.com/questions/tagged/divina">Q&amp;A Support</a></p>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="cli.html">CLI documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="experiments.html">experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws.html">aws</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">documentation</a></li>
 </ul>
 </div>
 <p><a class="reference internal" href="#module-divina" title="divina"><code class="xref py py-mod docutils literal notranslate"><span class="pre">divina</span></code></a> is an open source, BSD3-licensed library providing scalable and hyper-interpretable causal forecasting capabilities written in <a class="reference external" href="https://www.python.org/">Python</a> and consumable via CLI.</p>
@@ -55,17 +57,6 @@
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install divina
 </pre></div>
 </div>
-</div>
-<div class="section" id="use">
-<h2>Use<a class="headerlink" href="#use" title="Permalink to this headline">¶</a></h2>
-<p><a class="reference internal" href="#module-divina" title="divina"><code class="xref py py-mod docutils literal notranslate"><span class="pre">divina</span></code></a> is consumable via CLI, or command line interface. In order to run an experiment with <a class="reference internal" href="#module-divina" title="divina"><code class="xref py py-mod docutils literal notranslate"><span class="pre">divina</span></code></a>, first create your experiment definition and then run the below command in your console of choice.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>divina experiment /path/to/my/experiment_definition.json
-</pre></div>
-</div>
-</div>
-<div class="section" id="experiment-definitions">
-<h2>Experiment Definitions<a class="headerlink" href="#experiment-definitions" title="Permalink to this headline">¶</a></h2>
-<p>Experiment configuration with <a class="reference internal" href="#module-divina" title="divina"><code class="xref py py-mod docutils literal notranslate"><span class="pre">divina</span></code></a> has been abstracted completely to a JSON file called the experiment definition that the user supplies to the <a class="reference internal" href="#module-divina" title="divina"><code class="xref py py-mod docutils literal notranslate"><span class="pre">divina</span></code></a> cli. For an exhaustive example of an experiment definition with every available option described in detail, check out the experiment definition documentation. Or if you are new to divina, check out the get started page.</p>
 </div>
 <div class="section" id="getting-started">
 <h2>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this headline">¶</a></h2>
@@ -79,112 +70,13 @@
 <span class="p">}</span>
 </pre></div>
 </div>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-  <span class="nt">&quot;experiment_definition&quot;</span><span class="p">:</span> <span class="p">{</span>
-    <span class="nt">&quot;target&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;signal_dimensions&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">],</span>
-    <span class="nt">&quot;link_function&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;time_horizons&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;&lt;integer&gt;&quot;</span><span class="p">],</span>
-    <span class="nt">&quot;time_index&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;include_features&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">],</span>
-    <span class="nt">&quot;drop_features&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">],</span>
-    <span class="nt">&quot;time_validation_splits&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">],</span>
-    <span class="nt">&quot;train_end&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;train_end&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;forecast_end&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;forecast_end&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;validation_end&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;validation_end&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;encode_features&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">],</span>
-    <span class="nt">&quot;scenarios&quot;</span><span class="p">:</span> <span class="p">[</span>
-        <span class="p">{</span>
-          <span class="nt">&quot;feature&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-          <span class="nt">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;&lt;string, integer, float&gt;&quot;</span><span class="p">],</span>
-          <span class="nt">&quot;start&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-          <span class="nt">&quot;end&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span>
-        <span class="p">}</span>
-    <span class="p">],</span>
-    <span class="nt">&quot;scenario_freq&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;data_path&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-    <span class="nt">&quot;confidence_intervals&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;&lt;integer&gt;&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;integer&gt;&quot;</span><span class="p">],</span>
-    <span class="nt">&quot;joins&quot;</span><span class="p">:</span> <span class="p">[</span>
-      <span class="p">{</span>
-        <span class="nt">&quot;data_path&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;join_on&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;string&gt;&quot;</span><span class="p">],</span>
-        <span class="nt">&quot;as&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;string&gt;&quot;</span>
-      <span class="p">}</span>
-    <span class="p">]</span>
-    <span class="nt">&quot;bootstrap_sample&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;integer&gt;&quot;</span><span class="p">,</span>
-  <span class="p">}</span>
-<span class="p">}</span>
+</div>
+<div class="section" id="use">
+<h2>Use<a class="headerlink" href="#use" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference internal" href="#module-divina" title="divina"><code class="xref py py-mod docutils literal notranslate"><span class="pre">divina</span></code></a> is consumable via CLI, or command line interface. In order to run an experiment with <a class="reference internal" href="#module-divina" title="divina"><code class="xref py py-mod docutils literal notranslate"><span class="pre">divina</span></code></a>, first create your experiment definition and then run the below command in your console of choice.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>divina experiment /path/to/my/experiment_definition.json
 </pre></div>
 </div>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-    <span class="nt">&quot;experiment_definition&quot;</span><span class="p">:</span> <span class="p">{</span>
-        <span class="nt">&quot;time_index&quot;</span><span class="p">:</span> <span class="s2">&quot;Date&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;target&quot;</span><span class="p">:</span> <span class="s2">&quot;Sales&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;include_features&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Store&quot;</span><span class="p">,</span> <span class="s2">&quot;Promo&quot;</span><span class="p">,</span> <span class="s2">&quot;Weekday&quot;</span><span class="p">,</span>
-                             <span class="s2">&quot;LastDayOfMonth&quot;</span><span class="p">],</span>
-        <span class="nt">&quot;time_validation_splits&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;2015-07-18&quot;</span><span class="p">],</span>
-        <span class="nt">&quot;forecast_end&quot;</span><span class="p">:</span> <span class="s2">&quot;2015-08-30&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;bootstrap_sample&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
-        <span class="nt">&quot;signal_dimensions&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Store&quot;</span><span class="p">],</span>
-        <span class="nt">&quot;time_horizons&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">2</span><span class="p">],</span>
-        <span class="nt">&quot;forecast_freq&quot;</span><span class="p">:</span> <span class="s2">&quot;D&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;encode_features&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Weekday&quot;</span><span class="p">,</span> <span class="s2">&quot;Store&quot;</span><span class="p">],</span>
-        <span class="nt">&quot;scenarios&quot;</span><span class="p">:</span> <span class="p">[{</span><span class="nt">&quot;feature&quot;</span><span class="p">:</span> <span class="s2">&quot;Promo&quot;</span><span class="p">,</span> <span class="nt">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="nt">&quot;start&quot;</span><span class="p">:</span> <span class="s2">&quot;2015-08-01&quot;</span><span class="p">,</span> <span class="nt">&quot;end&quot;</span><span class="p">:</span> <span class="s2">&quot;2016-01-01&quot;</span><span class="p">}],</span>
-        <span class="nt">&quot;dataset_directory&quot;</span><span class="p">:</span> <span class="s2">&quot;divina://retail_sales&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;link_function&quot;</span><span class="p">:</span> <span class="s2">&quot;log&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;confidence_intervals&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
-        <span class="nt">&quot;joins&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="p">{</span>
-                <span class="nt">&quot;dataset_directory&quot;</span><span class="p">:</span> <span class="s2">&quot;divina://time&quot;</span><span class="p">,</span>
-                <span class="nt">&quot;join_on&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Date&quot;</span><span class="p">,</span> <span class="s2">&quot;Date&quot;</span><span class="p">],</span>
-                <span class="nt">&quot;as&quot;</span><span class="p">:</span> <span class="s2">&quot;time&quot;</span>
-            <span class="p">}</span>
-        <span class="p">]</span>
-    <span class="p">}</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-<p><strong>Experiment Persistence</strong></p>
-<p>Experiment artifacts are persisted either locally or to S3 depending on the use of the <cite>–aws</cite> flag as structured below.</p>
-<blockquote>
-<div><dl>
-<dt>experiment path</dt><dd><p><a href="#id1"><span class="problematic" id="id2">|</span></a>- models
-|    |
-|    - h_{forecast horizon}
-|           <a href="#id3"><span class="problematic" id="id4">|</span></a>-fit_model.joblib
-|           <a href="#id5"><span class="problematic" id="id6">|</span></a>-bootstrap
-|                |
-|                <a href="#id7"><span class="problematic" id="id8">|</span></a>- bootstrap_model_{random seed}
-|
-<a href="#id9"><span class="problematic" id="id10">|</span></a>- forecast
-|    |
-|    <a href="#id11"><span class="problematic" id="id12">|</span></a>- common_meta.parquet
-|    <a href="#id13"><span class="problematic" id="id14">|</span></a>- forecast_partition_0_meta.parquet
-|    <a href="#id15"><span class="problematic" id="id16">|</span></a>- forecast_partition_0.parquet
-|     …
-|
-<a href="#id17"><span class="problematic" id="id18">|</span></a>- validation</p>
-<blockquote>
-<div><div class="line-block">
-<div class="line"><br /></div>
-</div>
-<p><a href="#id19"><span class="problematic" id="id20">|</span></a>- metrics.json
-- {validation split}</p>
-<blockquote>
-<div><div class="line-block">
-<div class="line"><br /></div>
-</div>
-<p><a href="#id21"><span class="problematic" id="id22">|</span></a>- validation_partition_0_meta.parquet
-<a href="#id23"><span class="problematic" id="id24">|</span></a>- validation_partition_0.parquet
- …</p>
-</div></blockquote>
-</div></blockquote>
-</dd>
-</dl>
-</div></blockquote>
 </div>
 </div>
 
@@ -206,15 +98,17 @@
 
 <h3>Navigation</h3>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="cli.html">CLI documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="experiments.html">experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws.html">aws</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">documentation</a></li>
 </ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="#">Documentation overview</a><ul>
-      <li>Next: <a href="cli.html" title="next chapter">CLI documentation</a></li>
+      <li>Next: <a href="quickstart.html" title="next chapter">quickstart</a></li>
   </ul></li>
 </ul>
 </div>
