@@ -6,8 +6,6 @@ quickstart
 
 **Date**: |today| **Version**: |version|
 
-divina in 5 minutes
-
 Getting Started
 ###############
 
