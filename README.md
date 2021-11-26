@@ -23,10 +23,12 @@ At its core, divina aims to reduce the complexity and increase the consistency o
 ## Main Features
 Here are just a few of the things that divina does well:
 
+  - Abstraction of all necessary configuration of an experiment, from feature selection and engineering to target transformations and confidence intervals, is abstracted to a single JSON file for ease of consumption and ease of transparency.
+  - A user-centric, two-way [**interpretation interface**][interpretation] that allows for granular interpretation of models and predictions while also allowing domain experts to override factors.
   - Abstracted and scalable feature engineering. Encoding, interaction, normalization, binning and joining of datasets are handled scalably by the Dask back-end with minimal configuration required by the user.
   - Simulation of user-defined factors in support of forward-looking, multi-signal and decision-enabling causal forecasts.   
   - Automatic persistence of all experiment artifacts, including models, predictions and validation metrics, to s3 for posterity, traceability and easy integration.
-  - A user-centric, two-way [**interpretation interface**][interpretation] that allows for granular interpretation of models and predictions while also allowing domain experts to override factors.
+  
   
   [interpretation]: https://github.com/secrettoad/divina
   

@@ -1,7 +1,7 @@
 :noindex:
 
 ********************
-CLI documentation
+documentation
 ********************
 
 **Date**: |today| **Version**: |version|
@@ -9,5 +9,3 @@ CLI documentation
 .. click:: divina.cli.cli:divina
    :prog: divina
    :nested: full
-
-
