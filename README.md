@@ -65,7 +65,7 @@ pip install divina
 [BSD 3](LICENSE)
 
 ## Documentation
-Divina' documentation is available [here](https://secrettoad.github.io/divina/#). 
+``divina``'s documentation is available [here](https://secrettoad.github.io/divina/#). 
 
 ## Background
 Work on ``divina`` started at [Coysu Consulting](https://www.coysu.com/) (a technology consulting firm) in 2020 and
