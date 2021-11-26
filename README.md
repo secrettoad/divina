@@ -17,7 +17,7 @@
 
 **divina** is a Python package that provides scalable, interpretable and performant forecasting capabilities designed to make causal forecasting modular, efficient and simple.
 It aims to reduce the challenge of causal forecasting on datasets of any size to configuration via JSON as opposed to construction and consumption of Python objects. 
-At its core, divina aims reduce the complexity and increase the consistency of causal forecasting at scale.
+At its core, divina aims to reduce the complexity and increase the consistency of performant causal forecasting at scale.
 
 
 ## Main Features
