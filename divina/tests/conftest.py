@@ -121,99 +121,11 @@ def dask_client_remote(request, dask_cluster_ip):
         )
         cluster.scale(5)
         client = Client(cluster)
-        request.addfinalizer(lambda: client.close())
+        if not dask_cluster_ip:
+            request.addfinalizer(lambda: client.close())
         yield client
         if not dask_cluster_ip:
             client.shutdown()
-
-
-@pytest.fixture()
-def ed_no_data_path():
-    return {
-        "experiment_definition": {
-            "target": "c",
-            "time_index": "a",
-            "time_validation_splits": ["1970-01-01 00:00:08"],
-            "time_horizons": [1],
-        }
-    }
-
-
-@pytest.fixture()
-def ed_invalid_model():
-    return {
-        "experiment_definition": {
-            "target": "c",
-            "time_index": "a",
-            "data_path": "divina-test/dataset/test1",
-            "model": "scikitlearn.linear_models.linearRegression",
-            "time_validation_splits": ["1970-01-01 00:00:08"],
-            "time_horizons": [1],
-        }
-    }
-
-
-@pytest.fixture()
-def ed_no_time_index():
-    return {
-        "experiment_definition": {
-            "target": "c",
-            "data_path": "divina-test/dataset/test1",
-            "time_validation_splits": ["1970-01-01 00:00:08"],
-            "time_horizons": [1],
-        }
-    }
-
-
-@pytest.fixture()
-def ed_no_target():
-    return {
-        "experiment_definition": {
-            "time_index": "a",
-            "data_path": "divina-test/dataset/test1",
-            "time_validation_splits": ["1970-01-01 00:00:08"],
-            "time_horizons": [1],
-        }
-    }
-
-
-@pytest.fixture()
-def ed_time_validation_splits_not_list():
-    return {
-        "experiment_definition": {
-            "time_index": "a",
-            "target": "c",
-            "time_validation_splits": "1970-01-01 00:00:08",
-            "time_horizons": [1],
-            "data_path": "divina-test/dataset/test1",
-        }
-    }
-
-
-@pytest.fixture()
-def ed_time_horizons_not_list():
-    return {
-        "experiment_definition": {
-            "time_index": "a",
-            "target": "c",
-            "time_validation_splits": ["1970-01-01 00:00:08"],
-            "time_horizons": 1,
-            "data_path": "divina-test/dataset/test1",
-        }
-    }
-
-
-@pytest.fixture()
-def ed_time_horizons_range_not_tuple():
-    return {
-        "experiment_definition": {
-            "time_index": "a",
-            "target": "c",
-            "time_validation_splits": ["1970-01-01 00:00:08"],
-            "time_horizons": [[1, 60]],
-            "data_path": "divina-test/dataset/test1",
-        }
-    }
 
 
 @pytest.fixture()
@@ -270,7 +182,7 @@ def test_validation_models(test_df_1, random_state, test_ed_1):
     params = [[4.086805634357628, 0.7618639411983616, -1.6591807041382545]]
     intercepts = [1.6591672730002625]
     features = [['b', 'b_(5, 10]', 'b_(15, inf]']]
-    splits = test_ed_1["experiment_definition"]["time_validation_splits"]
+    splits = test_ed_1["experiment_definition"]["validation_splits"]
     validation_models = {}
 
     for j, i, p, f, split in zip(range(0, len(splits)), intercepts, params, features, splits):
@@ -295,7 +207,7 @@ def test_params_2(test_model_1):
 
 @pytest.fixture()
 def test_metrics_1():
-    return {'splits': {'1970-01-01 00:00:07': {'time_horizons': {'1': {'mae': 19.349425665160247}}}}}
+    return {'splits': {'1970-01-01 00:00:07': {'time_horizons': {1: {'mae': 19.349425665160247}}}}}
 
 
 @pytest.fixture()
@@ -410,7 +322,7 @@ def test_ed_1():
         "experiment_definition": {
             "time_index": "a",
             "target": "c",
-            "time_validation_splits": ["1970-01-01 00:00:07"],
+            "validation_splits": ["1970-01-01 00:00:07"],
             "validate_start": "1970-01-01 00:00:01",
             "validate_end": "1970-01-01 00:00:09",
             "forecast_start": "1970-01-01 00:00:05",
@@ -443,7 +355,7 @@ def test_ed_2():
         "experiment_definition": {
             "time_index": "a",
             "target": "c",
-            "time_validation_splits": ["1970-01-01 00:00:08"],
+            "validation_splits": ["1970-01-01 00:00:08"],
             "time_horizons": [1],
             "data_path": "divina-test/dataset/test1",
             "joins": [

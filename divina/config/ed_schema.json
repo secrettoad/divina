@@ -326,10 +326,10 @@
                     "type": "object",
                     "additionalProperties": true
                 },
-                "time_validation_splits": {
-                    "$id": "#/properties/experiment_definition/properties/time_validation_splits",
+                "validation_splits": {
+                    "$id": "#/properties/experiment_definition/properties/validation_splits",
                     "type": "array",
-                    "title": "The time_validation_splits schema",
+                    "title": "The validation_splits schema",
                     "description": "An explanation about the purpose of this instance.",
                     "default": [],
                     "examples": [
@@ -339,10 +339,10 @@
                     ],
                     "additionalItems": true,
                     "items": {
-                        "$id": "#/properties/experiment_definition/properties/time_validation_splits/items",
+                        "$id": "#/properties/experiment_definition/properties/validation_splits/items",
                         "anyOf": [
                             {
-                                "$id": "#/properties/experiment_definition/properties/time_validation_splits/items/anyOf/0",
+                                "$id": "#/properties/experiment_definition/properties/validation_splits/items/anyOf/0",
                                 "type": "string",
                                 "title": "The first anyOf schema",
                                 "description": "An explanation about the purpose of this instance.",

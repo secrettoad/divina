@@ -38,7 +38,7 @@
       "HolidayType",
       "Assortment"
     ],
-    "time_validation_splits": [
+    "validation_splits": [
       "2015-07-18"
     ],
     "interaction_features": {

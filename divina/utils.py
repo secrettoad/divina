@@ -13,8 +13,9 @@ import os
 import s3fs
 
 
-def get_parameters(s3_fs, model_path):
+def get_parameters(model_path):
     if model_path[:5] == "s3://":
+        s3_fs = s3fs.S3FileSystem()
         if not s3_fs.exists(model_path):
             s3_fs.mkdir(
                 model_path,
@@ -34,8 +35,9 @@ def get_parameters(s3_fs, model_path):
         return params
 
 
-def set_parameters(s3_fs, model_path, params):
+def set_parameters(model_path, params):
     if model_path[:5] == "s3://":
+        s3_fs = s3fs.S3FileSystem()
         if not s3_fs.exists(model_path):
             s3_fs.mkdir(
                 model_path,
@@ -125,6 +127,8 @@ def create_write_directory(func):
         else:
             path = pathlib.Path(write_path)
             path.mkdir(exist_ok=True, parents=True)
+            pathlib.Path(path, 'models/bootstrap').mkdir(exist_ok=True, parents=True)
+            pathlib.Path(path, 'models/validation').mkdir(exist_ok=True, parents=True)
         return func(*args, **kwargs)
     return wrapper
 
