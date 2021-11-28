@@ -10,6 +10,7 @@ import pathlib
 import numpy as np
 import json
 import os
+import s3fs
 
 
 def get_parameters(s3_fs, model_path):
@@ -105,6 +106,26 @@ def validate_experiment_definition(func):
             validate(instance={'experiment_definition': kwargs['experiment_definition']}, schema=json.load(f))
         return func(*args, **kwargs)
 
+    return wrapper
+
+
+def create_write_directory(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        write_path = kwargs["write_path"]
+        s3_fs = s3fs.S3FileSystem()
+        if write_path[:5] == "s3://":
+            if not s3_fs.exists(write_path):
+                s3_fs.mkdir(
+                    write_path,
+                    create_parents=True,
+                    region_name=os.environ["AWS_DEFAULT_REGION"],
+                    acl="private",
+                )
+        else:
+            path = pathlib.Path(write_path)
+            path.mkdir(exist_ok=True, parents=True)
+        return func(*args, **kwargs)
     return wrapper
 
 
