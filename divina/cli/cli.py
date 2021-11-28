@@ -1,5 +1,5 @@
 import click
-from ..utils import get_parameters, set_parameters
+from ..utils import get_parameters, set_parameters, validate_experiment_definition
 import sys
 import json
 import s3fs
@@ -35,7 +35,6 @@ def experiment(experiment_def, keep_alive, ec2_key, write_path, aws_workers, ran
     """
     experiment_def = json.load(experiment_def)['experiment_definition']
     _experiment(
-                    s3_fs=s3fs.S3FileSystem(),
                     experiment_definition=experiment_def,
                     read_path=write_path,
                     write_path=write_path,
@@ -67,9 +66,9 @@ def train(
     :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
     experiment_def = json.load(experiment_def)['experiment_definition']
+    validate_experiment_definition(experiment_def)
     _train(
-        s3_fs=s3fs.S3FileSystem(),
-        experiment_definition=json.load(experiment_def),
+        experiment_definition=experiment_def,
         write_path=write_path,
         random_state=random_state
     )
@@ -97,9 +96,10 @@ def forecast(
     :aws_workers: optionally run experiment on EC2 cluster of specified size
     :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
+    experiment_def = json.load(experiment_def)['experiment_definition']
+    validate_experiment_definition(experiment_def)
     _forecast(
-        s3_fs=s3fs.S3FileSystem(),
-        experiment_definition=json.load(experiment_def),
+        experiment_definition=experiment_def,
         write_path=write_path,
         read_path=read_path,
     )
@@ -131,9 +131,10 @@ def validate(
     :aws_workers: optionally run experiment on EC2 cluster of specified size
     :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
+    experiment_def = json.load(experiment_def)['experiment_definition']
+    validate_experiment_definition(experiment_def)
     _validate(
-        s3_fs=s3fs.S3FileSystem(),
-        experiment_definition=json.load(experiment_def),
+        experiment_definition=experiment_def,
         write_path=write_path,
         read_path=read_path,
     )
@@ -146,8 +147,8 @@ def get_params(
 ):
     """:model_path: s3:// or aws path to model to get parameters from
     """
-    get_parameters(s3_fs=s3fs.S3FileSystem(), model_path=model_path)
-    sys.stdout.write(get_parameters(s3_fs=s3fs.S3FileSystem(), model_path=model_path))
+    get_parameters(model_path=model_path)
+    sys.stdout.write(get_parameters(model_path=model_path))
 
 
 @click.argument("model_path", required=True)
@@ -160,4 +161,4 @@ def set_params(
     :params: dictionary of trained model parameters to update
     """
 
-    sys.stdout.write(set_parameters(s3_fs=s3fs.S3FileSystem(), model_path=model_path, params=params))
+    sys.stdout.write(set_parameters(model_path=model_path, params=params))
