@@ -1,13 +1,8 @@
 import click
-from ..utils import get_parameters, set_parameters, validate_experiment_definition
+from ..utils import get_parameters, set_parameters, validate_experiment_definition, get_dask_client
 import sys
 import json
-import s3fs
-from utils import get_dask_client
-from ..train import _train
-from ..forecast import _forecast
-from ..validate import _validate
-from ..experiment import _experiment
+from ..experiment import Experiment
 
 @click.group()
 def divina():
@@ -67,8 +62,8 @@ def train(
     """
     experiment_def = json.load(experiment_def)['experiment_definition']
     validate_experiment_definition(experiment_def)
-    _train(
-        experiment_definition=experiment_def,
+    experiment = Experiment(**experiment_def)
+    experiment.train(
         write_path=write_path,
         random_state=random_state
     )
@@ -98,7 +93,8 @@ def forecast(
     """
     experiment_def = json.load(experiment_def)['experiment_definition']
     validate_experiment_definition(experiment_def)
-    _forecast(
+    experiment = Experiment(**experiment_def)
+    experiment.forecast(
         experiment_definition=experiment_def,
         write_path=write_path,
         read_path=read_path,
@@ -133,7 +129,8 @@ def validate(
     """
     experiment_def = json.load(experiment_def)['experiment_definition']
     validate_experiment_definition(experiment_def)
-    _validate(
+    experiment = Experiment(**experiment_def)
+    experiment.validate(
         experiment_definition=experiment_def,
         write_path=write_path,
         read_path=read_path,

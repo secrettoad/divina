@@ -1,45 +1,12 @@
 import os
 import json
-from ..train import _train
-from ..forecast import _forecast
-from ..dataset import _get_dataset
-from ..validate import _validate
-from ..experiment import _experiment
-import pathlib
 from ..utils import compare_sk_models, get_parameters, set_parameters
+from ..experiment import Experiment
+import pathlib
 import joblib
 import pandas as pd
 import dask.dataframe as ddf
-from jsonschema import validate
-from jsonschema.exceptions import ValidationError
 import plotly.graph_objects as go
-
-
-def test_validate_experiment_definition(
-        ed_no_target,
-        ed_time_horizons_not_list,
-        ed_time_validation_splits_not_list,
-        ed_no_time_index,
-        ed_no_data_path,
-        ed_invalid_model,
-        ed_time_horizons_range_not_tuple
-):
-    for dd in [
-        ed_no_target,
-        ed_no_time_index,
-        ed_time_validation_splits_not_list,
-        ed_time_horizons_not_list,
-        ed_no_data_path,
-        ed_invalid_model,
-        ed_time_horizons_range_not_tuple
-    ]:
-        try:
-            with open(pathlib.Path(pathlib.Path(__file__).parent.parent, 'config/ed_schema.json'), 'r') as f:
-                validate(instance=dd, schema=json.load(f))
-        except ValidationError:
-            return None
-        else:
-            assert False
 
 
 def test_get_composite_dataset(
@@ -64,8 +31,8 @@ def test_get_composite_dataset(
 
         test_ed_2["experiment_definition"]["joins"][0]["data_path"]
     )
-    df = _get_dataset(test_ed_2["experiment_definition"])
-
+    experiment = Experiment(**test_ed_2["experiment_definition"])
+    df = experiment.get_dataset()
     pd.testing.assert_frame_equal(df.compute().reset_index(drop=True), test_composite_dataset_1.reset_index(drop=True))
 
 
@@ -78,76 +45,29 @@ def test_train(s3_fs, test_df_1, test_ed_1, test_model_1, dask_client, test_boot
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
         test_ed_1["experiment_definition"]["data_path"]
     )
-    _train(
-        s3_fs=s3_fs,
-        experiment_definition=test_ed_1["experiment_definition"],
+    experiment = Experiment(**test_ed_1["experiment_definition"])
+    experiment.train(
         write_path=experiment_path,
         random_state=random_state,
     )
 
     compare_sk_models(
-        joblib.load(
-            os.path.abspath(
-                os.path.join(
-                    experiment_path,
-                    "models",
-                    "h-1",
-                )
-            )
-        ),
+        experiment.models['horizons'][1]['base'][0],
         test_model_1[0],
     )
-    with open(os.path.abspath(
-            os.path.join(
-                experiment_path,
-                "models",
-                "h-1_params.json",
-            )
-    )) as f:
-        assert json.load(f) == test_model_1[1]
+    assert experiment.models['horizons'][1]['base'][1] == test_model_1[1]['features']
     for state in test_bootstrap_models:
         compare_sk_models(
-            joblib.load(
-                os.path.abspath(
-                    os.path.join(
-                        experiment_path,
-                        "models/bootstrap",
-                        "h-1_r-{}".format(state),
-                    )
-                )
-            ),
+            experiment.models['horizons'][1]['bootstrap'][state][0],
             test_bootstrap_models[state][0],
         )
-        with open(os.path.abspath(
-                os.path.join(
-                    experiment_path,
-                    "models/bootstrap",
-                    "h-1_r-{}_params.json".format(state),
-                )
-        )) as f:
-            assert json.load(f) == test_bootstrap_models[state][1]
+        assert experiment.models['horizons'][1]['bootstrap'][state][1] == test_bootstrap_models[state][1]['features']
     for split in test_validation_models:
         compare_sk_models(
-            joblib.load(
-                os.path.abspath(
-                    os.path.join(
-                        experiment_path,
-                        "models",
-                        "s-{}_h-1".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
-                    )
-                )
-            ),
+            experiment.models['horizons'][1]['splits'][split][0],
             test_validation_models[split][0],
         )
-        with open(os.path.abspath(
-                os.path.join(
-                    experiment_path,
-                    "models",
-                    "s-{}_h-1_params.json".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
-                )
-        )) as f:
-            features = json.load(f)
-        assert features == test_validation_models[split][1]
+        assert experiment.models['horizons'][1]['splits'][split][1] == test_validation_models[split][1]['features']
 
 
 def test_forecast(
@@ -199,20 +119,13 @@ def test_forecast(
                 test_bootstrap_models[state][1],
                 f
             )
-
-    _forecast(
-        s3_fs=s3_fs,
-        experiment_definition=test_ed_1["experiment_definition"],
+    experiment = Experiment(**test_ed_1["experiment_definition"])
+    experiment.forecast(
         read_path=experiment_path,
         write_path=experiment_path,
     )
     pd.testing.assert_frame_equal(
-        ddf.read_parquet(
-            os.path.join(
-                experiment_path,
-                "forecast"
-            )
-        ).compute().reset_index(drop=True),
+        experiment.predictions.compute().reset_index(drop=True),
         test_forecast_1.reset_index(drop=True), check_dtype=False
     )
 
@@ -268,31 +181,16 @@ def test_validate(
                 test_bootstrap_models[state][1],
                 f
             )
-    _validate(
-        s3_fs=s3_fs,
-        experiment_definition=test_ed_1["experiment_definition"],
+    experiment = Experiment(**test_ed_1["experiment_definition"])
+    experiment.validate(
         read_path=experiment_path,
-        write_path=experiment_path,
+        write_path=experiment_path
     )
-    pd.testing.assert_frame_equal(
-        ddf.read_parquet(
-            os.path.join(
-                experiment_path,
-                "validation",
-                "s-19700101-000007",
-            )
-        ).compute().reset_index(drop=True),
-        test_val_predictions_1.reset_index(drop=True), check_dtype=False
-    )
-    with open(
-            os.path.join(experiment_path, "metrics.json"),
-            "r",
-    ) as f:
-        assert json.load(f) == test_metrics_1
+    assert experiment.metrics == test_metrics_1
 
 
 def test_get_params(
-        s3_fs, test_model_1, test_params_1
+        test_model_1, test_params_1
 ):
     experiment_path = "divina-test/experiment/test1"
     pathlib.Path(os.path.join(experiment_path, "models")).mkdir(
@@ -312,7 +210,7 @@ def test_get_params(
             "s-19700101-000007_h-1_params",
     ), 'w+') as f:
         json.dump(test_model_1[1], f)
-    params = get_parameters(s3_fs=s3_fs, model_path=os.path.join(
+    params = get_parameters(model_path=os.path.join(
         experiment_path,
         "models",
         "s-19700101-000007_h-1",
@@ -322,7 +220,7 @@ def test_get_params(
 
 
 def test_set_params(
-        s3_fs, test_model_1, test_params_1, test_params_2
+        test_model_1, test_params_1, test_params_2
 ):
     experiment_path = "divina-test/experiment/test1"
     pathlib.Path(os.path.join(experiment_path, "models")).mkdir(
@@ -342,7 +240,7 @@ def test_set_params(
             "s-19700101-000007_h-1_params",
     ), 'w+') as f:
         json.dump(test_params_1, f)
-    set_parameters(s3_fs=s3_fs, model_path=os.path.join(
+    set_parameters(model_path=os.path.join(
         experiment_path,
         "models",
         "s-19700101-000007_h-1",
@@ -362,18 +260,12 @@ def test_quickstart(test_eds_quickstart, random_state):
     for k in test_eds_quickstart:
         ed = test_eds_quickstart[k]
         experiment_path = "divina-test/experiment/test1"
-        _experiment(
-            experiment_definition=ed["experiment_definition"],
-            read_path=experiment_path,
+        experiment = Experiment(**ed["experiment_definition"])
+        experiment.run(
             write_path=experiment_path,
             random_state=11
         )
-        result_df = ddf.read_parquet(
-            os.path.join(
-                experiment_path,
-                "forecast"
-            )
-        ).compute().reset_index(drop=True)
+        result_df = experiment.predictions.compute().reset_index(drop=True)
         ###RESET
         '''ddf.read_parquet(
             os.path.join(

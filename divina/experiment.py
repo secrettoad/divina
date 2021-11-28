@@ -3,10 +3,10 @@ import dask.dataframe as dd
 import joblib
 import backoff
 from botocore.exceptions import ClientError
-from .datasets.load import _load
+from datasets.load import _load
 import os
 from functools import partial
-from .utils import validate_experiment_definition, create_write_directory, cull_empty_partitions
+from .utils import create_write_directory, cull_empty_partitions
 import json
 import dask.array as da
 from pandas.api.types import is_numeric_dtype
@@ -14,21 +14,32 @@ import pandas as pd
 import numpy as np
 from dask_ml.linear_model import LinearRegression
 import s3fs
+from dask_ml.preprocessing import Categorizer, DummyEncoder
+from sklearn.pipeline import make_pipeline
+from itertools import product
 
 
 class Experiment():
-    def __init__(self, target, time_index, data_path, joins=None, encode_features=None, bin_features=None, interaction_features=None, time_horizons=None, train_start=None, train_end=None, forecast_start=None, forecast_end=None,
-                 validate_start=None, validate_end=None, validation_splits=None, link_function=None, confidence_intervals=None, bootstrap_sample=None):
+    def __init__(self, target, time_index, data_path, target_dimensions=None, include_features=None, drop_features=None, joins=None, encode_features=None, bin_features=None, interaction_features=None, time_horizons=None, train_start=None, train_end=None, forecast_start=None, forecast_end=None,
+                 validate_start=None, validate_end=None, validation_splits=None, link_function=None, confidence_intervals=None, bootstrap_sample=None, scenarios=None, frequency=None):
         if not time_horizons:
             self.time_horizons = [0]
         else:
+            horizon_ranges = [x for x in time_horizons if type(x) == tuple]
+            if len(horizon_ranges) > 0:
+                self.time_horizons = [x for x in time_horizons if type(x) == int]
+                for x in horizon_ranges:
+                    self.time_horizons = set(self.time_horizons + list(range(x[0], x[1])))
             self.time_horizons = time_horizons
         if not confidence_intervals:
             self.confidence_intervals = []
         else:
-            self.confidence_intervals = self.confidence_intervals
+            self.confidence_intervals = confidence_intervals
         self.data_path = data_path
+        self.target_dimensions = target_dimensions
         self.joins = joins
+        self.include_features = include_features
+        self.drop_features = drop_features
         self.encode_features = encode_features
         self.bin_features = bin_features
         self.interaction_features = interaction_features
@@ -43,17 +54,197 @@ class Experiment():
         self.target = target
         self.time_index = time_index
         self.bootstrap_sample = bootstrap_sample
+        self.scenarios = scenarios
+        self.frequency = frequency
+        self.models = {}
+        self.predictions = None
+        self.metrics = {}
+        self.validation = None
+
+    def _train_model(self, df, model_name, random_state, features, target,
+                     link_function, write_open, write_path, bootstrap_sample=None, confidence_intervals=None):
+        if random_state:
+            model = LinearRegression(random_state=random_state)
+        else:
+            model = LinearRegression()
+
+        df_train = df[~df[target].isnull()]
+        df_std = df_train[features].std().compute()
+        constant_columns = [c for c in df_std.index if df_std[c] == 0]
+        features = [
+            c
+            for c in features
+            if not c
+                   in constant_columns and is_numeric_dtype(df_train.dtypes[c])
+        ]
+
+        if link_function == "log":
+            model.fit(
+                df_train[features].to_dask_array(lengths=True),
+                da.log1p(
+                    df_train[target].to_dask_array(lengths=True)),
+            )
+        else:
+            model.fit(
+                df_train[features].to_dask_array(lengths=True),
+                df_train[target].to_dask_array(lengths=True))
+        with write_open(
+                "{}/models/{}".format(
+                    write_path,
+                    model_name
+                ),
+                "wb",
+        ) as f:
+            joblib.dump(model, f)
+        with write_open(
+                "{}/models/{}_params.json".format(
+                    write_path,
+                    model_name
+                ),
+                "w",
+        ) as f:
+            json.dump({"features": features}, f)
+
+        sys.stdout.write("Model persisted: {}\n".format(model_name))
+
+        if confidence_intervals:
+            if not bootstrap_sample:
+                bootstrap_sample = 30
+
+            def train_persist_bootstrap_model(features, df, target, link_function, model_name, random_state):
+
+                if random_state:
+                    df_train_bootstrap = df.sample(replace=False, frac=.8, random_state=random_state)
+                else:
+                    df_train_bootstrap = df.sample(replace=False, frac=.8)
+                if random_state:
+                    bootstrap_model = LinearRegression(random_state=random_state)
+                else:
+                    bootstrap_model = LinearRegression()
+                df_std_bootstrap = df_train_bootstrap[features].std().compute()
+                bootstrap_features = [c for c in features if not df_std_bootstrap.loc[c] == 0]
+                if link_function == 'log':
+                    bootstrap_model.fit(
+                        df_train_bootstrap[bootstrap_features].to_dask_array(lengths=True),
+                        da.log1p(df_train_bootstrap[target].to_dask_array(lengths=True)),
+                    )
+                else:
+                    bootstrap_model.fit(
+                        df_train_bootstrap[bootstrap_features].to_dask_array(lengths=True),
+                        df_train_bootstrap[target].to_dask_array(lengths=True),
+                    )
+                with write_open(
+                        "{}/models/bootstrap/{}_r-{}".format(
+                            write_path,
+                            model_name,
+                            random_state
+                        ),
+                        "wb",
+                ) as f:
+                    joblib.dump(bootstrap_model, f)
+
+                with write_open(
+                        "{}/models/bootstrap/{}_r-{}_params.json".format(
+                            write_path,
+                            model_name,
+                            random_state
+                        ),
+                        "w",
+                ) as f:
+                    json.dump(
+                        {"features": bootstrap_features}, f)
+
+                sys.stdout.write("Model persisted: {}_r-{}\n".format(model_name, random_state))
+
+                return (bootstrap_model, bootstrap_features)
+
+            if random_state:
+                states = [x for x in range(random_state, random_state + bootstrap_sample)]
+            else:
+                states = [x for x in np.random.randint(0, 10000, size=bootstrap_sample)]
+
+            bootstrap_models = {}
+            for state in states:
+                bootstrap_models[state] = train_persist_bootstrap_model(features, df_train,
+                                                  target,
+                                                  link_function,
+                                                  model_name, state)
+
+            return (model, features), bootstrap_models
+
+        else:
+
+            return (model, features)
+
+    @create_write_directory
+    @backoff.on_exception(backoff.expo, ClientError, max_time=30)
+    def train(self, write_path, random_state=None):
+
+        if write_path[:5] == "s3://":
+            s3_fs = s3fs.S3FileSystem()
+            write_open = s3_fs.open
+        else:
+            write_open = open
+
+        sys.stdout.write("Loading dataset\n")
+
+        df = self.get_dataset(start=self.train_start, end=self.train_end)
+
+        time_min, time_max = (
+            pd.to_datetime(str(df[self.time_index].min().compute())),
+            pd.to_datetime(str(df[self.time_index].max().compute())),
+        )
+
+        features = [
+            c
+            for c in df.columns
+            if not c
+                   in [
+                       "{}_h_{}".format(self.target, h)
+                       for h in self.time_horizons
+                   ]
+                   + [
+                       self.time_index,
+                       self.target,
+                   ]
+        ]
+
+        self.models = {'horizons': {h: {} for h in self.time_horizons}}
+        self.validation_models = {'horizons': {h: {} for h in self.time_horizons}}
+
+        for h in self.time_horizons:
+
+            model, bootstrap_models = self._train_model(df=df, model_name="h-{}".format(h), random_state=random_state,
+                                                        features=features, target=self.target,
+                                                        bootstrap_sample=self.bootstrap_sample,
+                                                        confidence_intervals=self.confidence_intervals,
+                                                        link_function=self.link_function, write_open=write_open,
+                                                        write_path=write_path)
+
+            self.models['horizons'][h]['base'] = model
+            self.models['horizons'][h]['bootstrap'] = bootstrap_models
+
+            if self.validation_splits:
+                for s in self.validation_splits:
+                    if pd.to_datetime(str(s)) <= time_min or pd.to_datetime(str(s)) >= time_max:
+                        raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
+                    df_train = df[df[self.time_index] < s]
+
+                    split_model = self._train_model(df=df_train, model_name="s-{}_h-{}".format(
+                        pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
+                        h
+                    ), random_state=random_state,
+                                                    features=features, target=self.target,
+                                                    link_function=self.link_function, write_open=write_open,
+                                                    write_path=write_path)
+
+                    self.models['horizons'][h]['splits'] = {}
+                    self.models['horizons'][h]['splits'][s] = split_model
 
     @create_write_directory
     @backoff.on_exception(backoff.expo, ClientError, max_time=30)
     def forecast(self, read_path, write_path):
-        forecast_df = _get_dataset(pad=True, start=self.forecast_start, end=self.forecast_end)
-
-        horizon_ranges = [x for x in self.time_horizons if type(x) == tuple]
-        if len(horizon_ranges) > 0:
-            time_horizons = [x for x in self.time_horizons if type(x) == int]
-            for x in horizon_ranges:
-                time_horizons = set(time_horizons + list(range(x[0], x[1])))
+        forecast_df = self.get_dataset(start=self.forecast_start, end=self.forecast_end)
 
         if read_path[:5] == "s3://":
             s3_fs = s3fs.S3FileSystem()
@@ -180,191 +371,18 @@ class Experiment():
                 )
             )
 
-    def _train_model(self, df, model_name, random_state, features, target,
-                     link_function, write_open, write_path, bootstrap_sample=None, confidence_intervals=None):
-        if random_state:
-            model = LinearRegression(random_state=random_state)
-        else:
-            model = LinearRegression()
-
-        df_train = df[~df[target].isnull()]
-        df_std = df_train[features].std().compute()
-        constant_columns = [c for c in df_std.index if df_std[c] == 0]
-        features = [
-            c
-            for c in features
-            if not c
-                   in constant_columns and is_numeric_dtype(df_train.dtypes[c])
-        ]
-
-        if link_function == "log":
-            model.fit(
-                df_train[features].to_dask_array(lengths=True),
-                da.log1p(
-                    df_train[target].to_dask_array(lengths=True)),
-            )
-        else:
-            model.fit(
-                df_train[features].to_dask_array(lengths=True),
-                df_train[target].to_dask_array(lengths=True))
-        with write_open(
-                "{}/models/{}".format(
-                    write_path,
-                    model_name
-                ),
-                "wb",
-        ) as f:
-            joblib.dump(model, f)
-        with write_open(
-                "{}/models/{}_params.json".format(
-                    write_path,
-                    model_name
-                ),
-                "w",
-        ) as f:
-            json.dump({"features": features}, f)
-
-        sys.stdout.write("Model persisted: {}\n".format(model_name))
-
-        if confidence_intervals:
-            if not bootstrap_sample:
-                bootstrap_sample = 30
-
-            def train_persist_bootstrap_model(features, df, target, link_function, model_name, random_state):
-
-                if random_state:
-                    df_train_bootstrap = df.sample(replace=False, frac=.8, random_state=random_state)
-                else:
-                    df_train_bootstrap = df.sample(replace=False, frac=.8)
-                if random_state:
-                    bootstrap_model = LinearRegression(random_state=random_state)
-                else:
-                    bootstrap_model = LinearRegression()
-                df_std_bootstrap = df_train_bootstrap[features].std().compute()
-                bootstrap_features = [c for c in features if not df_std_bootstrap.loc[c] == 0]
-                if link_function == 'log':
-                    bootstrap_model.fit(
-                        df_train_bootstrap[bootstrap_features].to_dask_array(lengths=True),
-                        da.log1p(df_train_bootstrap[target].to_dask_array(lengths=True)),
-                    )
-                else:
-                    bootstrap_model.fit(
-                        df_train_bootstrap[bootstrap_features].to_dask_array(lengths=True),
-                        df_train_bootstrap[target].to_dask_array(lengths=True),
-                    )
-                with write_open(
-                        "{}/models/bootstrap/{}_r-{}".format(
-                            write_path,
-                            model_name,
-                            random_state
-                        ),
-                        "wb",
-                ) as f:
-                    joblib.dump(bootstrap_model, f)
-
-                with write_open(
-                        "{}/models/bootstrap/{}_r-{}_params.json".format(
-                            write_path,
-                            model_name,
-                            random_state
-                        ),
-                        "w",
-                ) as f:
-                    json.dump(
-                        {"features": bootstrap_features}, f)
-
-                sys.stdout.write("Model persisted: {}_r-{}\n".format(model_name, random_state))
-
-                return (bootstrap_model, bootstrap_features)
-
-            if random_state:
-                states = [x for x in range(random_state, random_state + bootstrap_sample)]
-            else:
-                states = [x for x in np.random.randint(0, 10000, size=bootstrap_sample)]
-
-            bootstrap_models = []
-            for state in states:
-                bootstrap_models.append(
-                    train_persist_bootstrap_model(features, df_train,
-                                                  target,
-                                                  link_function,
-                                                  model_name, state))
-
-            return (model, features), bootstrap_models
-
-        else:
-
-            return (model, features)
+            self.predictions = forecast_df
 
     @create_write_directory
     @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-    def train(self, write_path, random_state=None):
-
-        if write_path[:5] == "s3://":
-            s3_fs = s3fs.S3FileSystem()
-            write_open = s3_fs.open
-        else:
-            write_open = open
-
-        sys.stdout.write("Loading dataset\n")
-
-        dataset_kwargs = {}
-        for k in [self.train_start, self.train_end]:
-            dataset_kwargs.update({k.split('_')[1]: k})
-
-        df = _get_dataset()
-
-        time_min, time_max = (
-            pd.to_datetime(str(df[self.time_index].min().compute())),
-            pd.to_datetime(str(df[self.time_index].max().compute())),
-        )
-
-        features = [
-            c
-            for c in df.columns
-            if not c
-                   in [
-                       "{}_h_{}".format(self.target, h)
-                       for h in self.time_horizons
-                   ]
-                   + [
-                       self.time_index,
-                       self.target,
-                   ]
-        ]
-
-        for h in self.time_horizons:
-
-            model, bootstrap_models = self._train_model(df=df, model_name="h-{}".format(h), random_state=random_state,
-                                                        features=features, target=self.target,
-                                                        bootstrap_sample=self.bootstrap_sample,
-                                                        confidence_intervals=self.confidence_intervals,
-                                                        link_function=self.link_function, write_open=write_open,
-                                                        write_path=write_path)
-
-            for s in self.validation_splits:
-                if pd.to_datetime(str(s)) <= time_min or pd.to_datetime(str(s)) >= time_max:
-                    raise Exception("Bad Time Split: {} | Check Dataset Time Range".format(s))
-                df_train = df[df[self.time_index] < s]
-
-                split_model = self._train_model(df=df_train, model_name="s-{}_h-{}".format(
-                    pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
-                    h
-                ), random_state=random_state,
-                                                features=features, target=self.target,
-                                                link_function=self.link_function, write_open=write_open,
-                                                write_path=write_path)
-
-    @create_write_directory
-    @backoff.on_exception(backoff.expo, ClientError, max_time=30)
-    def validate(self, experiment_definition, write_path, read_path):
+    def validate(self, write_path, read_path):
         def get_metrics(df):
             metrics = {"time_horizons": {}}
-            for h in time_horizons:
+            for h in self.time_horizons:
                 metrics["time_horizons"][h] = {}
                 df["resid_h_{}".format(h)] = (
-                        df[experiment_definition["target"]].shift(-h)
-                        - df["{}_h_{}_pred".format(experiment_definition["target"], h)]
+                        df[self.target].shift(-h)
+                        - df["{}_h_{}_pred".format(self.target, h)]
                 )
                 metrics["time_horizons"][h]["mae"] = (
                     df[
@@ -379,42 +397,28 @@ class Experiment():
         if read_path[:5] == "s3://":
             s3_fs = s3fs.S3FileSystem()
             read_open = s3_fs.open
-            read_ls = s3_fs.ls
             write_open = s3_fs.open
-            bootstrap_prefix = None
         else:
             read_open = open
-            read_ls = os.listdir
             write_open = open
-            bootstrap_prefix = os.path.join(read_path, 'models', 'bootstrap')
 
-        dataset_kwargs = {}
-        for k in [self.validate_start, self.validate_end]:
-            if k in experiment_definition:
-                dataset_kwargs.update({k.split('_')[1]: experiment_definition[k]})
-
-        df = _get_dataset(experiment_definition)
+        df = self.get_dataset()
 
         metrics = {"splits": {}}
 
-        horizon_ranges = [x for x in self.time_horizons if type(x) == tuple]
-        if len(horizon_ranges) > 0:
-            time_horizons = [x for x in self.time_horizons if type(x) == int]
-            for x in horizon_ranges:
-                time_horizons = set(time_horizons + list(range(x[0], x[1])))
-
         df = df[
-            [experiment_definition["target"], experiment_definition["time_index"]]
+            [self.target, self.time_index]
         ]
 
         time_min, time_max = (
-            df[experiment_definition["time_index"]].min().compute(),
-            df[experiment_definition["time_index"]].max().compute(),
+            df[self.time_index].min().compute(),
+            df[self.time_index].max().compute(),
         )
+
+        del(df)
 
         for s in self.validation_splits:
 
-            validate_kwargs = {}
             if self.validate_start:
                 if pd.to_datetime(str(s)) < pd.to_datetime(str(self.validate_start)):
                     start = pd.to_datetime(str(s))
@@ -431,7 +435,7 @@ class Experiment():
                     end = pd.to_datetime(str(s))
             else:
                 end = None
-            validate_df = _get_dataset(experiment_definition, pad=False, start=start, end=end)
+            validate_df = self.get_dataset(start=start, end=end)
 
             for h in self.time_horizons:
                 with read_open(
@@ -475,25 +479,15 @@ class Experiment():
                 validate_df = cull_empty_partitions(validate_df)
                 metrics["splits"][s] = get_metrics(validate_df)
 
+                self.metrics = metrics
+
                 with write_open("{}/metrics.json".format(write_path), "w") as f:
                     json.dump(metrics, f)
 
             validate_df[self.time_index] = dd.to_datetime(
                 validate_df[self.time_index])
 
-            dd.to_parquet(
-                validate_df[
-                    [self.time_index]
-                    + [
-                        "{}_h_{}_pred".format(self.target, h)
-                        for h in self.time_horizons
-                    ]
-                    ],
-                "{}/validation/s-{}".format(
-                    write_path,
-                    pd.to_datetime(str(s)).strftime("%Y%m%d-%H%M%S"),
-                )
-            )
+            self.validation = validate_df.compute()
 
     @backoff.on_exception(backoff.expo, ClientError, max_time=30)
     def get_dataset(self, start=None, end=None):
@@ -516,7 +510,7 @@ class Experiment():
                     df[c].dtype in [int, float] and c != self.time_index},
                  **{c: "first" for c in df.columns if
                     df[c].dtype not in [int, float] and c != self.time_index}}).drop(
-                columns=self.target_dimensionos).reset_index()
+                columns=self.target_dimensions).reset_index()
         else:
             df = df.groupby(self.time_index).agg(
                 {**{c: "sum" for c in df.columns if
@@ -569,7 +563,7 @@ class Experiment():
                                         self.scenarios[c]["mode"] == "constant"]
                     for c in constant_columns:
                         combinations = [x[0] + [x[1]] for x in
-                                        product(combinations, self.scenarioos[c]["constant_values"])]
+                                        product(combinations, self.scenarios[c]["constant_values"])]
                     df_scenario = dd.from_pandas(
                         pd.DataFrame(combinations, columns=scenario_columns + constant_columns),
                         npartitions=npartitions)
@@ -592,7 +586,7 @@ class Experiment():
                                     df_scenario.set_index(self.time_index)], axis=0).reset_index()
 
         if self.joins:
-            for i, join in enumerate(self.joinos):
+            for i, join in enumerate(self.joins):
                 try:
                     if join["data_path"].startswith("divina://"):
                         join_df = _load(join["data_path"])
@@ -613,23 +607,19 @@ class Experiment():
             if df[c].dtype == bool:
                 df[c] = df[c].astype(float)
 
+        if self.include_features:
+            df = df[[self.target, self.time_index] + self.include_features]
 
-        ###TODO PICKUP HERE POLYMORPHISM
-
-        if "include_features" in experiment_definition:
-            df = df[[experiment_definition["target"], experiment_definition["time_index"]] + experiment_definition[
-                "include_features"]]
-
-        if "bin_features" in experiment_definition:
-            for c in experiment_definition["bin_features"]:
-                edges = [-np.inf] + experiment_definition["bin_features"][c] + [np.inf]
+        if self.bin_features:
+            for c in self.bin_features:
+                edges = [-np.inf] + self.bin_features[c] + [np.inf]
                 for v, v_1 in zip(edges, edges[1:]):
                     df["{}_({}, {}]".format(c, v, v_1)] = 1
                     df["{}_({}, {}]".format(c, v, v_1)] = df["{}_({}, {}]".format(c, v, v_1)].where(
                         ((df[c] < v_1) & (df[c] >= v)), 0)
 
-        if "encode_features" in experiment_definition:
-            for c in experiment_definition["encode_features"]:
+        if self.encode_features:
+            for c in self.encode_features:
                 if df[c].dtype == int:
                     df[c] = df[c].astype(float)
                 else:
@@ -637,20 +627,20 @@ class Experiment():
                 df["{}_dummy".format(c)] = df[c]
 
             pipe = make_pipeline(
-                Categorizer(columns=experiment_definition["encode_features"]),
-                DummyEncoder(columns=experiment_definition["encode_features"]))
+                Categorizer(columns=self.encode_features),
+                DummyEncoder(columns=self.encode_features))
 
             pipe.fit(df)
 
             df = pipe.transform(df)
 
-            for c in experiment_definition["encode_features"]:
+            for c in self.encode_features:
                 df[c] = df["{}_dummy".format(c)]
-            df = df.drop(columns=["{}_dummy".format(c) for c in experiment_definition["encode_features"]])
+            df = df.drop(columns=["{}_dummy".format(c) for c in self.encode_features])
 
-        if "interaction_features" in experiment_definition:
-            for t in experiment_definition["interaction_features"]:
-                if t in experiment_definition["encode_features"]:
+        if self.interaction_features:
+            for t in self.interaction_features:
+                if t in self.encode_features:
                     pipe = make_pipeline(
                         Categorizer(columns=[t]),
                         DummyEncoder(columns=[t]))
@@ -658,8 +648,8 @@ class Experiment():
                 else:
                     interactions = [t]
                 for c in interactions:
-                    for w in experiment_definition["interaction_features"][t]:
-                        if w in experiment_definition["encode_features"]:
+                    for w in self.interaction_features[t]:
+                        if w in self.encode_features:
                             pipe = make_pipeline(
                                 Categorizer(columns=[w]),
                                 DummyEncoder(columns=[w]))
@@ -673,13 +663,13 @@ class Experiment():
                                 else:
                                     df['{}-x-{}'.format(c, m)] = df[t] * df[m]
 
-        if "encode_features" in experiment_definition:
-            df = df.drop(columns=experiment_definition["encode_features"])
+        if self.encode_features:
+            df = df.drop(columns=self.encode_features)
 
-        if "drop_features" in experiment_definition:
-            df = df.drop(columns=experiment_definition["drop_features"])
+        if self.drop_features:
+            df = df.drop(columns=self.drop_features)
 
-        df[experiment_definition["time_index"]] = dd.to_datetime(df[experiment_definition["time_index"]])
+        df[self.time_index] = dd.to_datetime(df[self.time_index])
         df = df.repartition(npartitions=npartitions)
         df = cull_empty_partitions(df)
         df['index'] = 1
@@ -689,23 +679,17 @@ class Experiment():
         df.index.name = None
         return df.copy().persist()
 
-    @validate_experiment_definition
-    def _experiment(self, experiment_definition, read_path, write_path, random_state=None, s3_fs=None):
+    def run(self, write_path, random_state=None):
         self.train(
-            s3_fs=s3_fs,
-            experiment_definition=experiment_definition,
             write_path=write_path,
             random_state=random_state
         )
         self.forecast(
-            s3_fs=s3_fs,
-            experiment_definition=experiment_definition,
-            read_path=read_path,
+            read_path=write_path,
             write_path=write_path
         )
-        self.validate(
-            s3_fs=s3_fs,
-            experiment_definition=experiment_definition,
-            read_path=read_path,
-            write_path=write_path
-        )
+        if self.validation_splits:
+            self.validate(
+                read_path=write_path,
+                write_path=write_path
+            )

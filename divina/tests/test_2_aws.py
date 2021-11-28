@@ -1,8 +1,5 @@
 import os
-from ..train import _train
-from ..forecast import _forecast
-from ..validate import _validate
-from ..experiment import _experiment
+from ..experiment import Experiment
 import dask.dataframe as ddf
 import pandas as pd
 import joblib
@@ -19,37 +16,36 @@ def setup_teardown(setup_teardown_test_bucket_contents):
 
 
 def test_train_base(
-        s3_fs, test_df_1, test_model_1, test_ed_3, dask_client_remote, test_bucket, test_bootstrap_models, random_state
+        s3_fs, test_df_1, test_model_1, test_ed_3, dask_client_remote, test_bucket, test_bootstrap_models, random_state, test_validation_models
 ):
     experiment_path = "{}/experiment/test1".format(test_bucket)
     ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
         test_ed_3["experiment_definition"]["data_path"]
     )
-    _train(
-        s3_fs=s3_fs,
-        experiment_definition=test_ed_3["experiment_definition"],
+    experiment = Experiment(**test_ed_3["experiment_definition"])
+    experiment.train(
         write_path=experiment_path,
         random_state=random_state,
     )
-    with s3_fs.open(
-            os.path.join(
-                experiment_path,
-                "models",
-                "h-1",
-            ),
-            "rb",
-    ) as f:
-        compare_sk_models(joblib.load(f), test_model_1[0])
+
+    compare_sk_models(
+        experiment.models['horizons'][1]['base'][0],
+        test_model_1[0],
+    )
+    assert experiment.models['horizons'][1]['base'][1] == test_model_1[1]['features']
     for state in test_bootstrap_models:
-        with s3_fs.open(
-                os.path.join(
-                    experiment_path,
-                    "models/bootstrap",
-                    "h-1_r-{}".format(state),
-                ),
-                "rb",
-        ) as f:
-            compare_sk_models(joblib.load(f), test_bootstrap_models[state][0])
+        compare_sk_models(
+            experiment.models['horizons'][1]['bootstrap'][state][0],
+            test_bootstrap_models[state][0],
+        )
+        assert experiment.models['horizons'][1]['bootstrap'][state][1] == test_bootstrap_models[state][1]['features']
+    for split in test_validation_models:
+        compare_sk_models(
+            experiment.models['horizons'][1]['splits'][split][0],
+            test_validation_models[split][0],
+        )
+        assert experiment.models['horizons'][1]['splits'][split][1] == test_validation_models[split][1]['features']
+    del(experiment)
 
 
 def test_forecast_base(
@@ -105,21 +101,16 @@ def test_forecast_base(
         recursive=True,
     )
     shutil.rmtree('models', ignore_errors=True)
-    _forecast(
-        s3_fs=s3_fs,
-        experiment_definition=test_ed_3["experiment_definition"],
-        write_path=experiment_path,
+    experiment = Experiment(**test_ed_3["experiment_definition"])
+    experiment.forecast(
         read_path=experiment_path,
+        write_path=experiment_path,
     )
     pd.testing.assert_frame_equal(
-        ddf.read_parquet(
-            os.path.join(
-                experiment_path,
-                "forecast"
-            )
-        ).compute().reset_index(drop=True),
+        experiment.predictions.compute().reset_index(drop=True),
         test_forecast_1.reset_index(drop=True), check_dtype=False
     )
+    del experiment
 
 
 def test_validate_base(
@@ -151,50 +142,27 @@ def test_validate_base(
                 test_validation_models[split][1],
                 f
             )
-    _validate(
-        s3_fs=s3_fs,
-        experiment_definition=test_ed_3["experiment_definition"],
-        write_path=experiment_path,
-        read_path=experiment_path
+    experiment = Experiment(**test_ed_3["experiment_definition"])
+    experiment.validate(
+        read_path=experiment_path,
+        write_path=experiment_path
     )
-    pd.testing.assert_frame_equal(
-        ddf.read_parquet(
-            os.path.join(
-                experiment_path,
-                "validation",
-                "s-19700101-000007",
-            )
-        ).compute().reset_index(drop=True),
-        test_val_predictions_1.reset_index(drop=True),
-    )
-
-    with s3_fs.open(
-            os.path.join(experiment_path, "metrics.json"),
-            "r",
-    ) as f:
-        metrics = json.load(f)
-
-    assert metrics == test_metrics_1
+    assert experiment.metrics == test_metrics_1
+    del (experiment)
 
 
 def test_quickstart(test_eds_quickstart, random_state, dask_client_remote, test_bucket, s3_fs):
     for k in test_eds_quickstart:
         experiment_path = "{}/experiment/test1/{}".format(test_bucket, k)
         ed = test_eds_quickstart[k]
-        _experiment(
-            s3_fs=s3_fs,
-            experiment_definition=ed["experiment_definition"],
-            read_path=experiment_path,
+        experiment = Experiment(**ed["experiment_definition"])
+        experiment.run(
             write_path=experiment_path,
             random_state=11
         )
-        result_df = ddf.read_parquet(
-            os.path.join(
-                experiment_path,
-                "forecast"
-            )
-        ).compute().reset_index(drop=True)
+        result_df = experiment.predictions.compute().reset_index(drop=True)
         pd.testing.assert_frame_equal(result_df, pd.read_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
                                k)).reset_index(drop=True), check_exact=False, rtol=.1)
+        del (experiment)
 
 
