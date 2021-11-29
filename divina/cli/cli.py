@@ -1,8 +1,16 @@
-import click
-from ..utils import get_parameters, set_parameters, validate_experiment_definition, get_dask_client
-import sys
 import json
+import sys
+
+import click
+
 from ..experiment import Experiment
+from ..utils import (
+    get_dask_client,
+    get_parameters,
+    set_parameters,
+    validate_experiment_definition,
+)
+
 
 @click.group()
 def divina():
@@ -21,18 +29,18 @@ def divina():
 @click.argument("random_state", default=None, required=False)
 @divina.command()
 @get_dask_client
-def experiment(experiment_def, keep_alive, ec2_key, write_path, aws_workers, random_state):
+def experiment(
+    experiment_def, keep_alive, ec2_key, write_path, aws_workers, random_state
+):
     """:write_path: s3:// or aws path to write results to
     :experiment_def: path to experiment definition JSON file
     :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging.
     :aws_workers: optionally run experiment on EC2 cluster of specified size
     :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
-    experiment_def = json.load(experiment_def)['experiment_definition']
+    experiment_def = json.load(experiment_def)["experiment_definition"]
     experiment = Experiment(**experiment_def)
-    experiment.run(
-        write_path=write_path
-    )
+    experiment.run(write_path=write_path)
 
 
 @click.argument("ec2_keypair_name", default=None, required=False)
@@ -42,27 +50,17 @@ def experiment(experiment_def, keep_alive, ec2_key, write_path, aws_workers, ran
 @click.argument("aws_workers", default=0, required=False)
 @click.argument("random_state", default=None, required=False)
 @divina.command()
-def train(
-        experiment_def,
-        keep_alive,
-        ec2_key,
-        write_path,
-        aws_workers,
-        random_state
-):
+def train(experiment_def, keep_alive, ec2_key, write_path, aws_workers, random_state):
     """:write_path: s3:// or aws path to write results to
     :experiment_def: path to experiment definition JSON file
     :keep_alive: flag to keep ec2 instances in dask cluster alive after completing computation. use for debugging.
     :aws_workers: optionally run experiment on EC2 cluster of specified size
     :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
-    experiment_def = json.load(experiment_def)['experiment_definition']
+    experiment_def = json.load(experiment_def)["experiment_definition"]
     validate_experiment_definition(experiment_def)
     experiment = Experiment(**experiment_def)
-    experiment.train(
-        write_path=write_path,
-        random_state=random_state
-    )
+    experiment.train(write_path=write_path, random_state=random_state)
 
 
 @click.argument("ec2_key", default=None, required=False)
@@ -73,12 +71,12 @@ def train(
 @click.argument("aws_workers", default=0, required=False)
 @divina.command()
 def forecast(
-        experiment_def,
-        keep_alive,
-        ec2_key,
-        write_path,
-        read_path,
-        aws_workers,
+    experiment_def,
+    keep_alive,
+    ec2_key,
+    write_path,
+    read_path,
+    aws_workers,
 ):
     """:read_path: s3:// or aws path to read trained model fromn
     :write_path: s3:// or aws path to write results to
@@ -87,7 +85,7 @@ def forecast(
     :aws_workers: optionally run experiment on EC2 cluster of specified size
     :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
-    experiment_def = json.load(experiment_def)['experiment_definition']
+    experiment_def = json.load(experiment_def)["experiment_definition"]
     validate_experiment_definition(experiment_def)
     experiment = Experiment(**experiment_def)
     experiment.forecast(
@@ -109,12 +107,12 @@ def forecast(
 @click.argument("aws_workers", default=0, required=False)
 @divina.command()
 def validate(
-        experiment_def,
-        keep_alive,
-        ec2_key,
-        write_path,
-        read_path,
-        aws_workers,
+    experiment_def,
+    keep_alive,
+    ec2_key,
+    write_path,
+    read_path,
+    aws_workers,
 ):
     """:read_path: s3:// or aws path to load models from
     :write_path: s3:// or aws path to write results to
@@ -123,7 +121,7 @@ def validate(
     :aws_workers: optionally run experiment on EC2 cluster of specified size
     :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
-    experiment_def = json.load(experiment_def)['experiment_definition']
+    experiment_def = json.load(experiment_def)["experiment_definition"]
     validate_experiment_definition(experiment_def)
     experiment = Experiment(**experiment_def)
     experiment.validate(
@@ -135,21 +133,15 @@ def validate(
 
 @click.argument("model_path", required=True)
 @divina.command()
-def get_params(
-        model_path
-):
-    """:model_path: s3:// or aws path to model to get parameters from
-    """
+def get_params(model_path):
+    """:model_path: s3:// or aws path to model to get parameters from"""
     get_parameters(model_path=model_path)
     sys.stdout.write(get_parameters(model_path=model_path))
 
 
 @click.argument("model_path", required=True)
 @divina.command()
-def set_params(
-        model_path,
-        params
-):
+def set_params(model_path, params):
     """:model_path: s3:// or aws path to model to get parameters from
     :params: dictionary of trained model parameters to update
     """
