@@ -309,7 +309,7 @@ class Experiment():
                 )) if '.' not in p]
                 bootstrap_model_paths.sort()
 
-                def load_and_predict_bootstrap_model(paths, df):
+                def load_and_predict_bootstrap_model(paths, target, link_function, df):
                     for path in paths:
                         if bootstrap_prefix:
                             model_path = os.path.join(bootstrap_prefix, path)
@@ -327,21 +327,21 @@ class Experiment():
                         ) as f:
                             bootstrap_params = json.load(f)
                             bootstrap_features = bootstrap_params['features']
-                        if self.link_function == 'log':
-                            df['{}_h_{}_pred_b_{}'.format(self.target, h,
+                        if link_function == 'log':
+                            df['{}_h_{}_pred_b_{}'.format(target, h,
                                                           path.split("-")[-1])] = da.expm1(
                                 bootstrap_model.predict(
                                     dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(
                                         lengths=True)))
                         else:
-                            df['{}_h_{}_pred_b_{}'.format(self.target, h,
+                            df['{}_h_{}_pred_b_{}'.format(target, h,
                                                           path.split("-")[-1])] = bootstrap_model.predict(
                                 dd.from_pandas(df[bootstrap_features], chunksize=10000).to_dask_array(lengths=True))
 
                     return df
 
                 forecast_df = forecast_df.map_partitions(partial(load_and_predict_bootstrap_model,
-                                                                 bootstrap_model_paths
+                                                                 bootstrap_model_paths, self.target, self.link_function
                                                                  ))
 
                 df_interval = dd.from_array(dd.from_array(
@@ -371,7 +371,7 @@ class Experiment():
                 )
             )
 
-            self.predictions = forecast_df
+            self.predictions = forecast_df.compute()
 
     @create_write_directory
     @backoff.on_exception(backoff.expo, ClientError, max_time=30)
@@ -573,9 +573,13 @@ class Experiment():
                         if self.target_dimensions:
                             last = df.groupby(self.target_dimensions)[last_columns].last().compute()
                             meta = df_scenario.join(last.reset_index(drop=True), how="right")
+
+                            def join_func(target_dimension, time_index, df):
+                                return df.set_index(target_dimension).join(
+                                    last).reset_index().set_index(time_index).reset_index()
+
                             df_scenario = df_scenario.groupby(self.target_dimensions).apply(
-                                lambda x: x.set_index(self.target_dimensions).join(
-                                    last).reset_index().set_index(self.time_index).reset_index(),
+                                partial(join_func, self.target_dimensions, self.time_index),
                                 meta=meta).reset_index(drop=True)
                         else:
                             last = df[last_columns].tail(1)

@@ -125,7 +125,7 @@ def test_forecast(
         write_path=experiment_path,
     )
     pd.testing.assert_frame_equal(
-        experiment.predictions.compute().reset_index(drop=True),
+        experiment.predictions.reset_index(drop=True),
         test_forecast_1.reset_index(drop=True), check_dtype=False
     )
 
@@ -265,7 +265,7 @@ def test_quickstart(test_eds_quickstart, random_state):
             write_path=experiment_path,
             random_state=11
         )
-        result_df = experiment.predictions.compute().reset_index(drop=True)
+        result_df = experiment.predictions.reset_index(drop=True)
         ###RESET
         '''ddf.read_parquet(
             os.path.join(
@@ -275,7 +275,7 @@ def test_quickstart(test_eds_quickstart, random_state):
         ).to_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
                                k))'''
         pd.testing.assert_frame_equal(result_df, ddf.read_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
-                               k)).compute().reset_index(drop=True))
+                               k)).reset_index(drop=True))
         ed["experiment_definition"]['time_horizons'] = [0]
         if not "target_dimensions" in ed["experiment_definition"]:
             stores = [6]
