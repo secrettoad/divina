@@ -120,12 +120,12 @@ def test_forecast(
                 f
             )
     experiment = Experiment(**test_ed_1["experiment_definition"])
-    experiment.forecast(
+    result = experiment.forecast(
         read_path=experiment_path,
         write_path=experiment_path,
     )
     pd.testing.assert_frame_equal(
-        experiment.predictions.reset_index(drop=True),
+        result.compute().reset_index(drop=True),
         test_forecast_1.reset_index(drop=True), check_dtype=False
     )
 
@@ -261,11 +261,11 @@ def test_quickstart(test_eds_quickstart, random_state):
         ed = test_eds_quickstart[k]
         experiment_path = "divina-test/experiment/test1"
         experiment = Experiment(**ed["experiment_definition"])
-        experiment.run(
+        result = experiment.run(
             write_path=experiment_path,
             random_state=11
         )
-        result_df = experiment.predictions.reset_index(drop=True)
+        result_df = result.compute().reset_index(drop=True)
         ###RESET
         '''ddf.read_parquet(
             os.path.join(
@@ -275,7 +275,7 @@ def test_quickstart(test_eds_quickstart, random_state):
         ).to_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
                                k))'''
         pd.testing.assert_frame_equal(result_df, ddf.read_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
-                               k)).reset_index(drop=True))
+                               k)).compute().reset_index(drop=True))
         ed["experiment_definition"]['time_horizons'] = [0]
         if not "target_dimensions" in ed["experiment_definition"]:
             stores = [6]
