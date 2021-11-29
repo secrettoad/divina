@@ -1,6 +1,152 @@
 CHANGES
 =======
 
+* remove local docs
+* gitattributes
+* gitattributes
+* alpha
+
+2021.11.23
+----------
+
+* merge main
+* Build docs
+* alpha
+* alpha
+* Build docs
+* alpha
+* alpha
+* alpha
+* Build docs
+* merge test
+* quickstart charts ready
+* quickstart charts ready
+* quickstart charts ready
+* quickstart charts ready
+* dataset.py improved
+* Revert "Build docs"
+* tests passing - random seed passed to dask model
+* add time dataset
+* Build docs
+* add time dataset
+* Build docs
+* add time dataset
+* tests passing
+* WIP: quickstart charts ready
+* WIP: quickstart charts ready
+* WIP: quickstart charts ready
+* WIP: ffill added
+* WIP: before adding ffill
+* WIP: before adding ffill
+* tests pass and docs test functioning
+* tests passing
+* WIP: charts fixed. need to reset tests
+* WIP: store encode in retail example. need to reset tests
+* WIP: filepath issue resolved. need to reset tests
+* WIP: tests passing except for module datasets not loading filepaths
+* WIP: random seed fixed - tests need to be updated
+* Revert "WIP: datasets module implemented but not tested"
+* WIP: random seed issues
+* WIP: datasets module implemented but not tested
+* WIP: datasets module implemented but not tested
+* validation splits tested - integration and unit
+* validation splits tested
+* doc updates
+* factor plot added
+* confidence interval charts improved
+* WIP: all tests passing - another big confidence interval bug fixed
+* WIP: one test not passing
+* WIP: two tests still not passing. bootstrap confidence intervals bug fixed
+* WIP: all tests but integration forecast passing
+* WIP: persist performance greatly improved and unit tests locked for next release
+* WIP: 3d and 2d graphs working in test
+* WIP: 3d and 2d graphs working in test
+* WIP: blind forecast tests passing unit
+* WIP: confidence intervals shaded
+* WIP: simulations tested more thoroughly
+* WIP: fixed forecast definition validation test
+* WIP: performance bug resolved. basic plotting added to predict unit test
+* WIP: various improvements - retail tests ready to lock
+* Build docs
+* all tests working with interaction features
+* unit tests working with interaction features
+* unit tests working with scaling and regularlization
+* multiple partitions on test datasets
+* multiple partitions on test datasets
+* dataset aggregation fixed to first
+* cleanup
+* retail tests done
+* WIP: retail train test setup but not passing
+* datasets removed
+* s3 cleaning up between tests and patches removed
+* s3 cleaning up between tests and patches removed
+* s3 cleaning up between tests and patches removed
+* base jsonschema implemented
+* binner working, but still need to add s3 path interoperability and clear s3 after tests
+* binner working, but still need to add s3 path interoperability and clear s3 after tests
+* binner working, but still need to add s3 path interoperability and clear s3 after tests
+* binner working, but still need to add s3 path interoperability and clear s3 after tests
+* confidence intervals optimized and moved to bootstrap
+* WIP: before chop up predit
+* confidence intervals almost done
+* confidence intervals added
+* bunch of fixes and added encoder and interaction terms
+* quickstart tested and various improvements
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* Build docs
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* WIP: add codecov
+* param set and get added to cli
+* parameters persisted as json and overridable
+* Build docs
+* WIP: add simulation and aggregation
+* Build docs
+* WIP: add simulation and aggregation
+* Build docs
+* cleanup docs directory
+* Build docs
+* cleanup docs directory
+
+2021.9.5
+--------
+
+* Build docs
+* cleanup docs directory
+* cleanup docs directory
+* cleanup docs directory
+* cleanup docs directory
+* cleanup docs directory
+* -f
+* Build docs
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
 * add tag
 * update prod github action yaml
 * update prod github action yaml
