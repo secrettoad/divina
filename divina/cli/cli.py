@@ -29,13 +29,9 @@ def experiment(experiment_def, keep_alive, ec2_key, write_path, aws_workers, ran
     :ec2_key: aws ec2 keypair name to provide access to dask cluster for debugging.
     """
     experiment_def = json.load(experiment_def)['experiment_definition']
-    _experiment(
-                    experiment_definition=experiment_def,
-                    read_path=write_path,
-                    write_path=write_path,
-                    ec2_keypair_name=ec2_key,
-                    keep_instances_alive=keep_alive,
-                    random_state=random_state
+    experiment = Experiment(**experiment_def)
+    experiment.run(
+        write_path=write_path
     )
 
 
