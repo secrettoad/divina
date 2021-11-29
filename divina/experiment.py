@@ -3,7 +3,7 @@ import dask.dataframe as dd
 import joblib
 import backoff
 from botocore.exceptions import ClientError
-from datasets.load import _load
+from .datasets.load import _load
 import os
 from functools import partial
 from .utils import create_write_directory, cull_empty_partitions
