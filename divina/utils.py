@@ -1,16 +1,17 @@
-from sklearn.base import BaseEstimator
-from sklearn.pipeline import Pipeline
+import json
+import os
+import pathlib
+from functools import wraps
+
 import dask.dataframe as dd
+import numpy as np
+import s3fs
 from dask.distributed import Client
 from dask_cloudprovider.aws import EC2Cluster
 from dask_ml.linear_model import LinearRegression
 from jsonschema import validate
-from functools import wraps
-import pathlib
-import numpy as np
-import json
-import os
-import s3fs
+from sklearn.base import BaseEstimator
+from sklearn.pipeline import Pipeline
 
 
 def get_parameters(model_path):
@@ -27,10 +28,7 @@ def get_parameters(model_path):
 
     else:
         write_open = open
-    with write_open(
-            '{}_params'.format(model_path),
-            "rb"
-    ) as f:
+    with write_open("{}_params".format(model_path), "rb") as f:
         params = json.load(f)
         return params
 
@@ -49,23 +47,20 @@ def set_parameters(model_path, params):
 
     else:
         write_open = open
-    with write_open(
-            '{}_params'.format(model_path),
-            "rb"
-    ) as f:
-        parameters = json.load(f)['features']
+    with write_open("{}_params".format(model_path), "rb") as f:
+        parameters = json.load(f)["features"]
     if not params == parameters:
-        raise Exception('Parameters {} not found in trained model. Cannot set new values for these parameters'.format(
-            ', '.join(list(set(params) - set(parameters)))))
+        raise Exception(
+            "Parameters {} not found in trained model. Cannot set new values for these parameters".format(
+                ", ".join(list(set(params) - set(parameters)))
+            )
+        )
     else:
         for p in params:
             if not p in parameters:
                 parameters.append(p)
-        with write_open(
-                '{}_params'.format(model_path),
-                "w"
-        ) as f:
-            json.dump({'features': parameters}, f)
+        with write_open("{}_params".format(model_path), "w") as f:
+            json.dump({"features": parameters}, f)
 
 
 def compare_sk_models(model1, model2):
@@ -104,8 +99,13 @@ def cull_empty_partitions(df):
 def validate_experiment_definition(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        with open(pathlib.Path(pathlib.Path(__file__).parent, 'config/ed_schema.json'), 'r') as f:
-            validate(instance={'experiment_definition': kwargs['experiment_definition']}, schema=json.load(f))
+        with open(
+            pathlib.Path(pathlib.Path(__file__).parent, "config/ed_schema.json"), "r"
+        ) as f:
+            validate(
+                instance={"experiment_definition": kwargs["experiment_definition"]},
+                schema=json.load(f),
+            )
         return func(*args, **kwargs)
 
     return wrapper
@@ -127,9 +127,10 @@ def create_write_directory(func):
         else:
             path = pathlib.Path(write_path)
             path.mkdir(exist_ok=True, parents=True)
-            pathlib.Path(path, 'models/bootstrap').mkdir(exist_ok=True, parents=True)
-            pathlib.Path(path, 'models/validation').mkdir(exist_ok=True, parents=True)
+            pathlib.Path(path, "models/bootstrap").mkdir(exist_ok=True, parents=True)
+            pathlib.Path(path, "models/validation").mkdir(exist_ok=True, parents=True)
         return func(*args, **kwargs)
+
     return wrapper
 
 
@@ -150,19 +151,18 @@ def get_dask_client(func):
             else:
                 keep_alive = kwargs["keep_alive"]
             with EC2Cluster(
-                        key_name=ec2_key,
-                        security=False,
-                        docker_image="jhurdle/divina:latest",
-                        env_vars={
-                            "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                            "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                            "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
-                        },
-                        auto_shutdown=not keep_alive,
-                ) as cluster:
-                    cluster.scale(aws_workers)
-                    with Client(cluster) as client:
-                        return func(*args, **kwargs)
+                key_name=ec2_key,
+                security=False,
+                docker_image="jhurdle/divina:latest",
+                env_vars={
+                    "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+                    "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+                    "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
+                },
+                auto_shutdown=not keep_alive,
+            ) as cluster:
+                cluster.scale(aws_workers)
+                with Client(cluster) as client:
+                    return func(*args, **kwargs)
 
     return wrapper
-
