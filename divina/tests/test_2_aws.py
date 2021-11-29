@@ -102,12 +102,12 @@ def test_forecast(
     )
     shutil.rmtree('models', ignore_errors=True)
     experiment = Experiment(**test_ed_3["experiment_definition"])
-    experiment.forecast(
+    result = experiment.forecast(
         read_path=experiment_path,
         write_path=experiment_path,
     )
     pd.testing.assert_frame_equal(
-        experiment.predictions.reset_index(drop=True),
+        result.compute().reset_index(drop=True),
         test_forecast_1.reset_index(drop=True), check_dtype=False
     )
     del experiment
@@ -156,14 +156,14 @@ def test_quickstart(test_eds_quickstart, random_state, dask_client_remote, test_
         experiment_path = "{}/experiment/test1/{}".format(test_bucket, k)
         ed = test_eds_quickstart[k]
         experiment = Experiment(**ed["experiment_definition"])
-        experiment.run(
+        result = experiment.run(
             write_path=experiment_path,
             random_state=11
         )
-        experiment.predictions.visualize('{}.jpg'.format(k))
-        result_df = experiment.predictions.reset_index(drop=True)
+        result.visualize("{}.jpg".format(k))
+        result_df = result.compute().reset_index(drop=True)
         pd.testing.assert_frame_equal(result_df, pd.read_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
                                k)).reset_index(drop=True), check_exact=False, rtol=.1)
-        del (experiment)
+        del result
 
 

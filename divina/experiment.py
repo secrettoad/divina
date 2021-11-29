@@ -57,9 +57,7 @@ class Experiment():
         self.scenarios = scenarios
         self.frequency = frequency
         self.models = {}
-        self.predictions = None
         self.metrics = {}
-        self.validation = None
 
     def _train_model(self, df, model_name, random_state, features, target,
                      link_function, write_open, write_path, bootstrap_sample=None, confidence_intervals=None):
@@ -344,6 +342,8 @@ class Experiment():
                                                                  bootstrap_model_paths, self.target, self.link_function
                                                                  ))
 
+                ###TODO rewrite this....horrendously slow and not distributing to more than one worker
+
                 df_interval = dd.from_array(dd.from_array(
                     forecast_df[
                         ['{}_h_{}_pred_b_{}'.format(self.target, h, i.split("-")[-1]) for i in
@@ -352,7 +352,7 @@ class Experiment():
                                                   h)]].to_dask_array(lengths=True).T).repartition(
                     npartitions=forecast_df.npartitions).quantile(
                     [i * .01 for i in self.confidence_intervals]).to_dask_array(
-                    lengths=True).T).persist()
+                    lengths=True).T)
                 df_interval.columns = ['{}_h_{}_pred_c_{}'.format(self.target, h, c) for c in
                                        self.confidence_intervals]
 
@@ -371,7 +371,7 @@ class Experiment():
                 )
             )
 
-            self.predictions = forecast_df.compute()
+            return forecast_df
 
     @create_write_directory
     @backoff.on_exception(backoff.expo, ClientError, max_time=30)
@@ -688,7 +688,7 @@ class Experiment():
             write_path=write_path,
             random_state=random_state
         )
-        self.forecast(
+        forecast = self.forecast(
             read_path=write_path,
             write_path=write_path
         )
@@ -697,3 +697,4 @@ class Experiment():
                 read_path=write_path,
                 write_path=write_path
             )
+        return forecast
