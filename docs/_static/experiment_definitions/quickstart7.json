@@ -1,0 +1,77 @@
+{
+  "experiment_definition": {
+    "target": "Sales",
+    "link_function": "log",
+    "target_dimensions": [
+      "Store"
+    ],
+    "time_index": "Date",
+    "data_path": "divina://retail_sales",
+    "include_features": [
+      "Store",
+      "Weekday",
+      "Promo",
+      "Month",
+      "Holiday",
+      "HolidayType",
+      "StoreType",
+      "Assortment",
+      "LastDayOfMonth"
+    ],
+    "joins": [
+      {
+        "data_path": "divina://time",
+        "join_on": [
+          "Date",
+          "Date"
+        ],
+        "as": "time"
+      }
+    ],
+    "forecast_end": "01-01-2016",
+    "frequency": "D",
+    "encode_features": [
+      "Store",
+      "Month",
+      "StoreType",
+      "Weekday",
+      "HolidayType",
+      "Assortment"
+    ],
+    "validation_splits": [
+      "2015-07-18"
+    ],
+    "interaction_features": {
+      "Store": [
+        "Holiday"
+      ]
+    },
+    "bin_features": {
+      "Month": [
+        3,
+        6,
+        9
+      ]
+    },
+    "scenarios": {
+      "Promo": {
+        "mode": "constant",
+        "constant_values": [
+          0,
+          1
+        ]
+      },
+      "StoreType": {
+        "mode": "last"
+      },
+      "Assortment": {
+        "mode": "last"
+      }
+    },
+    "confidence_intervals": [
+      0,
+      100
+    ],
+    "bootstrap_sample": 5
+  }
+}
