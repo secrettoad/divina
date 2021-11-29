@@ -15,7 +15,7 @@ def setup_teardown(setup_teardown_test_bucket_contents):
     pass
 
 
-def test_train_base(
+def test_train(
         s3_fs, test_df_1, test_model_1, test_ed_3, dask_client_remote, test_bucket, test_bootstrap_models, random_state, test_validation_models
 ):
     experiment_path = "{}/experiment/test1".format(test_bucket)
@@ -48,7 +48,7 @@ def test_train_base(
     del(experiment)
 
 
-def test_forecast_base(
+def test_forecast(
         s3_fs,
         test_df_1,
         test_model_1,
@@ -107,13 +107,13 @@ def test_forecast_base(
         write_path=experiment_path,
     )
     pd.testing.assert_frame_equal(
-        experiment.predictions.compute().reset_index(drop=True),
+        experiment.predictions.reset_index(drop=True),
         test_forecast_1.reset_index(drop=True), check_dtype=False
     )
     del experiment
 
 
-def test_validate_base(
+def test_validate(
         s3_fs,
         test_ed_3,
         test_df_1,
@@ -160,7 +160,8 @@ def test_quickstart(test_eds_quickstart, random_state, dask_client_remote, test_
             write_path=experiment_path,
             random_state=11
         )
-        result_df = experiment.predictions.compute().reset_index(drop=True)
+        experiment.predictions.visualize('{}.jpg'.format(k))
+        result_df = experiment.predictions.reset_index(drop=True)
         pd.testing.assert_frame_equal(result_df, pd.read_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
                                k)).reset_index(drop=True), check_exact=False, rtol=.1)
         del (experiment)
