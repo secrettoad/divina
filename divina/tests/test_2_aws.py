@@ -175,7 +175,6 @@ def test_quickstart(
         ed = test_eds_quickstart[k]
         experiment = Experiment(**ed["experiment_definition"])
         result = experiment.run(write_path=experiment_path, random_state=11)
-        result.visualize("{}.jpg".format(k))
         result_df = result.compute().reset_index(drop=True)
         pd.testing.assert_frame_equal(
             result_df,
