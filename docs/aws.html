@@ -16,7 +16,7 @@
     <script src="_static/js/docs.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="documentation" href="cli.html" />
+    <link rel="next" title="cli" href="cli.html" />
     <link rel="prev" title="experiments" href="experiments.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -36,32 +36,9 @@
             
   <div class="section" id="aws">
 <h1>aws<a class="headerlink" href="#aws" title="Permalink to this headline">¶</a></h1>
-<p><strong>Experiment Persistence</strong></p>
-<p>Experiment artifacts are persisted either locally or to S3 depending on the use of the <cite>–local</cite> flag when running the experiment command and will produce a local output structure as shown below:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">experiment</span> <span class="n">path</span>
-  <span class="o">|-</span> <span class="n">models</span>
-  <span class="o">|</span>    <span class="o">|</span>
-  <span class="o">|</span>    \<span class="o">-</span> <span class="n">h_</span><span class="p">{</span><span class="n">forecast</span> <span class="n">horizon</span><span class="p">}</span>
-  <span class="o">|</span>           <span class="o">|-</span><span class="n">fit_model</span><span class="o">.</span><span class="n">joblib</span>
-  <span class="o">|</span>           <span class="o">|-</span><span class="n">bootstrap</span>
-  <span class="o">|</span>                <span class="o">|</span>
-  <span class="o">|</span>                <span class="o">|-</span> <span class="n">bootstrap_model_</span><span class="p">{</span><span class="n">random</span> <span class="n">seed</span><span class="p">}</span>
-  <span class="o">|</span>
-  <span class="o">|-</span> <span class="n">forecast</span>
-  <span class="o">|</span>    <span class="o">|</span>
-  <span class="o">|</span>    <span class="o">|-</span> <span class="n">common_meta</span><span class="o">.</span><span class="n">parquet</span>
-  <span class="o">|</span>    <span class="o">|-</span> <span class="n">forecast_partition_0_meta</span><span class="o">.</span><span class="n">parquet</span>
-  <span class="o">|</span>    <span class="o">|-</span> <span class="n">forecast_partition_0</span><span class="o">.</span><span class="n">parquet</span>
-  <span class="o">|</span>    \  <span class="o">...</span>
-  <span class="o">|</span>
-  <span class="o">|-</span> <span class="n">validation</span>
-       <span class="o">|</span>
-       <span class="o">|-</span> <span class="n">metrics</span><span class="o">.</span><span class="n">json</span>
-       \<span class="o">-</span> <span class="p">{</span><span class="n">validation</span> <span class="n">split</span><span class="p">}</span>
-              <span class="o">|</span>
-              <span class="o">|-</span> <span class="n">validation_partition_0_meta</span><span class="o">.</span><span class="n">parquet</span>
-              <span class="o">|-</span> <span class="n">validation_partition_0</span><span class="o">.</span><span class="n">parquet</span>
-              \  <span class="o">...</span>
+<p><strong>Forecasting at Scale</strong></p>
+<p>In order to to work with larger datasets, include more features, increase the bootstrap sample of divina’s confidence intervals, or otherwise scale your forecasting workload, use the –aws_workers option when running the experiment through the cli.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>divina experiment /path/to/my/experiment_definition.json -aws_workers<span class="o">=</span><span class="m">10</span>
 </pre></div>
 </div>
 </div>
@@ -87,7 +64,7 @@
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="experiments.html">experiments</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">aws</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cli.html">documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">cli</a></li>
 </ul>
 
 <div class="relations">
@@ -95,7 +72,7 @@
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
       <li>Previous: <a href="experiments.html" title="previous chapter">experiments</a></li>
-      <li>Next: <a href="cli.html" title="next chapter">documentation</a></li>
+      <li>Next: <a href="cli.html" title="next chapter">cli</a></li>
   </ul></li>
 </ul>
 </div>

@@ -1,7 +1,7 @@
 :noindex:
 
 ********************
-documentation
+cli
 ********************
 
 **Date**: |today| **Version**: |version|

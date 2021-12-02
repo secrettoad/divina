@@ -63,17 +63,17 @@ Information encoding, binning and interaction terms are all powerful features of
 .. raw:: html
     :file: _static/plots/quickstart/quickstart4_test_forecast_retail_h_0_s_1_factors.html
 
-While visual inspection is a powerful tool for validating a model, programmatic and distributional validation is provided through the ``time_validation_splits`` option of divina.
-
 **Cross Validation**
+
+While visual inspection is a powerful tool for validating a model, programmatic and distributional validation is provided through the ``time_validation_splits`` option of divina.
 
 .. literalinclude:: _static/experiment_definitions/quickstart5.json
    :language: json
    :emphasize-lines: 4
 
-A key feature of divina is the ability to easily simulate potential future values as information to feed the model. In our retail example, we simulate promotions as both occuring and not every day, so that we have both scenarios to consider during the decision-making process.
-
 **Simulation**
+
+A key feature of divina is the ability to easily simulate potential future values as information to feed the model. In our retail example, we simulate promotions as both occuring and not every day, so that we have both scenarios to consider during the decision-making process.
 
 .. literalinclude:: _static/experiment_definitions/quickstart6.json
    :language: json
@@ -96,11 +96,3 @@ Confidence intervals provide important insight into how sure divina is of its pr
 
 .. raw:: html
     :file: _static/plots/quickstart/quickstart7_h_0_s_1_2d.html
-
-**Forecasting at Scale**
-
-In order to to work with larger datasets, include more features, increase the bootstrap sample of divina's confidence intervals, or otherwise scale your forecasting workload, use the --aws_workers option when running the experiment through the cli.
-
-.. code-block:: bash
-
-    divina experiment /path/to/my/experiment_definition.json -aws_workers=10

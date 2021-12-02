@@ -24,9 +24,7 @@ RUN apt-get update
 #USER $USERNAME
 #WORKDIR /home/$USERNAME
 
-# Copy the entrypoint
-COPY entrypoint.sh entrypoint.sh
-RUN chmod +x /entrypoint.sh
+
 
 COPY requirements.txt requirements.txt
 RUN python3 -m pip install -r requirements.txt
