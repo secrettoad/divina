@@ -4,31 +4,10 @@
 aws
 **********************
 
-**Experiment Persistence**
+**Forecasting at Scale**
 
-Experiment artifacts are persisted either locally or to S3 depending on the use of the `--local` flag when running the experiment command and will produce a local output structure as shown below::
+In order to to work with larger datasets, include more features, increase the bootstrap sample of divina's confidence intervals, or otherwise scale your forecasting workload, use the --aws_workers option when running the experiment through the cli.
 
-    experiment path
-      |- models
-      |    |
-      |    \- h_{forecast horizon}
-      |           |-fit_model.joblib
-      |           |-bootstrap
-      |                |
-      |                |- bootstrap_model_{random seed}
-      |
-      |- forecast
-      |    |
-      |    |- common_meta.parquet
-      |    |- forecast_partition_0_meta.parquet
-      |    |- forecast_partition_0.parquet
-      |    \  ...
-      |
-      |- validation
-           |
-           |- metrics.json
-           \- {validation split}
-                  |
-                  |- validation_partition_0_meta.parquet
-                  |- validation_partition_0.parquet
-                  \  ...
+.. code-block:: bash
+
+    divina experiment /path/to/my/experiment_definition.json -aws_workers=10
