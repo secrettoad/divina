@@ -19,7 +19,7 @@ from pandas import Timestamp
 
 @pytest.fixture()
 def test_bucket():
-    return "s3://divina-test-2"
+    return "s3://divina-test"
 
 
 @pytest.fixture()
