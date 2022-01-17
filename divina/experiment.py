@@ -427,7 +427,7 @@ class Experiment:
                                 for i in bootstrap_model_paths
                             ]
                             + ["{}_h_{}_pred".format(self.target, h)]
-                        ].map_partitions(lambda df: df.quantile([i * 0.01 for i in self.confidence_intervals], index=1))
+                        ].map_partitions(lambda df: df.quantile([i * 0.01 for i in self.confidence_intervals], axis=1).T)
 
 
                 df_interval.columns = [
