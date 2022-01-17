@@ -419,7 +419,9 @@ class Experiment:
 
                 ###TODO rewrite this....horrendously slow and not distributing to more than one worker
 
-                df_interval = forecast_df[
+                df_interval = dd.from_array(
+                    dd.from_array(
+                        forecast_df[
                             [
                                 "{}_h_{}_pred_b_{}".format(
                                     self.target, h, i.split("-")[-1]
@@ -427,13 +429,20 @@ class Experiment:
                                 for i in bootstrap_model_paths
                             ]
                             + ["{}_h_{}_pred".format(self.target, h)]
-                        ].map_partitions(lambda df: df.quantile([i * 0.01 for i in self.confidence_intervals], index=1))
-
-
+                        ]
+                        .to_dask_array(lengths=True)
+                        .T
+                    )
+                    .repartition(npartitions=forecast_df.npartitions)
+                    .quantile([i * 0.01 for i in self.confidence_intervals])
+                    .to_dask_array(lengths=True)
+                    .T
+                )
                 df_interval.columns = [
                     "{}_h_{}_pred_c_{}".format(self.target, h, c)
                     for c in self.confidence_intervals
                 ]
+
                 df_interval = df_interval.repartition(
                     divisions=forecast_df.divisions
                 ).reset_index(drop=True)
