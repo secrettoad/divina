@@ -24,8 +24,6 @@ RUN apt-get update
 #USER $USERNAME
 #WORKDIR /home/$USERNAME
 
-
-
 COPY requirements.txt requirements.txt
 RUN python3 -m pip install -r requirements.txt
 
