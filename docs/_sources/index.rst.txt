@@ -20,7 +20,6 @@ divina
    quickstart
    experiments
    aws
-   cli
 
 :mod:`divina` is an open source, BSD3-licensed library providing scalable and hyper-interpretable causal forecasting capabilities written in `Python <https://www.python.org/>`__ and consumable via CLI.
 
