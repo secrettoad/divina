@@ -69,7 +69,7 @@ While visual inspection is a powerful tool for validating a model, programmatic 
 
 .. literalinclude:: _static/experiment_definitions/quickstart5.json
    :language: json
-   :emphasize-lines: 50-52
+   :emphasize-lines: 51-53
 
 **Simulation**
 
@@ -77,7 +77,7 @@ A key feature of divina is the ability to easily simulate potential future value
 
 .. literalinclude:: _static/experiment_definitions/quickstart6.json
    :language: json
-   :emphasize-lines: 53-67
+   :emphasize-lines: 56-70
 
 .. raw:: html
     :file: _static/plots/quickstart/quickstart6_h_0_s_1_2d.html
@@ -92,7 +92,7 @@ Confidence intervals provide important insight into how sure divina is of its pr
 
 .. literalinclude:: _static/experiment_definitions/quickstart7.json
    :language: json
-   :emphasize-lines: 68-72
+   :emphasize-lines: 71-75
 
 .. raw:: html
     :file: _static/plots/quickstart/quickstart7_h_0_s_1_2d.html
