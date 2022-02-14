@@ -18,3 +18,5 @@ html_css_files = [
 html_js_files = [
     "js/docs.js",
 ]
+
+html_theme = 'furo'
