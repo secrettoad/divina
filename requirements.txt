@@ -11,6 +11,7 @@ cloudpickle==1.6.0
 dask[distributed]==2021.7.2
 fsspec==2021.7.0
 flake8==3.9.2
+furo==2022.2.14.1
 idna==3.2
 importlib-metadata==4.6.4
 jmespath==0.10.0
