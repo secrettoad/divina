@@ -1,0 +1,18 @@
+[id*='-arg-']
+{
+    display: none;
+}
+[id*='-arg-'] + dd
+{
+    display: none;
+}
+h3{
+    font-size: 18px;
+}
+ul {
+    list-style:none !important;
+    list-style-type:none !important;
+}
+html {
+    display: grid;
+}
