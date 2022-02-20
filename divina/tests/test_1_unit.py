@@ -415,6 +415,14 @@ def test_quickstart(test_eds_quickstart, random_state):
                         k, h, s
                     ),
                 )
+                fig.update_layout(legend=dict(
+                    orientation="h",
+                    yanchor="top",
+                    y=-0.02,
+                    xanchor="center",
+                    x=0.5
+                ))
+                fig.update_xaxes(side="top")
                 path.parent.mkdir(parents=True, exist_ok=True)
                 fig.write_html(path)
                 factor_fig = go.Figure()
@@ -436,7 +444,14 @@ def test_quickstart(test_eds_quickstart, random_state):
                             else "_".join(f.split("_")[1:]),
                         )
                     )
-                factor_fig.update_layout(barmode="relative")
+                factor_fig.update_layout(barmode="relative", legend=dict(
+                    orientation="h",
+                    yanchor="top",
+                    y=-0.05,
+                    xanchor="center",
+                    x=0.5,
+                ))
+                factor_fig.update_xaxes(side="top")
                 path = pathlib.Path(
                     pathlib.Path(__file__).parent.parent.parent,
                     "docs_src/_static/plots/quickstart/{}_test_forecast_retail_h_{}_s_{}_factors.html".format(
