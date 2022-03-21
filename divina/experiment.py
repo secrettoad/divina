@@ -35,6 +35,7 @@ class Experiment:
         bin_features=None,
         interaction_features=None,
         time_horizons=None,
+        booster=None,
         train_start=None,
         train_end=None,
         forecast_start=None,
@@ -51,6 +52,10 @@ class Experiment:
         if not time_horizons:
             self.time_horizons = [0]
         else:
+            if not booster:
+                self.booster = "ma"
+            else:
+                self.booster = booster
             horizon_ranges = [x for x in time_horizons if type(x) == tuple]
             if len(horizon_ranges) > 0:
                 self.time_horizons = [x for x in time_horizons if type(x) == int]
@@ -309,157 +314,163 @@ class Experiment:
             read_ls = os.listdir
             bootstrap_prefix = os.path.join(read_path, "models", "bootstrap")
 
-        for h in self.time_horizons:
-            with read_open(
-                "{}/models/h-{}".format(
+        with read_open(
+                "{}/models/base".format(
                     read_path,
-                    h,
                 ),
                 "rb",
-            ) as f:
-                fit_model = joblib.load(f)
-            with read_open(
-                "{}/models/h-{}_params.json".format(
+        ) as f:
+            fit_model = joblib.load(f)
+        with read_open(
+                "{}/models/base_params.json".format(
                     read_path,
-                    h,
                 ),
                 "r",
-            ) as f:
-                fit_model_params = json.load(f)
-            features = fit_model_params["features"]
+        ) as f:
+            fit_model_params = json.load(f)
+        features = fit_model_params["features"]
 
-            for f in features:
-                if not is_numeric_dtype(forecast_df[f].dtype):
-                    try:
-                        forecast_df[f] = forecast_df[f].astype(float)
-                    except ValueError:
-                        raise ValueError(
-                            "{} could not be converted to float. "
-                            "Please convert to numeric or encode with "
-                            '"encode_features: {}"'.format(f, f)
-                        )
+        for f in features:
+            if not is_numeric_dtype(forecast_df[f].dtype):
+                try:
+                    forecast_df[f] = forecast_df[f].astype(float)
+                except ValueError:
+                    raise ValueError(
+                        "{} could not be converted to float. "
+                        "Please convert to numeric or encode with "
+                        '"encode_features: {}"'.format(f, f)
+                    )
 
-            if self.link_function:
-                forecast_df["{}_h_{}_pred".format(self.target, h)] = da.expm1(
-                    fit_model.predict(forecast_df[features].to_dask_array(lengths=True))
-                )
-                sys.stdout.write("Forecasts made for horizon {}\n".format(h))
-            else:
-                forecast_df["{}_h_{}_pred".format(self.target, h)] = fit_model.predict(
-                    forecast_df[features].to_dask_array(lengths=True)
-                )
-                sys.stdout.write("Forecasts made for horizon {}\n".format(h))
-
-            factor_df = dd.from_array(
-                forecast_df[features].to_dask_array(lengths=True)
-                * da.from_array(fit_model.coef_)
+        if self.link_function:
+            forecast_df["{}_pred".format(self.target)] = da.expm1(
+                fit_model.predict(forecast_df[features].to_dask_array(lengths=True))
             )
-            factor_df.columns = ["factor_{}".format(c) for c in features]
-            for c in factor_df:
-                forecast_df[c] = factor_df[c]
+        else:
+            forecast_df["{}_pred".format(self.target)] = fit_model.predict(
+                forecast_df[features].to_dask_array(lengths=True)
+            )
 
-            if len(self.confidence_intervals) > 0:
-                bootstrap_model_paths = [
-                    p
-                    for p in read_ls("{}/models/bootstrap".format(read_path))
-                    if "." not in p
-                ]
-                bootstrap_model_paths.sort()
+        factor_df = dd.from_array(
+            forecast_df[features].to_dask_array(lengths=True)
+            * da.from_array(fit_model.coef_)
+        )
+        factor_df.columns = ["factor_{}".format(c) for c in features]
+        for c in factor_df:
+            forecast_df[c] = factor_df[c]
 
-                def load_and_predict_bootstrap_model(paths, target, link_function, df):
-                    for path in paths:
-                        if bootstrap_prefix:
-                            model_path = os.path.join(bootstrap_prefix, path)
-                        else:
-                            model_path = path
-                        with read_open(
+        if len(self.confidence_intervals) > 0:
+            bootstrap_model_paths = [
+                p
+                for p in read_ls("{}/models/bootstrap".format(read_path))
+                if "." not in p
+            ]
+            bootstrap_model_paths.sort()
+
+            def load_and_predict_bootstrap_model(paths, target, link_function, df):
+                for path in paths:
+                    if bootstrap_prefix:
+                        model_path = os.path.join(bootstrap_prefix, path)
+                    else:
+                        model_path = path
+                    with read_open(
                             model_path,
                             "rb",
-                        ) as f:
-                            bootstrap_model = joblib.load(f)
-                        with read_open(
+                    ) as f:
+                        bootstrap_model = joblib.load(f)
+                    with read_open(
                             "{}_params.json".format(model_path),
                             "r",
-                        ) as f:
-                            bootstrap_params = json.load(f)
-                            bootstrap_features = bootstrap_params["features"]
-                        if link_function == "log":
-                            df[
-                                "{}_h_{}_pred_b_{}".format(
-                                    target, h, path.split("-")[-1]
-                                )
-                            ] = da.expm1(
-                                bootstrap_model.predict(
-                                    dd.from_pandas(
-                                        df[bootstrap_features], chunksize=10000
-                                    ).to_dask_array(lengths=True)
-                                )
+                    ) as f:
+                        bootstrap_params = json.load(f)
+                        bootstrap_features = bootstrap_params["features"]
+                    if link_function == "log":
+                        df[
+                            "{}_pred_b_{}".format(
+                                target, path.split("-")[-1]
                             )
-                        else:
-                            df[
-                                "{}_h_{}_pred_b_{}".format(
-                                    target, h, path.split("-")[-1]
-                                )
-                            ] = bootstrap_model.predict(
+                        ] = da.expm1(
+                            bootstrap_model.predict(
                                 dd.from_pandas(
                                     df[bootstrap_features], chunksize=10000
                                 ).to_dask_array(lengths=True)
                             )
+                        )
+                    else:
+                        df[
+                            "{}_pred_b_{}".format(
+                                target, path.split("-")[-1]
+                            )
+                        ] = bootstrap_model.predict(
+                            dd.from_pandas(
+                                df[bootstrap_features], chunksize=10000
+                            ).to_dask_array(lengths=True)
+                        )
 
-                    return df
+                return df
 
-                forecast_df = forecast_df.map_partitions(
-                    partial(
-                        load_and_predict_bootstrap_model,
-                        bootstrap_model_paths,
-                        self.target,
-                        self.link_function,
-                    )
+            forecast_df = forecast_df.map_partitions(
+                partial(
+                    load_and_predict_bootstrap_model,
+                    bootstrap_model_paths,
+                    self.target,
+                    self.link_function,
                 )
+            )
 
-                ###TODO rewrite this....horrendously slow and not distributing to more than one worker
-
-                df_interval = dd.from_array(
-                    dd.from_array(
-                        forecast_df[
-                            [
-                                "{}_h_{}_pred_b_{}".format(
-                                    self.target, h, i.split("-")[-1]
-                                )
-                                for i in bootstrap_model_paths
-                            ]
-                            + ["{}_h_{}_pred".format(self.target, h)]
+            ###TODO rewrite this....horrendously slow and not distributing to more than one worker
+            ###TODO start here - nans from shift for horizon causing on-trivial error on quantile.
+            df_interval = dd.from_array(
+                dd.from_array(
+                    forecast_df[
+                        [
+                            "{}_pred_b_{}".format(
+                                self.target, i.split("-")[-1]
+                            )
+                            for i in bootstrap_model_paths
+                        ]
+                        + ["{}_pred".format(self.target)]
                         ]
                         .to_dask_array(lengths=True)
                         .T
-                    )
-                    .repartition(npartitions=forecast_df.npartitions)
-                    .quantile([i * 0.01 for i in self.confidence_intervals])
+                ).repartition(npartitions=forecast_df.npartitions).quantile([i * 0.01 for i in self.confidence_intervals])
                     .to_dask_array(lengths=True)
                     .T
-                )
-                df_interval.columns = [
-                    "{}_h_{}_pred_c_{}".format(self.target, h, c)
-                    for c in self.confidence_intervals
-                ]
-
-                df_interval = df_interval.repartition(
-                    divisions=forecast_df.divisions
-                ).reset_index(drop=True)
-                forecast_df = forecast_df.reset_index(drop=True).join(df_interval)
-
-            forecast_df[self.time_index] = dd.to_datetime(forecast_df[self.time_index])
-
-            forecast_df = forecast_df.sort_values(self.time_index)
-
-            dd.to_parquet(
-                forecast_df,
-                "{}/forecast".format(
-                    write_path,
-                ),
             )
 
-            return forecast_df
+            df_interval.columns = [
+                "{}_pred_c_{}".format(self.target, c)
+                for c in self.confidence_intervals
+            ]
+
+            if self.booster == "ma":
+                forecast_df["factor_boost"] = (forecast_df[self.target] - forecast_df["{}_pred".format(self.target)]).fillna(0).compute().ewm(0.8).mean()
+                sys.stdout.write("Base forecasts made")
+
+            df_interval = df_interval.repartition(
+                divisions=forecast_df.divisions
+            ).reset_index(drop=True)
+            forecast_df = forecast_df.reset_index(drop=True).join(df_interval)
+
+            for h in self.time_horizons:
+                forecast_df["factor_boost_h_{}".format(h)] = forecast_df["factor_boost"].shift(h)
+                forecast_df["{}_h_{}_pred".format(self.target, h)] = forecast_df["{}_pred".format(self.target)] + \
+                                                                     forecast_df["factor_boost_h_{}".format(h)]
+                for c in self.confidence_intervals:
+                    forecast_df["{}_h_{}_pred_c_{}".format(self.target, h, c)] = forecast_df["{}_pred_c_{}".format(self.target, c)] + forecast_df["factor_boost_h_{}".format(h)]
+
+        forecast_df[self.time_index] = dd.to_datetime(forecast_df[self.time_index])
+
+        forecast_df = forecast_df.sort_values(self.time_index)
+
+        dd.to_parquet(
+            forecast_df,
+            "{}/forecast".format(
+                write_path,
+            ),
+        )
+
+        return forecast_df
+
 
     @create_write_directory
     @backoff.on_exception(backoff.expo, ClientError, max_time=30)
@@ -879,3 +890,4 @@ class Experiment:
         if self.validation_splits:
             self.validate(read_path=write_path, write_path=write_path)
         return forecast
+

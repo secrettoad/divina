@@ -112,14 +112,14 @@ def test_forecast(
         os.path.join(
             experiment_path,
             "models",
-            "h-1",
+            "base",
         ),
     )
     with open(
         os.path.join(
             experiment_path,
             "models",
-            "h-1_params.json",
+            "base_params.json",
         ),
         "w+",
     ) as f:
@@ -130,14 +130,14 @@ def test_forecast(
             os.path.join(
                 experiment_path,
                 "models/bootstrap",
-                "h-1_r-{}".format(state),
+                "base_r-{}".format(state),
             ),
         )
         with open(
             os.path.join(
                 experiment_path,
                 "models/bootstrap",
-                "h-1_r-{}_params.json".format(state),
+                "base_r-{}_params.json".format(state),
             ),
             "w+",
         ) as f:
