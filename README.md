@@ -8,7 +8,7 @@
 [![Continuous Integration](https://github.com/secrettoad/divina/actions/workflows/prod.yaml/badge.svg)](https://github.com/secrettoad/divina/actions/workflows/prod.yaml)
 [![PyPI Latest Release](https://img.shields.io/pypi/v/divina.svg)](https://pypi.org/project/divina/)
 [![Package Status](https://img.shields.io/pypi/status/divina.svg)](https://pypi.org/project/divina/)
-[![License](https://img.shields.io/pypi/l/divina.svg)](https://github.com/secrettoad/divina/blob/master/LICENSE)
+[![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://github.com/secrettoad/divina/blob/master/LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 
@@ -61,7 +61,7 @@ pip install divina
 
 
 ## License
-[BSD 3](LICENSE)
+[AGPL](LICENSE)
 
 ## Documentation
 ``divina``'s documentation is available [here](https://secrettoad.github.io/divina/#). 
