@@ -5,215 +5,68 @@ import pathlib
 import dask.dataframe as ddf
 import joblib
 import pandas as pd
+import numpy as np
 
 import plotly.graph_objects as go
 
-from ..experiment import Experiment
+from .._experiment import Experiment
 from ..utils import compare_sk_models, get_parameters, set_parameters
 
 
-def test_get_composite_dataset(
+def test_bin_features(
+    test_data_1,
     test_df_1,
-    test_df_2,
-    test_ed_2,
-    test_composite_dataset_1,
-    dask_client,
+    test_ed_1,
 ):
-    for dataset in test_ed_2["experiment_definition"]["joins"]:
-        pathlib.Path(dataset["data_path"]).mkdir(parents=True, exist_ok=True)
-    pathlib.Path(
-        test_ed_2["experiment_definition"]["data_path"],
-    ).mkdir(parents=True, exist_ok=True)
-
-    ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_ed_2["experiment_definition"]["data_path"]
-    )
-    ddf.from_pandas(test_df_2, npartitions=2).to_parquet(
-        test_ed_2["experiment_definition"]["joins"][0]["data_path"]
-    )
-    experiment = Experiment(**test_ed_2["experiment_definition"])
-    df = experiment.get_dataset()
+    experiment = Experiment(**test_ed_1["experiment_definition"])
+    df = experiment.preprocess(test_data_1)
     pd.testing.assert_frame_equal(
-        df.compute().reset_index(drop=True),
-        test_composite_dataset_1.reset_index(drop=True),
+        df.compute(),
+        test_df_1.compute().set_index('a'),
     )
 
-
-def test_train(
-    s3_fs,
+###TODO get rid of experiment definitions and make it all pythonic
+def test_glm_train(
     test_df_1,
     test_ed_1,
     test_model_1,
-    dask_client,
-    test_bootstrap_models,
-    test_validation_models,
     random_state,
 ):
-    experiment_path = "divina-test/experiment/test1"
-    pathlib.Path(
-        test_ed_1["experiment_definition"]["data_path"],
-    ).mkdir(parents=True, exist_ok=True)
-    ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_ed_1["experiment_definition"]["data_path"]
-    )
     experiment = Experiment(**test_ed_1["experiment_definition"])
-    experiment.train(
-        write_path=experiment_path,
-        random_state=random_state,
-    )
-
+    model = experiment.train(
+        X=test_df_1.set_index('a').drop(columns='c'), y=test_df_1[['c']], random_state=random_state, model_type='GLM', model_params={'link_function': 'log'})
     compare_sk_models(
-        experiment.models["horizons"][1]["base"][0],
+        model,
         test_model_1[0],
     )
-    assert experiment.models["horizons"][1]["base"][1] == test_model_1[1]["features"]
-    for state in test_bootstrap_models:
-        compare_sk_models(
-            experiment.models["horizons"][1]["bootstrap"][state][0],
-            test_bootstrap_models[state][0],
-        )
-        assert (
-            experiment.models["horizons"][1]["bootstrap"][state][1]
-            == test_bootstrap_models[state][1]["features"]
-        )
-    for split in test_validation_models:
-        compare_sk_models(
-            experiment.models["horizons"][1]["splits"][split][0],
-            test_validation_models[split][0],
-        )
-        assert (
-            experiment.models["horizons"][1]["splits"][split][1]
-            == test_validation_models[split][1]["features"]
-        )
 
 
-def test_forecast(
-    s3_fs,
-    dask_client,
+def test_glm_forecast(
     test_df_1,
     test_ed_1,
     test_model_1,
-    test_val_predictions_1,
     test_forecast_1,
-    test_bootstrap_models,
 ):
-    experiment_path = "divina-test/experiment/test1"
-    pathlib.Path(test_ed_1["experiment_definition"]["data_path"]).mkdir(
-        parents=True, exist_ok=True
-    )
-    pathlib.Path(os.path.join(experiment_path, "models/bootstrap")).mkdir(
-        parents=True, exist_ok=True
-    )
-    ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_ed_1["experiment_definition"]["data_path"]
-    )
-    joblib.dump(
-        test_model_1[0],
-        os.path.join(
-            experiment_path,
-            "models",
-            "h-1",
-        ),
-    )
-    with open(
-        os.path.join(
-            experiment_path,
-            "models",
-            "h-1_params.json",
-        ),
-        "w+",
-    ) as f:
-        json.dump(test_model_1[1], f)
-    for state in test_bootstrap_models:
-        joblib.dump(
-            test_bootstrap_models[state][0],
-            os.path.join(
-                experiment_path,
-                "models/bootstrap",
-                "h-1_r-{}".format(state),
-            ),
-        )
-        with open(
-            os.path.join(
-                experiment_path,
-                "models/bootstrap",
-                "h-1_r-{}_params.json".format(state),
-            ),
-            "w+",
-        ) as f:
-            json.dump(test_bootstrap_models[state][1], f)
     experiment = Experiment(**test_ed_1["experiment_definition"])
     result = experiment.forecast(
-        read_path=experiment_path,
-        write_path=experiment_path,
+        model=test_model_1[0], X=test_df_1.set_index('a').drop(columns='c'),
     )
-    pd.testing.assert_frame_equal(
-        result.compute().reset_index(drop=True),
-        test_forecast_1.reset_index(drop=True),
-        check_dtype=False,
+    np.testing.assert_equal(
+        result.compute().values,
+        test_forecast_1.compute().values
     )
 
 
 def test_validate(
-    s3_fs,
     test_ed_1,
     test_df_1,
-    test_metrics_1,
-    dask_client,
-    test_val_predictions_1,
-    test_validation_models,
-    test_model_1,
-    test_bootstrap_models,
+    test_forecast_1,
+    test_metrics_1
 ):
-    experiment_path = "divina-test/experiment/test1"
-    ddf.from_pandas(test_df_1, npartitions=2).to_parquet(
-        test_ed_1["experiment_definition"]["data_path"]
-    )
-    pathlib.Path(os.path.join(experiment_path, "models", "bootstrap")).mkdir(
-        parents=True, exist_ok=True
-    )
 
-    for split in test_validation_models:
-        joblib.dump(
-            test_validation_models[split][0],
-            os.path.join(
-                experiment_path,
-                "models",
-                "s-{}_h-1".format(pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")),
-            ),
-        )
-        with open(
-            os.path.join(
-                experiment_path,
-                "models",
-                "s-{}_h-1_params.json".format(
-                    pd.to_datetime(str(split)).strftime("%Y%m%d-%H%M%S")
-                ),
-            ),
-            "w+",
-        ) as f:
-            json.dump(test_validation_models[split][1], f)
-    for state in test_bootstrap_models:
-        joblib.dump(
-            test_bootstrap_models[state][0],
-            os.path.join(
-                experiment_path,
-                "models/bootstrap",
-                "h-1_r-{}".format(state),
-            ),
-        )
-        with open(
-            os.path.join(
-                experiment_path,
-                "models/bootstrap",
-                "h-1_r-{}_params.json".format(state),
-            ),
-            "w+",
-        ) as f:
-            json.dump(test_bootstrap_models[state][1], f)
     experiment = Experiment(**test_ed_1["experiment_definition"])
-    experiment.validate(read_path=experiment_path, write_path=experiment_path)
-    assert experiment.metrics == test_metrics_1
+    metrics = experiment.validate(truth_dataset=test_df_1[['c']], prediction_dataset=test_forecast_1)
+    assert metrics == test_metrics_1
 
 
 def test_get_params(test_model_1, test_params_1):
@@ -292,6 +145,20 @@ def test_set_params(test_model_1, test_params_1, test_params_2):
 
     assert params == test_params_2
 
+
+def test_example_pipeline(
+    test_df_4,
+    test_ed_2,
+    ):
+    experiment = Experiment(**test_ed_2["experiment_definition"])
+    ###TODO use target dimensions in long to wide
+    experiment.run(test_df_4, boost_model_params={'window': 7, 'alpha': 0.08})
+    pass
+
+
+
+###TODO start here test full pipeline and then test kfp pipeline
+###TODO then implement interpretability/analytics interface
 
 def test_quickstart(test_eds_quickstart, random_state):
     for k in test_eds_quickstart:

@@ -6,12 +6,13 @@ from functools import wraps
 import dask.dataframe as dd
 import numpy as np
 import s3fs
-from dask.distributed import Client
 from dask_cloudprovider.aws import EC2Cluster
 from dask_ml.linear_model import LinearRegression
 from jsonschema import validate
+from .model import GLM
 from sklearn.base import BaseEstimator
 from sklearn.pipeline import Pipeline
+from dask.distributed import Client, LocalCluster
 
 
 def get_parameters(model_path):
@@ -74,10 +75,10 @@ def compare_sk_models(model1, model2):
         steps2 = model2.steps
     for s, o in zip(steps1, steps2):
         if isinstance(s[1], BaseEstimator):
-            assert set(s[1].get_params()) == set(o[1].get_params())
-        if isinstance(s[1], LinearRegression):
-            assert np.allclose(s[1].coef_, o[1].coef_)
-            assert np.allclose([s[1].intercept_], [o[1].intercept_])
+            assert s[1].get_params(deep=True) == o[1].get_params(deep=True)
+        if isinstance(s[0], GLM):
+            assert np.allclose(s[1].linear_model.coef_, o[1].linear_model.coef_)
+            assert np.allclose([s[1].linear_model.intercept_], [o[1].linear_model.intercept_])
         return None
 
 
@@ -134,23 +135,8 @@ def create_write_directory(func):
     return wrapper
 
 
-def get_dask_client(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if not "aws_workers" in kwargs:
-            with Client():
-                return func(*args, **kwargs)
-        else:
-            aws_workers = kwargs["aws_workers"]
-            if not "ec2_key" in kwargs:
-                ec2_key = None
-            else:
-                ec2_key = kwargs["ec2_key"]
-            if not "keep_alive" in kwargs:
-                keep_alive = False
-            else:
-                keep_alive = kwargs["keep_alive"]
-            with EC2Cluster(
+def create_dask_aws_cluster(aws_workers, ec2_key, keep_alive):
+            cluster = EC2Cluster(
                 key_name=ec2_key,
                 security=False,
                 docker_image="jhurdle/divina:latest",
@@ -160,9 +146,33 @@ def get_dask_client(func):
                     "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
                 },
                 auto_shutdown=not keep_alive,
-            ) as cluster:
-                cluster.scale(aws_workers)
-                with Client(cluster) as client:
-                    return func(*args, **kwargs)
+            )
+            cluster.scale(aws_workers)
+            return cluster
 
+
+def get_dask_client(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not kwargs["dask_scheduler_ip"]:
+            if not kwargs["create_cluster_destination"]:
+                with LocalCluster() as cluster:
+                    with Client(cluster) as client:
+                        value = func(*args, **kwargs)
+                        cluster.close()
+                        cluster.shutdown()
+                        return value
+            elif kwargs["create_cluster_destination"] == "aws":
+                with create_dask_aws_cluster(kwargs["num_workers"], kwargs["ssh_key"], keep_alive=kwargs["debug"]) as cluster:
+                    with Client(cluster) as client:
+                        value = func(*args, **kwargs)
+                        cluster.close()
+                        cluster.shutdown()
+                        return value
+            ###todo add gcp, azure
+
+        else:
+            with Client(kwargs["dask_scheduler_ip"]):
+                return func(*args, **kwargs)
     return wrapper
+
