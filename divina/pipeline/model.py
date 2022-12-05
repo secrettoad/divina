@@ -23,6 +23,11 @@ class EWMA(BaseEstimator):
         y_hat = da.dot(da.nan_to_num(X), da.from_array(self.weights)) / self.window
         return y_hat
 
+    def __eq__(self, other):
+        return self.alpha == other.alpha and self.window == other.window and self.weights == self.weights
+
+
+
 
 class GLM(BaseEstimator):
     def __init__(self, link_function=None, linear_parameters: dict=None):
@@ -35,6 +40,14 @@ class GLM(BaseEstimator):
             self.linear_model = LinearRegression()
         super().__init__()
 
+    @property
+    def _coef(self):
+        return self.linear_model._coef
+
+    @_coef.setter
+    def _coef(self, value: np.array):
+        self.linear_model._coef = value
+
     def fit(self, X, y):
         if self.link_function == 'log':
             y = np.log(y)
@@ -45,5 +58,10 @@ class GLM(BaseEstimator):
         if self.link_function == 'log':
             y_hat = np.exp(y_hat)
         return y_hat
+
+    def __eq__(self, other):
+        return np.allclose(self._coef, other._coef)
+
+
 
 

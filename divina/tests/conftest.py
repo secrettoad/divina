@@ -4,127 +4,31 @@ import pathlib
 import shutil
 from unittest.mock import patch
 
-import boto3
 import dask.dataframe as ddf
 import fsspec
 import numpy as np
 import pandas as pd
 import pytest
-import s3fs
 from dask.distributed import Client
-from dask_cloudprovider.aws import EC2Cluster
 from dask_ml.linear_model import LinearRegression
 from pandas import Timestamp
-from ..model import GLM
+from pykube import Pod, PersistentVolume
+import time
+from pipeline.model import GLM, EWMA
+from pipeline._experiment import ExperimentResult, ValidationSplit, BoostValidation, CausalValidation, Validation
+from sklearn.base import BaseEstimator
+import kfp
 
-
-@pytest.fixture()
-def test_bucket():
-    return "s3://divina-test"
 
 
 @pytest.fixture()
 def random_state():
     return 11
 
-
-def setup_teardown_test_bucket(s3_fs, test_bucket):
-    fsspec.filesystem("s3").invalidate_cache()
-    try:
-        s3_fs.rm(test_bucket, recursive=True)
-    except FileNotFoundError:
-        pass
-    s3_fs.mkdir(
-        test_bucket,
-        region_name=os.environ["AWS_DEFAULT_REGION"],
-        acl="private",
-    )
-    yield
-    try:
-        s3_fs.rm(test_bucket, recursive=True)
-    except FileNotFoundError:
-        pass
-
-
-@pytest.fixture()
-def setup_teardown_test_bucket_contents(s3_fs, test_bucket):
-    fsspec.filesystem("s3").invalidate_cache()
-    try:
-        s3_fs.rm(test_bucket, recursive=True)
-    except FileNotFoundError:
-        pass
-    s3_fs.mkdir(
-        test_bucket,
-        region_name=os.environ["AWS_DEFAULT_REGION"],
-        acl="private",
-    )
-    yield
-    try:
-        s3_fs.rm(test_bucket, recursive=True)
-    except FileNotFoundError:
-        pass
-
-
-@pytest.fixture(autouse=True)
-def setup_teardown_test_directory(s3_fs, test_bucket):
-    try:
-        os.mkdir("divina-test")
-    except FileExistsError:
-        shutil.rmtree("divina-test")
-        os.mkdir("divina-test")
-    yield
-    try:
-        shutil.rmtree("divina-test")
-    except FileNotFoundError:
-        pass
-
-
-@patch.dict(os.environ, {"AWS_SHARED_CREDENTIALS_FILE": "~/.aws/credentials"})
-@pytest.fixture()
-def divina_session():
-    return boto3.Session()
-
-
-@pytest.fixture(scope="session")
-def s3_fs():
-    return s3fs.S3FileSystem()
-
-
-@pytest.fixture(scope="session")
-def dask_cluster_ip():
-    return None
-
-
-@pytest.fixture(scope="session")
-def dask_client_remote(request, dask_cluster_ip):
-    if dask_cluster_ip:
-        client = Client(dask_cluster_ip)
-        yield client
-    else:
-        cluster = EC2Cluster(
-            key_name="divina2",
-            security=False,
-            docker_image="jhurdle/divina:test",
-            debug=False,
-            env_vars={
-                "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-                "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-                "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
-            },
-            auto_shutdown=True,
-        )
-        cluster.scale(5)
-        client = Client(cluster)
-        request.addfinalizer(lambda: client.close())
-        yield client
-        if not dask_cluster_ip:
-            client.shutdown()
-
-
 @pytest.fixture()
 def test_model_1(test_df_1, random_state, test_ed_1):
-    params = [2.78841111,  0.93118321, -2.24143098]
-    intercept = 2.2413622182946873
+    params = [0.02066113, -0.32723665, 0.32723891]
+    intercept = 2.0304274531519955
     features = ["b", "b_(5, 10]", "b_(15, inf]"]
 
     model = GLM(link_function='log')
@@ -177,7 +81,7 @@ def test_bootstrap_models(test_df_1, random_state, test_ed_1):
     bootstrap_models = {}
 
     for j, i, p, f, state in zip(
-        range(0, len(states)), intercepts, params, features, states
+            range(0, len(states)), intercepts, params, features, states
     ):
         model = LinearRegression()
         model.fit(
@@ -205,7 +109,7 @@ def test_validation_models(test_df_1, random_state, test_ed_1):
     validation_models = {}
 
     for j, i, p, f, split in zip(
-        range(0, len(splits)), intercepts, params, features, splits
+            range(0, len(splits)), intercepts, params, features, splits
     ):
         model = LinearRegression()
         model.fit(
@@ -234,7 +138,7 @@ def test_params_2(test_model_1):
 
 @pytest.fixture()
 def test_metrics_1():
-    return {'mse': 7.403630461048873e+65}
+    return {'mse': 298.6217303164645}
 
 
 @pytest.fixture()
@@ -254,8 +158,18 @@ def test_val_predictions_1():
 
 @pytest.fixture()
 def test_forecast_1():
-    return ddf.from_array(np.array([2970.3819018152676, 18730846144.84451, 178040476.4682159, 181.7979998940561, 3.9443353279256965e+21, 2.1076475693600494e+33])).to_frame()
+    return ddf.from_array(np.array(
+        [6.4784406641130605, 15.972826954952883, 14.405114442640931, 6.089076652014592, 28.485654314221193, 51.8613272721154])).to_frame()
 
+
+@pytest.fixture()
+def test_pipeline_name():
+    return 'test-pipeline'
+
+
+@pytest.fixture()
+def test_pipeline_root(test_pipeline_name, test_bucket):
+    return 's3://{}/{}'.format(test_bucket, test_pipeline_name)
 
 @pytest.fixture()
 def test_ed_1():
@@ -276,12 +190,13 @@ def test_ed_1():
                 "b": {"mode": "constant", "constant_values": [0, 1, 2, 3, 4, 5]}
             },
             "time_horizons": [1],
-            #"data_path": "divina-test/dataset/test1",
+            "boost_window": 7
         }
     }
 
+
 @pytest.fixture()
-def test_ed_2():
+def test_ed_2(test_pipeline_root):
     return {
         "experiment_definition": {
             "time_index": "a",
@@ -294,13 +209,16 @@ def test_ed_2():
             "frequency": "S",
             "confidence_intervals": [90],
             "bootstrap_sample": 5,
+            "random_seed": 11,
             "bin_features": {"b": [5, 10, 15]},
             "scenarios": {
                 "b": {"mode": "constant", "constant_values": [0, 1, 2, 3, 4, 5]}
             },
             "time_horizons": [1],
-            "target_dimensions": ['d', 'e']
-            #"data_path": "divina-test/dataset/test1",
+            "pipeline_root": test_pipeline_root,
+            "target_dimensions": ['d', 'e'],
+            "boost_window": 7
+            # "data_path": "divina-test/dataset/test1",
         }
     }
 
@@ -309,19 +227,19 @@ def test_ed_2():
 def test_eds_quickstart():
     eds = {}
     for file in sorted(
-        os.listdir(
-            pathlib.Path(
-                pathlib.Path(__file__).parent.parent.parent,
-                "docs_src/_static/experiment_definitions",
+            os.listdir(
+                pathlib.Path(
+                    pathlib.Path(__file__).parent.parent.parent,
+                    "docs_src/_static/experiment_definitions",
+                )
             )
-        )
     ):
         with open(
-            pathlib.Path(
-                pathlib.Path(__file__).parent.parent.parent,
-                "docs_src/_static/experiment_definitions",
-                file,
-            )
+                pathlib.Path(
+                    pathlib.Path(__file__).parent.parent.parent,
+                    "docs_src/_static/experiment_definitions",
+                    file,
+                )
         ) as f:
             eds[file.split(".")[0]] = json.load(f)
     return eds
@@ -330,9 +248,9 @@ def test_eds_quickstart():
 @pytest.fixture()
 def test_ed_3(test_bucket, test_ed_1):
     test_ed = test_ed_1
-    #test_ed["experiment_definition"].update(
+    # test_ed["experiment_definition"].update(
     #    {"data_path": "{}/dataset/test1".format(test_bucket)}
-    #)
+    # )
     return test_ed
 
 
@@ -365,22 +283,22 @@ def test_data_1():
                 [Timestamp("1970-01-01 00:00:10"), 11.0, 12.0],
             ]
         )
-        .sample(25, replace=True, random_state=11)
-        .reset_index(drop=True)
+            .sample(25, replace=True, random_state=11)
+            .reset_index(drop=True)
     )
     df.columns = ["a", "b", "c"]
-    return  ddf.from_pandas(df, npartitions=2)
+    return ddf.from_pandas(df, npartitions=2)
 
 
 @pytest.fixture()
 def test_df_1():
     df = pd.DataFrame(
-         [[Timestamp('1970-01-01 00:00:01'), 8.0, 12.0, 1, 0],
-                    [Timestamp('1970-01-01 00:00:04'), 20.0, 24.0, 0, 1],
-                    [Timestamp('1970-01-01 00:00:05'), 15.0, 18.0, 0, 1],
-                    [Timestamp('1970-01-01 00:00:06'), 5.0, 6.0, 1, 0],
-                    [Timestamp('1970-01-01 00:00:07'), 48.0, 54.0, 0, 1],
-                    [Timestamp('1970-01-01 00:00:10'), 77.0, 84.0, 0, 1]]
+        [[Timestamp('1970-01-01 00:00:01'), 8.0, 12.0, 1, 0],
+         [Timestamp('1970-01-01 00:00:04'), 20.0, 24.0, 0, 1],
+         [Timestamp('1970-01-01 00:00:05'), 15.0, 18.0, 0, 1],
+         [Timestamp('1970-01-01 00:00:06'), 5.0, 6.0, 1, 0],
+         [Timestamp('1970-01-01 00:00:07'), 48.0, 54.0, 0, 1],
+         [Timestamp('1970-01-01 00:00:10'), 77.0, 84.0, 0, 1]]
     )
     df.columns = ['a', 'b', 'c', 'b_(5, 10]', 'b_(15, inf]']
     return ddf.from_pandas(df, npartitions=2)
@@ -409,46 +327,202 @@ def test_df_3():
     return df
 
 
-
 @pytest.fixture()
 def test_df_4():
     df = pd.DataFrame(
-         [[Timestamp('1970-01-01 00:00:01'), 8.0, 12.0, 1, 0],
-                    [Timestamp('1970-01-01 00:00:04'), 20.0, 24.0, 0, 1],
-                    [Timestamp('1970-01-01 00:00:05'), 15.0, 18.0, 0, 1],
-                    [Timestamp('1970-01-01 00:00:06'), 5.0, 6.0, 1, 0],
-                    [Timestamp('1970-01-01 00:00:07'), 48.0, 54.0, 0, 1],
-                    [Timestamp('1970-01-01 00:00:10'), 77.0, 84.0, 0, 1],
-          [Timestamp('1970-01-02 00:00:01'), 8.0, 12.0, 1, 0],
-          [Timestamp('1970-01-02 00:00:04'), 20.0, 24.0, 0, 1],
-          [Timestamp('1970-01-02 00:00:05'), 15.0, 18.0, 0, 1],
-          [Timestamp('1970-01-02 00:00:06'), 5.0, 6.0, 1, 0],
-          [Timestamp('1970-01-02 00:00:07'), 48.0, 54.0, 0, 1],
-          [Timestamp('1970-01-02 00:00:10'), 77.0, 84.0, 0, 1],
+        [[Timestamp('1970-01-01 00:00:01'), 8.0, 12.0, 1, 0],
+         [Timestamp('1970-01-01 00:00:04'), 20.0, 24.0, 0, 1],
+         [Timestamp('1970-01-01 00:00:05'), 15.0, 18.0, 0, 1],
+         [Timestamp('1970-01-01 00:00:06'), 5.0, 6.0, 1, 0],
+         [Timestamp('1970-01-01 00:00:07'), 48.0, 54.0, 0, 1],
+         [Timestamp('1970-01-01 00:00:10'), 77.0, 84.0, 0, 1],
+         [Timestamp('1970-01-02 00:00:01'), 8.0, 12.0, 1, 0],
+         [Timestamp('1970-01-02 00:00:04'), 20.0, 24.0, 0, 1],
+         [Timestamp('1970-01-02 00:00:05'), 15.0, 18.0, 0, 1],
+         [Timestamp('1970-01-02 00:00:06'), 5.0, 6.0, 1, 0],
+         [Timestamp('1970-01-02 00:00:07'), 48.0, 54.0, 0, 1],
+         [Timestamp('1970-01-02 00:00:10'), 77.0, 84.0, 0, 1],
 
-          [Timestamp('1970-01-03 00:00:01'), 8.0, 12.0, 1, 0],
-          [Timestamp('1970-01-03 00:00:04'), 20.0, 24.0, 0, 1],
-          [Timestamp('1970-01-03 00:00:05'), 15.0, 18.0, 0, 1],
-          [Timestamp('1970-01-03 00:00:06'), 5.0, 6.0, 1, 0],
-          [Timestamp('1970-01-03 00:00:07'), 48.0, 54.0, 0, 1],
-          [Timestamp('1970-01-03 00:00:10'), 77.0, 84.0, 0, 1],
+         [Timestamp('1970-01-03 00:00:01'), 8.0, 12.0, 1, 0],
+         [Timestamp('1970-01-03 00:00:04'), 20.0, 24.0, 0, 1],
+         [Timestamp('1970-01-03 00:00:05'), 15.0, 18.0, 0, 1],
+         [Timestamp('1970-01-03 00:00:06'), 5.0, 6.0, 1, 0],
+         [Timestamp('1970-01-03 00:00:07'), 48.0, 54.0, 0, 1],
+         [Timestamp('1970-01-03 00:00:10'), 77.0, 84.0, 0, 1],
 
-          [Timestamp('1970-01-04 00:00:01'), 8.0, 12.0, 1, 0],
-          [Timestamp('1970-01-04 00:00:04'), 20.0, 24.0, 0, 1],
-          [Timestamp('1970-01-04 00:00:05'), 15.0, 18.0, 0, 1],
-          [Timestamp('1970-01-04 00:00:06'), 5.0, 6.0, 1, 0],
-          [Timestamp('1970-01-04 00:00:07'), 48.0, 54.0, 0, 1],
-          [Timestamp('1970-01-04 00:00:10'), 77.0, 84.0, 0, 1],
+         [Timestamp('1970-01-04 00:00:01'), 8.0, 12.0, 1, 0],
+         [Timestamp('1970-01-04 00:00:04'), 20.0, 24.0, 0, 1],
+         [Timestamp('1970-01-04 00:00:05'), 15.0, 18.0, 0, 1],
+         [Timestamp('1970-01-04 00:00:06'), 5.0, 6.0, 1, 0],
+         [Timestamp('1970-01-04 00:00:07'), 48.0, 54.0, 0, 1],
+         [Timestamp('1970-01-04 00:00:10'), 77.0, 84.0, 0, 1],
 
-          [Timestamp('1970-01-05 00:00:01'), 8.0, 12.0, 1, 0],
-          [Timestamp('1970-01-05 00:00:04'), 20.0, 24.0, 0, 1],
-          [Timestamp('1970-01-05 00:00:05'), 15.0, 18.0, 0, 1],
-          [Timestamp('1970-01-05 00:00:06'), 5.0, 6.0, 1, 0],
-          [Timestamp('1970-01-05 00:00:07'), 48.0, 54.0, 0, 1],
-          [Timestamp('1970-01-05 00:00:10'), 77.0, 84.0, 0, 1]
-          ]
+         [Timestamp('1970-01-05 00:00:01'), 8.0, 12.0, 1, 0],
+         [Timestamp('1970-01-05 00:00:04'), 20.0, 24.0, 0, 1],
+         [Timestamp('1970-01-05 00:00:05'), 15.0, 18.0, 0, 1],
+         [Timestamp('1970-01-05 00:00:06'), 5.0, 6.0, 1, 0],
+         [Timestamp('1970-01-05 00:00:07'), 48.0, 54.0, 0, 1],
+         [Timestamp('1970-01-05 00:00:10'), 77.0, 84.0, 0, 1]
+         ]
     )
     df.columns = ['a', 'b', 'c', 'b_(5, 10]', 'b_(15, inf]']
     for c in ['e', 'd']:
-        df[c] = np.random.randint(1, 3, df.shape[0])
+        R = np.random.RandomState(11)
+        df[c] = R.randint(1, 3, df.shape[0])
     return ddf.from_pandas(df, npartitions=2)
+
+
+@pytest.fixture
+def test_boosted_predictions():
+    df = pd.DataFrame(
+        [[45.58413137156656], [60.7895464849905], [13.859510463526139], [28.79254702198098], [24.051514028073512],
+         [13.313258838703597], [44.942921520368664], [61.145193973857204], [15.233716818422364], [25.008343275203817],
+         [23.468016925036036], [16.312445897505494], [42.58681555603796], [63.87539354585601], [11.786678091145998],
+         [27.588968494855635], [21.468108056979702], [10.418534142054174], [40.77127346734583], [60.29947992722473],
+         [9.813262777350197], [23.702105865908596], [20.665251630170108], [9.545864112913312], [38.03477476759858],
+         [56.52041334521233]])
+    df.columns = [0]
+    return ddf.from_pandas(df, npartitions=2)
+
+
+@pytest.fixture
+def test_causal_predictions():
+    df = pd.DataFrame(
+        [[38.03477476759858], [56.52041334521233], [7.532516315578564], [20.18657200300599], [16.99939293790017],
+         [5.620208876515074], [38.03477476759858], [56.52041334521233], [7.532516315578564], [20.18657200300599],
+         [16.99939293790017], [5.620208876515074], [38.03477476759858], [56.52041334521233], [7.532516315578564],
+         [20.18657200300599], [16.99939293790017], [5.620208876515074], [38.03477476759858], [56.52041334521233],
+         [7.532516315578564], [20.18657200300599], [16.99939293790017], [5.620208876515074], [38.03477476759858],
+         [56.52041334521233]])
+    df.columns = ['mean']
+    return ddf.from_pandas(df, npartitions=2)
+
+
+@pytest.fixture
+def test_truth():
+    df = pd.DataFrame([['1970-01-01 00:00:07__index__2__index__1', 48.0, 54.0, 0, 1],
+                       ['1970-01-01 00:00:10__index__2__index__2', 77.0, 84.0, 0, 1],
+                       ['1970-01-02 00:00:01__index__1__index__1', 8.0, 12.0, 1, 0],
+                       ['1970-01-02 00:00:04__index__1__index__2', 20.0, 24.0, 0, 1],
+                       ['1970-01-02 00:00:05__index__2__index__1', 15.0, 18.0, 0, 1],
+                       ['1970-01-02 00:00:06__index__2__index__2', 5.0, 6.0, 1, 0],
+                       ['1970-01-02 00:00:07__index__1__index__1', 48.0, 54.0, 0, 1],
+                       ['1970-01-02 00:00:10__index__1__index__2', 77.0, 84.0, 0, 1],
+                       ['1970-01-03 00:00:01__index__2__index__1', 8.0, 12.0, 1, 0],
+                       ['1970-01-03 00:00:04__index__1__index__1', 20.0, 24.0, 0, 1],
+                       ['1970-01-03 00:00:05__index__1__index__1', 15.0, 18.0, 0, 1],
+                       ['1970-01-03 00:00:06__index__1__index__2', 5.0, 6.0, 1, 0],
+                       ['1970-01-03 00:00:07__index__1__index__2', 48.0, 54.0, 0, 1],
+                       ['1970-01-03 00:00:10__index__1__index__2', 77.0, 84.0, 0, 1],
+                       ['1970-01-04 00:00:01__index__1__index__1', 8.0, 12.0, 1, 0],
+                       ['1970-01-04 00:00:04__index__2__index__1', 20.0, 24.0, 0, 1],
+                       ['1970-01-04 00:00:05__index__1__index__1', 15.0, 18.0, 0, 1],
+                       ['1970-01-04 00:00:06__index__2__index__1', 5.0, 6.0, 1, 0],
+                       ['1970-01-04 00:00:07__index__1__index__1', 48.0, 54.0, 0, 1],
+                       ['1970-01-04 00:00:10__index__2__index__2', 77.0, 84.0, 0, 1],
+                       ['1970-01-05 00:00:01__index__1__index__1', 8.0, 12.0, 1, 0],
+                       ['1970-01-05 00:00:04__index__1__index__1', 20.0, 24.0, 0, 1],
+                       ['1970-01-05 00:00:05__index__2__index__1', 15.0, 18.0, 0, 1],
+                       ['1970-01-05 00:00:06__index__1__index__1', 5.0, 6.0, 1, 0],
+                       ['1970-01-05 00:00:07__index__2__index__2', 48.0, 54.0, 0, 1],
+                       ['1970-01-05 00:00:10__index__1__index__2', 77.0, 84.0, 0, 1]])
+    df.columns = ['__target_dimension_index__', 'b', 'c', 'b_(5, 10]', 'b_(15, inf]']
+    return ddf.from_pandas(df.set_index('__target_dimension_index__'), npartitions=2)
+
+
+@pytest.fixture
+def test_bootstrap_validations():
+    state = [({'mse': 124.16190403858947}, np.array([3.54524468, 0.75499658, -1.1595055, 1.15946188]),
+              [[40.944542248313226], [62.83944297443861], [8.425711791823481], [19.804638098950782],
+               [16.02965521513606], [6.160722061534648], [40.944542248313226], [62.83944297443861], [8.425711791823481],
+               [19.804638098950782], [16.02965521513606], [6.160722061534648], [40.944542248313226],
+               [62.83944297443861], [8.425711791823481], [19.804638098950782], [16.02965521513606], [6.160722061534648],
+               [40.944542248313226], [62.83944297443861], [8.425711791823481], [19.804638098950782],
+               [16.02965521513606], [6.160722061534648], [40.944542248313226], [62.83944297443861]]), (
+                 {'mse': 229.0403771665481}, np.array([4.34323446, 0.61122715, -3.34270131, 3.34266718]),
+                 [[37.024804743734904], [54.75039203362197], [5.8903503351407185], [19.910444601774977],
+                  [16.854308862139277], [4.056668891359298], [37.024804743734904], [54.75039203362197],
+                  [5.8903503351407185], [19.910444601774977], [16.854308862139277], [4.056668891359298],
+                  [37.024804743734904], [54.75039203362197], [5.8903503351407185], [19.910444601774977],
+                  [16.854308862139277], [4.056668891359298], [37.024804743734904], [54.75039203362197],
+                  [5.8903503351407185], [19.910444601774977], [16.854308862139277], [4.056668891359298],
+                  [37.024804743734904], [54.75039203362197]]), (
+                 {'mse': 229.04037716654764}, np.array([4.34323446, 0.61122715, -3.34270131, 3.34266718]),
+                 [[37.02480474373492], [54.750392033622], [5.8903503351407185], [19.910444601774977],
+                  [16.854308862139277],
+                  [4.056668891359296], [37.02480474373492], [54.750392033622], [5.8903503351407185],
+                  [19.910444601774977],
+                  [16.854308862139277], [4.056668891359296], [37.02480474373492], [54.750392033622],
+                  [5.8903503351407185],
+                  [19.910444601774977], [16.854308862139277], [4.056668891359296], [37.02480474373492],
+                  [54.750392033622],
+                  [5.8903503351407185], [19.910444601774977], [16.854308862139277], [4.056668891359296],
+                  [37.02480474373492], [54.750392033622]]), (
+                 {'mse': 245.7282869286211}, np.array([6.97819441, 0.5519436, -3.42995856, 3.42994363]),
+                 [[36.901430624102545], [52.90779489234828], [7.9637846221382995], [21.447009951313554],
+                  [18.687291974029808], [6.307953835768051], [36.901430624102545], [52.90779489234828],
+                  [7.9637846221382995], [21.447009951313554], [18.687291974029808], [6.307953835768051],
+                  [36.901430624102545], [52.90779489234828], [7.9637846221382995], [21.447009951313554],
+                  [18.687291974029808], [6.307953835768051], [36.901430624102545], [52.90779489234828],
+                  [7.9637846221382995], [21.447009951313554], [18.687291974029808], [6.307953835768051],
+                  [36.901430624102545], [52.90779489234828]]), (
+                 {'mse': 188.34572704380332}, np.array([5.46736964, 0.6577846, -1.23726192, 1.23726118]),
+                 [[38.27829147810729], [57.35404479203078], [9.492384493649608], [19.86032276121565],
+                  [16.571399776056424],
+                  [7.519030702554074], [38.27829147810729], [57.35404479203078], [9.492384493649608],
+                  [19.86032276121565],
+                  [16.571399776056424], [7.519030702554074], [38.27829147810729], [57.35404479203078],
+                  [9.492384493649608],
+                  [19.86032276121565], [16.571399776056424], [7.519030702554074], [38.27829147810729],
+                  [57.35404479203078],
+                  [9.492384493649608], [19.86032276121565], [16.571399776056424], [7.519030702554074],
+                  [38.27829147810729],
+                  [57.35404479203078]])]
+
+    validations = [Validation(metrics=x[0], predictions=ddf.from_pandas(pd.DataFrame(x[2]), npartitions=2), model=GLM())
+                   for x in state]
+    for v, c in zip(validations, state):
+        v.model._coef = c[1]
+    return validations
+
+
+@pytest.fixture
+def test_experiment_result(test_causal_predictions, test_boosted_predictions, test_truth, test_bootstrap_validations):
+    return ExperimentResult(split_validations=[ValidationSplit(split='1970-01-01 00:00:07', boosted_validations=[
+        BoostValidation(metrics={'mse': 147.27655145967876}, horizon=1, predictions=test_boosted_predictions,
+                        model=EWMA(alpha=0.08, window=7))],
+                                                               causal_validation=CausalValidation(
+                                                                   metrics={'mse': 199.71788056125322},
+                                                                   predictions=test_causal_predictions,
+                                                                   bootstrap_validations=test_bootstrap_validations),
+
+                                                               truth=test_truth)])
+@pytest.fixture
+def test_kind_cluster(kind_cluster):
+    kfp_version = '1.8.5'
+    kind_cluster.kubectl("apply", "-k", "github.com/kubeflow/pipelines/manifests/kustomize/cluster-scoped-resources?ref={}".format(kfp_version))
+    kind_cluster.kubectl("wait", "--for", "condition=established", "--timeout=60s", "crd/applications.app.k8s.io")
+    kind_cluster.kubectl("apply", "-k", "github.com/kubeflow/pipelines/manifests/kustomize/env/platform-agnostic-pns?ref={}".format(kfp_version))
+    for p in Pod.objects(kind_cluster.api, namespace="kubeflow").filter(selector=""):
+        if p.metadata['name'].startswith('test-pipeline'):
+            p.delete()
+    while not all([p.obj['status']['phase'] == 'Running' for p in Pod.objects(kind_cluster.api, namespace="kubeflow").filter(selector="")]):
+        time.sleep(5)
+
+    return kind_cluster
+
+
+@pytest.fixture
+def minio_endpoint(test_kind_cluster):
+    for p in Pod.objects(test_kind_cluster.api, namespace="kubeflow").filter(selector=""):
+        if p.metadata['name'].startswith('minio'):
+            return 'http://{}:9000'.format(p.obj['status']['podIP'])
+
+
+@pytest.fixture()
+def test_bucket():
+    return 'test-bucket'
+
+@pytest.fixture
+def test_boost_model_params():
+    return {'window': 7, 'alpha': 0.08}
