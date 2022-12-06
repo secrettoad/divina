@@ -7,17 +7,11 @@ import joblib
 import pandas as pd
 import numpy as np
 
+import s3fs
 import plotly.graph_objects as go
 
 from pipeline._experiment import Experiment, ExperimentResult, ValidationSplit, BoostValidation, CausalValidation
-from pipeline.utils import compare_sk_models, get_parameters, set_parameters
-
-from kfp.v2.dsl import component, Input, Output, Dataset, Model, Artifact
-from kfp.dsl import pipeline
-from kfp import compiler
-import kfp
-import gcsfs
-import dill
+from pipeline.utils import get_parameters, set_parameters
 
 
 def test_bin_features(
@@ -26,7 +20,7 @@ def test_bin_features(
         test_ed_1,
 ):
     experiment = Experiment(**test_ed_1["experiment_definition"])
-    df = experiment.preprocess(test_data_1)
+    df = experiment.preprocess(test_data_1, unit_test=True)
     pd.testing.assert_frame_equal(
         df.compute(),
         test_df_1.compute().set_index('a'),
@@ -43,7 +37,7 @@ def test_glm_train(
     experiment = Experiment(**test_ed_1["experiment_definition"])
     model = experiment.train(
         x=test_df_1.set_index('a').drop(columns='c'), y=test_df_1[['c']], random_state=random_state, model_type='GLM',
-        model_params={'link_function': 'log'})
+        model_params={'link_function': 'log'}, unit_test=True)
     assert model == test_model_1[0]
 
 
@@ -55,7 +49,7 @@ def test_glm_forecast(
 ):
     experiment = Experiment(**test_ed_1["experiment_definition"])
     result = experiment.forecast(
-        model=test_model_1[0], x=test_df_1.set_index('a').drop(columns='c'),
+        model=test_model_1[0], x=test_df_1.set_index('a').drop(columns='c'), unit_test=True
     )
     ##TODO - start here figure out why forecasts and test values are so bad and then resume changing components to new format
     np.testing.assert_equal(
@@ -71,7 +65,7 @@ def test_validate(
         test_metrics_1
 ):
     experiment = Experiment(**test_ed_1["experiment_definition"])
-    metrics = experiment.validate(truth_dataset=test_df_1[['c']], prediction_dataset=test_forecast_1)
+    metrics = experiment.validate(truth_dataset=test_df_1[['c']], prediction_dataset=test_forecast_1, unit_test=True)
     assert metrics == test_metrics_1
 
 
@@ -162,7 +156,7 @@ def test_example_pipeline(
     assert result == test_experiment_result
 
 
-def test_example_pipeline_kfp(
+'''def test_example_pipeline_kfp(
         test_df_4,
         test_ed_2,
         test_experiment_result,
@@ -216,7 +210,7 @@ def test_example_pipeline_kfp(
 
         ###TODO start here - build result object from pipeline-root and compare - create parse method in result object
         ###TODO start here - test kfp pipeline with kind
-        ###TODO then implement interpretability/analytics interface
+        ###TODO then implement interpretability/analytics interface'''
 
 
 def test_example_pipeline_prefect(
@@ -233,7 +227,6 @@ def test_example_pipeline_prefect(
     experiment.env_variables = {'AWS_SECRET_ACCESS_KEY': os.environ['AWS_SECRET_ACCESS_KEY'],
                        'AWS_ACCESS_KEY_ID': os.environ['AWS_ACCESS_KEY_ID']}
     experiment.storage_options = {'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}}
-    import s3fs
     test_data_path = '{}/test-data'.format(test_pipeline_root)
     fs = s3fs.S3FileSystem(**experiment.storage_options)
     if fs.exists(test_bucket):
@@ -242,24 +235,17 @@ def test_example_pipeline_prefect(
         fs.mkdir(test_bucket)
     test_df_4.to_parquet(test_data_path,
                          storage_options={'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}})
-    from prefect import flow, task
-    @task()
-    def result_task(result):
-        print(result)
+    from prefect import flow
     @flow(
-        name=test_pipeline_name,
+        name=test_pipeline_name, persist_result=True
     )
-    def run_experiment(data: str = 'test_uri', boost_model_params=json.dumps({"test": "test2"})):
-        result = experiment.preprocess(df=test_data_path)
-        return result_task(result)
+    def run_experiment(df: str):
+        return experiment.run(df=df)
 
-    result = run_experiment()
-    # with fs.open(pipeline_root + '/result.pkl', 'rb') as f:
-    #    result = dill.load(f)
-    # assert result == test_experiment_result
+    result = run_experiment(test_data_path)
+    assert result == test_experiment_result
 
-###TODO start here - build result object from pipeline-root and compare - create parse method in result object
-###TODO start here - test kfp pipeline with kind
+###TODO start here - reset hardcoded values in conftest for this test - use same fixtures for unit and pieline tests
 ###TODO then implement interpretability/analytics interface
 
 def test_quickstart(test_eds_quickstart, random_state):

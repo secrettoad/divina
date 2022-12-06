@@ -174,30 +174,36 @@ def _component_helper(func):
             else:
                 new_args.append(v)
         new_args = tuple(new_args)
-        result = func(*new_args)
-        outputs = [v for v, a in zip(args, _args) if _args[a].annotation == Output]
+        result = func(*new_args, **kwargs)
+        from itertools import zip_longest
+        outputs = [v for v, a in zip_longest(args, _args) if _args[a].annotation == Output]
+        reduce_result = False
         if not type(result) == tuple:
             result = (result,)
+            reduce_result = True
         if not len(outputs) == len(result):
             raise ValueError(
                 'The same number of Outputs must be designated in component signature as returned within component function')
 
         for o, r in zip(outputs, result):
-            if type(r) == dd.DataFrame:
+            if type(r) == dd.DataFrame and o:
                 npartitions = (r.memory_usage(deep=True).sum().compute() // 104857600) + 1
                 r = cull_empty_partitions(r)
                 r = r.repartition(npartitions=npartitions)
                 r.to_parquet(o, storage_options=self.storage_options)
-            if type(r) == dict:
+            if type(r) == dict and o:
                 fs = s3fs.S3FileSystem(**self.storage_options)
-                with fs.open(o, 'w') as f:
+                with fs.open(o + '.json', 'w') as f:
                     json.dump(r, f)
-            if type(r) == BaseEstimator:
+            if isinstance(r, BaseEstimator) and o:
                 fs = s3fs.S3FileSystem(**self.storage_options)
-                with fs.open(o, 'wb') as f:
+                with fs.open(o + '.pkl', 'wb') as f:
                     dill.dump(r, f)
 
-        return result
+        if reduce_result:
+            return result[0]
+        else:
+            return result
 
     return wrapper
 
@@ -209,17 +215,26 @@ class testClass:
 
 from prefect import task
 
+def generate_random_key(length):
+    import random
+    import string
+    return ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(length))
 
 def _divina_component(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        self = args[0]
-        from inspect import signature
-        _args = dict(signature(func).parameters)
-        for a in _args:
-            if _args[a].annotation == Output:
-                kwargs[a] = '/'.join([self.pipeline_root, func.__name__, a])
-        return task(_component_helper(func))(*args, **kwargs)
+        if not 'unit_test' in kwargs or not kwargs['unit_test']:
+            _task = task(_component_helper(func))
+            self = args[0]
+            from inspect import signature
+            _args = dict(signature(func).parameters)
+            for a in _args:
+                if _args[a].annotation == Output:
+                    kwargs[a] = '/'.join([self.pipeline_root, func.__name__, generate_random_key(15), a])
+            return _task(*args, **kwargs)
+        else:
+            kwargs.pop('unit_test')
+            return _component_helper(func)(*args, **kwargs)
     return wrapper
 
 

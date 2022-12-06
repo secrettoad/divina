@@ -1,31 +1,14 @@
-import json
-import os
-import sys
-from functools import partial
-from itertools import product
-from typing import Tuple, List
 from .model import *
 from typing import Union
-from prefect import flow, task
-import dask.array as da
-import dask.dataframe as dd
-import joblib
-from datetime import datetime
-import numpy as np
 import pandas as pd
-from dask_ml.linear_model import LinearRegression
 from pandas.api.types import is_numeric_dtype
 from sklearn.pipeline import make_pipeline
-import gcsfs
-import dill
-from pipeline.utils import _component_helper, _divina_component
+from pipeline.utils import _divina_component
 from datasets.load import _load
 from pipeline.utils import create_write_directory, get_dask_client, Output, Input
-
+import dask.dataframe as dd
+from dask_ml.preprocessing import Categorizer, DummyEncoder
 import numpy as np
-from pandas.testing import assert_frame_equal
-import collections
-from typing import List
 
 
 class Validation():
@@ -35,8 +18,7 @@ class Validation():
         self.model = model
 
     def __eq__(self, other):
-        return self.metrics == other.metrics and (
-                self.predictions.compute().values == other.predictions.compute().values).all() and self.model == other.model
+        return self.metrics == other.metrics and self.predictions.compute().values == other.predictions.compute().values and self.model == other.model
 
 
 class CausalValidation(Validation):
@@ -111,7 +93,9 @@ class Experiment:
             causal_model_params=None,
             pipeline_root=None,
             boost_window=0,
-            storage_options=None
+            storage_options=None,
+            boost_model_type='EWMA',
+            boost_model_params=None,
     ):
         if not time_horizons:
             self.time_horizons = [0]
@@ -160,6 +144,8 @@ class Experiment:
         self.pipeline_root = pipeline_root
         self.boost_window = boost_window
         self.storage_options = storage_options
+        self.boost_model_type = boost_model_type
+        self.boost_model_params = boost_model_params
 
     @property
     def bootstrap_sample(self):
@@ -183,10 +169,6 @@ class Experiment:
     @_divina_component
     def preprocess(self, df: Union[str, dd.DataFrame], start=None, end=None,
                    dataset: Output = None):
-
-        import dask.dataframe as dd
-        import numpy as np
-        from dask_ml.preprocessing import Categorizer, DummyEncoder
 
         df[self.time_index] = dd.to_datetime(df[self.time_index])
 
@@ -448,24 +430,10 @@ class Experiment:
             df = df.set_index(self.time_index)
         return df
 
-    def split_dataset(self, split: str, df: Union[str, dd.DataFrame],
-                      component_kwargs=None, kfp=False):
 
-        return Experiment._split_dataset_component(split=split, df=df,
-                                                   component_kwargs=component_kwargs, kfp=kfp,
-                                                   pipeline_root=self.pipeline_root)
-
-    @staticmethod
     @_divina_component
-    @_component_helper
-    def _split_dataset_component(split: str, df: Union[str, dd.DataFrame], train_df: Output = None,
-                                 test_df: Output = None, component_kwargs=None, kfp=False) -> collections.namedtuple(
-        'Output', 'train_df test_df'):
-
-        import dask.dataframe as dd
-        import numpy as np
-        import json
-        import collections
+    def split_dataset(self, split: str, df: Union[str, dd.DataFrame], train_df: Output = None,
+                                 test_df: Output = None):
 
         if df.index.name == '__target_dimension_index__':
             df_time = df.reset_index()['__target_dimension_index__'].str.split('__index__', expand=True, n=len(
@@ -478,31 +446,14 @@ class Experiment:
 
         return df_train, df_test
 
-    def train(self, model_type: str,
-              x: Union[str, dd.DataFrame],
-              y: Union[str, dd.DataFrame],
-              model_params: dict = None,
-              random_state: int = 11,
-              bootstrap_percentage: float = 0.8, horizon: int = 0,
-              component_kwargs=None, kfp=False):
 
-        return Experiment._train_component(model_type=model_type, model_params=model_params,
-                                           x=x,
-                                           y=y,
-                                           random_state=random_state,
-                                           bootstrap_percentage=bootstrap_percentage, horizon=horizon,
-                                           component_kwargs=component_kwargs, kfp=kfp, pipeline_root=self.pipeline_root)
-
-    @staticmethod
     @_divina_component
-    @_component_helper
-    def _train_component(model_type: str,
+    def train(self, model_type: str,
                          x: Union[str, dd.DataFrame],
                          y: Union[str, dd.DataFrame],
                          random_state: int = 11,
                          model_params: dict = None,
-                         bootstrap_percentage: float = None, horizon: int = 0, model: Output = None,
-                         component_kwargs=None, kfp=False) -> collections.namedtuple('Output', 'model'):
+                         bootstrap_percentage: float = None, horizon: int = 0, model: Output = None):
 
         if y.isna().sum().compute()[0] > 0:
             raise ValueError('Null values in target not permitted.')
@@ -526,20 +477,9 @@ class Experiment:
         )
         return model
 
-    def forecast(self, model: Union[str, BaseEstimator], x: Union[str, dd.DataFrame],
-                 component_kwargs=None, kfp=False):
-
-        return Experiment._forecast_component(model=model, x=x,
-                                              component_kwargs=component_kwargs, kfp=kfp,
-                                              pipeline_root=self.pipeline_root)
-
-    @staticmethod
     @_divina_component
-    @_component_helper
-    def _forecast_component(model: Union[str, BaseEstimator], x: Union[str, dd.DataFrame],
-                            predictions: Output = None, component_kwargs=None, kfp=False) -> collections.namedtuple(
-        'Output', 'predictions'):
-
+    def forecast(self, model: Union[str, BaseEstimator], x: Union[str, dd.DataFrame],
+                            predictions: Output = None):
         features = x.columns
         for f in features:
             if not is_numeric_dtype(x[f].dtype):
@@ -566,67 +506,43 @@ class Experiment:
         for c in factor_df:
             df[c] = factor_df[c]
         '''
+        y_hat.columns = ['y_hat']
         return y_hat
 
-    def validate(self, truth_dataset: Union[str, dd.DataFrame], prediction_dataset: Union[str, dd.DataFrame],
-                 component_kwargs=None, kfp=False):
-        return Experiment._validate_component(target=self.target, truth_dataset=truth_dataset,
-                                              prediction_dataset=prediction_dataset,
-                                              component_kwargs=component_kwargs, kfp=kfp,
-                                              pipeline_root=self.pipeline_root)
 
-    @staticmethod
     @_divina_component
-    @_component_helper
-    def _validate_component(target, truth_dataset: Union[str, dd.DataFrame],
-                            prediction_dataset: Union[str, dd.DataFrame], metrics: Output = None, component_kwargs=None,
-                            kfp=False) -> collections.namedtuple('Output', 'metrics'):
+    def validate(self, truth_dataset: Union[str, dd.DataFrame],
+                            prediction_dataset: Union[str, dd.DataFrame], metrics: Output = None):
 
-        residuals = prediction_dataset[prediction_dataset.columns[0]] - truth_dataset[target]
+        residuals = prediction_dataset[prediction_dataset.columns[0]] - truth_dataset[self.target]
 
         metrics = {"mse": residuals.pow(2).mean().compute()}
 
         return metrics
 
-    def x_y_split(self, df, target=None, kfp=False, component_kwargs=None):
-        return Experiment._x_y_split_component(target=target or self.target, df=df,
-                                               component_kwargs=component_kwargs, kfp=kfp,
-                                               pipeline_root=self.pipeline_root)
 
-    @staticmethod
     @_divina_component
-    @_component_helper
-    def _x_y_split_component(target, df: Union[str, dd.DataFrame], x: Output = None, y: Output = None,
-                             component_kwargs=None, kfp=False) -> collections.namedtuple('Output', 'x y'):
+    def x_y_split(self, df: Union[str, dd.DataFrame], target=None, x: Output = None, y: Output = None):
 
+        target = target or self.target
         x = df[[c for c in df.columns if not c == target]]
         y = df[[target]]
 
         return x, y
 
-    def aggregate_forecasts(self, forecasts: dict, kfp=False, component_kwargs=None):
-        return Experiment._aggregate_forecasts_component(forecasts=forecasts,
-                                                         confidence_intervals=self.confidence_intervals,
-                                                         target=self.target,
-                                                         component_kwargs=component_kwargs, kfp=kfp,
-                                                         pipeline_root=self.pipeline_root)
-
-    @staticmethod
     @_divina_component
-    @_component_helper
-    def _aggregate_forecasts_component(target, forecasts: dict, confidence_intervals=None, interval: Output = None,
-                                       point_estimates: Output = None, component_kwargs=None,
-                                       kfp=False) -> collections.namedtuple('Output', 'intervals point_estimates'):
+    def aggregate_forecasts(self, forecasts: list, interval: Output = None,
+                                       point_estimates: Output = None):
 
         df_forecasts = dd.concat([dd.from_dask_array(s.to_dask_array(lengths=True)) for s in forecasts],
                                  axis=1)
         df_forecasts.columns = ['bootstrap_{}'.format(c) for c in range(len(forecasts))]
         df_interval = dd.from_dask_array(dd.from_dask_array(df_forecasts.to_dask_array(lengths=True).T).quantile(
-            [i * 0.01 for i in confidence_intervals]).to_dask_array(lengths=True).T)
+            [i * 0.01 for i in self.confidence_intervals]).to_dask_array(lengths=True).T)
 
         df_interval.columns = [
-            "{}_pred_c_{}".format(target, c)
-            for c in confidence_intervals
+            "{}_pred_c_{}".format(self.target, c)
+            for c in self.confidence_intervals
         ]
 
         df_point_estimate = dd.from_dask_array(
@@ -649,24 +565,11 @@ class Experiment:
 
         return df_interval, df_point_estimate
 
-    def long_to_wide_residuals(self, prediction_series: Union[str, dd.DataFrame],
-                               truth_series: Union[str, dd.DataFrame], horizon: int, window=0, kfp=False,
-                               component_kwargs=None):
-        return Experiment._long_to_wide_residuals_component(prediction_series=prediction_series,
-                                                            truth_series=truth_series, horizon=horizon,
-                                                            target_dimensions=self.target_dimensions, window=window,
-                                                            component_kwargs=component_kwargs, kfp=kfp,
-                                                            pipeline_root=self.pipeline_root)
-
-    @staticmethod
     @_divina_component
-    @_component_helper
-    def _long_to_wide_residuals_component(prediction_series: Union[str, dd.DataFrame],
-                                          truth_series: Union[str, dd.DataFrame], horizon: int, target_dimensions=None,
-                                          window=0, wide_format: Output = None, component_kwargs=None,
-                                          kfp=False) -> collections.namedtuple('Output', 'wide_format'):
-
-        if len(prediction_series) < horizon + window:
+    def long_to_wide_residuals(self, prediction_series: Union[str, dd.DataFrame],
+                                          truth_series: Union[str, dd.DataFrame], horizon: int,
+                                          wide_format: Output = None):
+        if len(prediction_series) < horizon + self.boost_window:
             raise ValueError('not enough observations to convert to wide format given window and horizon')
 
         series_name = prediction_series.columns[0]
@@ -675,14 +578,14 @@ class Experiment:
 
         residual_series.columns = [series_name]
 
-        lags = range(horizon, horizon + window)
+        lags = range(horizon, horizon + self.boost_window)
 
         def _create_lags(series_name, lags, df):
             for lag in lags:
                 df['lag_{}'.format(lag)] = df[series_name].shift(-lag)
             return df
 
-        if target_dimensions:
+        if self.target_dimensions:
             target_dimensions_df = residual_series.reset_index()['__target_dimension_index__'].str.split('__index__',
                                                                                                          expand=True,
                                                                                                          n=len(
@@ -691,11 +594,11 @@ class Experiment:
                                                                                                                  0].split(
                                                                                                                  '__index__')) - 1)
             target_dimensions_df.index = residual_series.index
-            target_dimensions_df.columns = ['time'] + target_dimensions
-            for c in target_dimensions:
+            target_dimensions_df.columns = ['time'] + self.target_dimensions
+            for c in self.target_dimensions:
                 residual_series[c] = target_dimensions_df[c]
-            residual_series = residual_series.groupby(target_dimensions).apply(
-                partial(_create_lags, series_name, lags)).drop(columns=target_dimensions)
+            residual_series = residual_series.groupby(self.target_dimensions).apply(
+                partial(_create_lags, series_name, lags)).drop(columns=self.target_dimensions)
 
         else:
             residual_series = _create_lags(series_name, lags, residual_series)
@@ -704,94 +607,19 @@ class Experiment:
 
         return residual_series
 
-    def boost_forecast(self, forecast_series: Union[str, dd.DataFrame], adjustment_series: Union[str, dd.DataFrame],
-                       kfp=False, component_kwargs=None, pipeline_root=None):
-        return Experiment._boost_forecast_component(forecast_series=forecast_series,
-                                                    adjustment_series=adjustment_series,
-                                                    component_kwargs=component_kwargs, kfp=kfp,
-                                                    pipeline_root=self.pipeline_root)
 
-    @staticmethod
     @_divina_component
-    @_component_helper
-    def _boost_forecast_component(forecast_series: Union[str, dd.DataFrame],
-                                  adjustment_series: Union[str, dd.DataFrame], x: Output = None, y: Output = None,
-                                  component_kwargs=None, kfp=False) -> collections.namedtuple('Output',
-                                                                                              'boosted_forecast'):
+    def boost_forecast(self, forecast_series: Union[str, dd.DataFrame],
+                                  adjustment_series: Union[str, dd.DataFrame], boosted_forecast: Output = None):
 
         boosted_forecast = (forecast_series[forecast_series.columns[0]] + adjustment_series[
             adjustment_series.columns[0]]).to_frame()
 
+        boosted_forecast.columns = ['y_hat_boosted']
+
         return boosted_forecast
 
-    def run(self, data, causal_model_type='GLM', boost_model_type='EWMA', causal_model_params=None,
-            boost_model_params=None, env_variables=None, volumes=None, kfp=False,
-            component_kwargs=None):
-        def _run_pipeline_kfp(df_uri, causal_model_type, boost_model_type, env_variables=None,
-                              volumes=None, causal_model_params=None,
-                              boost_model_params=None, component_kwargs=None):
-
-            ###TODO connect env_variables and volumes
-
-            df = self.preprocess(
-                df_uri=df_uri, component_kwargs=component_kwargs, kfp=True)
-            validation_splits = []
-
-            ###TODO - aggregate on second in preprocess
-
-            for i, s in enumerate(self.validation_splits):
-                bootstrap_predictions = []
-                ###TODO - get preproces unit test to pass, then duplicate on split_dataset and down the line
-                train_test_splits = self.split_dataset(split=s,
-                                                       df=df.outputs['dataset'], kfp=True,
-                                                       component_kwargs=component_kwargs)
-                x_y_train_splits = self.x_y_split(df=train_test_splits.outputs['train_df'],
-                                                  component_kwargs=component_kwargs, kfp=True)
-                x_y_test_splits = self.x_y_split(df=train_test_splits.outputs['test_df'],
-                                                 component_kwargs=component_kwargs, kfp=True)
-                for n in self.bootstrap_seeds:
-                    bootstrap_model = self.train(model_type=causal_model_type, model_params=causal_model_params,
-                                                 x=x_y_train_splits.outputs['x'],
-                                                 y=x_y_train_splits.outputs['y'], bootstrap_percentage=0.8,
-                                                 random_state=n,
-                                                 component_kwargs=component_kwargs, kfp=True)
-
-                    bootstrap_prediction = self.forecast(x=x_y_test_splits.outputs['x'],
-                                                         model=bootstrap_model.outputs['model'],
-                                                         component_kwargs=component_kwargs, kfp=True)
-                    bootstrap_validation = self.validate(truth_dataset=x_y_test_splits.outputs['y'],
-                                                         prediction_dataset=bootstrap_prediction.outputs['predictions'],
-                                                         component_kwargs=component_kwargs,
-                                                         kfp=True)
-                    bootstrap_predictions.append(bootstrap_prediction.outputs['predictions'])
-                causal_train_outputs = self.aggregate_forecasts({'predictions': bootstrap_predictions},
-                                                                component_kwargs=component_kwargs, kfp=True)
-
-                boosted_validations = []
-                for h in self.time_horizons:
-                    wide_residuals = self.long_to_wide_residuals(
-                        prediction_series=causal_train_outputs.outputs['point_estimates'],
-                        truth_series=x_y_test_splits.outputs['y'],
-                        horizon=h,
-                        component_kwargs=component_kwargs, kfp=True)
-                    x_y_residual_splits = self.x_y_split(wide_residuals.outputs['wide_format'], 'mean', kfp=True)
-                    boosted_model = self.train(model_type=boost_model_type, model_params=boost_model_params,
-                                               x=x_y_residual_splits.outputs['x'], y=x_y_residual_splits.outputs['y'],
-                                               component_kwargs=component_kwargs, kfp=True)
-                    residual_predictions = self.forecast(x=x_y_residual_splits.outputs['x'],
-                                                         model=boosted_model.outputs['model'],
-                                                         component_kwargs=component_kwargs, kfp=True)
-                    boosted_predictions = self.boost_forecast(
-                        forecast_series=causal_train_outputs.outputs['point_estimates'],
-                        adjustment_series=residual_predictions.outputs['predictions'],
-                        component_kwargs=component_kwargs, kfp=True)
-                    boosted_validation = self.validate(
-                        prediction_dataset=boosted_predictions.outputs['boosted_forecast'],
-                        truth_dataset=x_y_test_splits.outputs['y'], component_kwargs=component_kwargs, kfp=True)
-                    ###Todo - add serialize method to result object that lets us persist it inside of and then load it outside of the pipeline
-
-        def _run_pipeline(df, causal_model_type, boost_model_type, causal_model_params=None,
-                          boost_model_params=None):
+    def run(self, df):
 
             df = self.preprocess(df)
             validation_splits = []
@@ -805,7 +633,7 @@ class Experiment:
                 x_train, y_train = self.x_y_split(df=train_df)
                 x_test, y_test = self.x_y_split(df=test_df)
                 for n in self.bootstrap_seeds:
-                    bootstrap_model = self.train(model_type=causal_model_type, model_params=causal_model_params,
+                    bootstrap_model = self.train(model_type=self.causal_model_type, model_params=self.causal_model_params,
                                                  x=x_train,
                                                  y=y_train, bootstrap_percentage=0.8,
                                                  random_state=n)
@@ -821,9 +649,9 @@ class Experiment:
                 boosted_validations = []
                 for h in self.time_horizons:
                     wide_residuals = self.long_to_wide_residuals(prediction_series=point_estimates, truth_series=y_test,
-                                                                 horizon=h, window=boost_model_params['window'])
+                                                                 horizon=h)
                     x, y = self.x_y_split(df=wide_residuals, target='mean')
-                    boosted_model = self.train(model_type=boost_model_type, model_params=boost_model_params, x=x, y=y)
+                    boosted_model = self.train(model_type=self.boost_model_type, model_params=self.boost_model_params, x=x, y=y)
                     residual_predictions = self.forecast(x=x, model=boosted_model)
                     boosted_predictions = self.boost_forecast(forecast_series=point_estimates,
                                                               adjustment_series=residual_predictions)
@@ -839,13 +667,3 @@ class Experiment:
                         boosted_validations=boosted_validations,
                         split=s, truth=test_df))
             return ExperimentResult(split_validations=validation_splits)
-
-        if kfp:
-            return _run_pipeline_kfp(data, causal_model_type=causal_model_type, boost_model_type=boost_model_type,
-                                     causal_model_params=causal_model_params,
-                                     boost_model_params=boost_model_params,
-                                     env_variables=env_variables, volumes=volumes, component_kwargs=component_kwargs)
-        else:
-            return _run_pipeline(data, causal_model_type=causal_model_type, boost_model_type=boost_model_type,
-                                 causal_model_params=causal_model_params,
-                                 boost_model_params=boost_model_params)

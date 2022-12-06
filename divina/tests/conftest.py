@@ -20,15 +20,15 @@ from sklearn.base import BaseEstimator
 import kfp
 
 
-
 @pytest.fixture()
 def random_state():
     return 11
 
+
 @pytest.fixture()
 def test_model_1(test_df_1, random_state, test_ed_1):
-    params = [0.02066113, -0.32723665, 0.32723891]
-    intercept = 2.0304274531519955
+    params = [0.02160585, -0.3599889, 0.35998562]
+    intercept = 2.13828632
     features = ["b", "b_(5, 10]", "b_(15, inf]"]
 
     model = GLM(link_function='log')
@@ -138,7 +138,7 @@ def test_params_2(test_model_1):
 
 @pytest.fixture()
 def test_metrics_1():
-    return {'mse': 298.6217303164645}
+    return {'mse': 139.02753504162985}
 
 
 @pytest.fixture()
@@ -159,7 +159,7 @@ def test_val_predictions_1():
 @pytest.fixture()
 def test_forecast_1():
     return ddf.from_array(np.array(
-        [6.4784406641130605, 15.972826954952883, 14.405114442640931, 6.089076652014592, 28.485654314221193, 51.8613272721154])).to_frame()
+        [7.036734548365541, 18.734915837966778, 16.81648558356344, 6.595098159594108, 34.30711407155736, 64.19481152099334])).to_frame()
 
 
 @pytest.fixture()
@@ -170,6 +170,7 @@ def test_pipeline_name():
 @pytest.fixture()
 def test_pipeline_root(test_pipeline_name, test_bucket):
     return 's3://{}/{}'.format(test_bucket, test_pipeline_name)
+
 
 @pytest.fixture()
 def test_ed_1():
@@ -217,6 +218,7 @@ def test_ed_2(test_pipeline_root):
             "time_horizons": [1],
             "pipeline_root": test_pipeline_root,
             "target_dimensions": ['d', 'e'],
+            "boost_model_params": {'alpha': 0.8, 'window': 7},
             "boost_window": 7
             # "data_path": "divina-test/dataset/test1",
         }
@@ -283,8 +285,8 @@ def test_data_1():
                 [Timestamp("1970-01-01 00:00:10"), 11.0, 12.0],
             ]
         )
-            .sample(25, replace=True, random_state=11)
-            .reset_index(drop=True)
+        .sample(25, replace=True, random_state=11)
+        .reset_index(drop=True)
     )
     df.columns = ["a", "b", "c"]
     return ddf.from_pandas(df, npartitions=2)
@@ -497,16 +499,23 @@ def test_experiment_result(test_causal_predictions, test_boosted_predictions, te
                                                                    bootstrap_validations=test_bootstrap_validations),
 
                                                                truth=test_truth)])
+
+
 @pytest.fixture
 def test_kind_cluster(kind_cluster):
     kfp_version = '1.8.5'
-    kind_cluster.kubectl("apply", "-k", "github.com/kubeflow/pipelines/manifests/kustomize/cluster-scoped-resources?ref={}".format(kfp_version))
+    kind_cluster.kubectl("apply", "-k",
+                         "github.com/kubeflow/pipelines/manifests/kustomize/cluster-scoped-resources?ref={}".format(
+                             kfp_version))
     kind_cluster.kubectl("wait", "--for", "condition=established", "--timeout=60s", "crd/applications.app.k8s.io")
-    kind_cluster.kubectl("apply", "-k", "github.com/kubeflow/pipelines/manifests/kustomize/env/platform-agnostic-pns?ref={}".format(kfp_version))
+    kind_cluster.kubectl("apply", "-k",
+                         "github.com/kubeflow/pipelines/manifests/kustomize/env/platform-agnostic-pns?ref={}".format(
+                             kfp_version))
     for p in Pod.objects(kind_cluster.api, namespace="kubeflow").filter(selector=""):
         if p.metadata['name'].startswith('test-pipeline'):
             p.delete()
-    while not all([p.obj['status']['phase'] == 'Running' for p in Pod.objects(kind_cluster.api, namespace="kubeflow").filter(selector="")]):
+    while not all([p.obj['status']['phase'] == 'Running' for p in
+                   Pod.objects(kind_cluster.api, namespace="kubeflow").filter(selector="")]):
         time.sleep(5)
 
     return kind_cluster
@@ -522,6 +531,7 @@ def minio_endpoint(test_kind_cluster):
 @pytest.fixture()
 def test_bucket():
     return 'test-bucket'
+
 
 @pytest.fixture
 def test_boost_model_params():
