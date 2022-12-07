@@ -8,20 +8,30 @@ import dask.array as da
 
 
 class EWMA(BaseEstimator):
-    def __init__(self, alpha: float, window: int):
+    def __init__(self, alpha: float=0.8):
         self.alpha = alpha
-        self.window = window
-        self.weights = list([(1 - self.alpha) ** n for n in range(self.window)])
+        self._window = None
+        self.weights = None
         super().__init__()
 
     def fit(self, X, y):
-        warnings.warn('There is no need to fit EWMModel. The weights are determined solely by the alpha and window parameters')
+        self.window = X.shape[1]
 
     def predict(self, X):
         if X.shape[1] != self.window:
-            raise ValueError('Dataframe passed must have the same number of columns as the model\'s window attribute')
+            raise ValueError('Dataframe passed must have the same number of columns as the data used to train')
         y_hat = da.dot(da.nan_to_num(X), da.from_array(self.weights)) / self.window
         return y_hat
+
+    @property
+    def window(self):
+        return self._window
+
+    @window.setter
+    def window(self, value):
+        self._window = value
+        self.weights = list([(1 - self.alpha) ** n for n in range(self._window)])
+        return
 
     def __eq__(self, other):
         return self.alpha == other.alpha and self.window == other.window and self.weights == self.weights

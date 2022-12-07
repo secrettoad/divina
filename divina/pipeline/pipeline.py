@@ -11,7 +11,7 @@ from dask_ml.preprocessing import Categorizer, DummyEncoder
 import numpy as np
 from dask_ml.model_selection import GridSearchCV
 from sklearn.metrics import make_scorer
-
+from itertools import product
 
 
 class Validation():
@@ -56,15 +56,17 @@ class ValidationSplit:
                 self.truth.compute().values == other.truth.compute().values).all() and self.boosted_validations == other.boosted_validations
 
 
-class ExperimentResult():
+class PipelineValidation:
     def __init__(self, split_validations: [ValidationSplit]):
         self.split_validations = split_validations
 
     def __eq__(self, other):
+        if not type(other) == PipelineValidation:
+            return False
         return self.split_validations == other.split_validations
 
 
-class Experiment:
+class Pipeline:
     def __init__(
             self,
             target,
@@ -149,6 +151,9 @@ class Experiment:
         self.storage_options = storage_options
         self.boost_model_type = boost_model_type
         self.boost_model_params = boost_model_params
+        self.bootstrap_models = []
+        self.boost_models = {}
+        self.is_fit = False
 
     @property
     def bootstrap_sample(self):
@@ -239,111 +244,6 @@ class Experiment:
             else:
                 df = df[dd.to_datetime(df[self.time_index]) <= end]
 
-        ###TODO - start here - move scenarios to kubeflow - create them in separate component,
-        ### then pass them into predict component and all logic after as part of scenario pipeline
-        ### base on columns names, types and ranges
-        """if scenarios:
-            if not frequency:
-                raise Exception(
-                    'Frequency of time series must be supplied. Please supply with "frequency: "D", "M", "s", etc."'
-                )
-            if end:
-                if start and pd.to_datetime(start) > time_max:
-                    new_dates = pd.date_range(
-                        pd.to_datetime(str(start)),
-                        pd.to_datetime(str(end)),
-                        freq=frequency,
-                    )
-                else:
-                    new_dates = pd.date_range(
-                        time_max + pd.tseries.frequencies.to_offset(frequency),
-                        pd.to_datetime(str(end)),
-                        freq=frequency,
-                    )
-                if len(new_dates) > 0:
-    
-                    combinations = list(new_dates)
-                    if target_dimensions:
-                        combinations = [
-                            list(x)
-                            for x in product(
-                                combinations,
-                                *[
-                                    df[s].unique().compute().values
-                                    for s in target_dimensions
-                                ]
-                            )
-                        ]
-                        scenario_columns = [time_index] + target_dimensions
-                    else:
-                        combinations = [[x] for x in combinations]
-                        scenario_columns = [time_index]
-                    constant_columns = [
-                        c
-                        for c in scenarios
-                        if scenarios[c]["mode"] == "constant"
-                    ]
-                    for c in constant_columns:
-                        combinations = [
-                            x[0] + [x[1]]
-                            for x in product(
-                                combinations, scenarios[c]["constant_values"]
-                            )
-                        ]
-                    df_scenario = dd.from_pandas(
-                        pd.DataFrame(
-                            combinations, columns=scenario_columns + constant_columns
-                        ),
-                        npartitions=npartitions,
-                    )
-                    last_columns = [
-                        c for c in scenarios if scenarios[c]["mode"] == "last"
-                    ]
-                    if len(last_columns) > 0:
-                        if target_dimensions:
-                            last = (
-                                df.groupby(target_dimensions)[last_columns]
-                                    .last()
-                                    .compute()
-                            )
-                            meta = df_scenario.join(
-                                last.reset_index(drop=True), how="right"
-                            )
-    
-                            def join_func(target_dimension, time_index, df):
-                                return (
-                                    df.set_index(target_dimension)
-                                        .join(last)
-                                        .reset_index()
-                                        .set_index(time_index)
-                                        .reset_index()
-                                )
-    
-                            df_scenario = (
-                                df_scenario.groupby(target_dimensions)
-                                    .apply(
-                                    partial(
-                                        join_func,
-                                        target_dimensions,
-                                        time_index,
-                                    ),
-                                    meta=meta,
-                                )
-                                    .reset_index(drop=True)
-                            )
-                        else:
-                            last = df[last_columns].tail(1)
-                            for l in last_columns:
-                                df_scenario[l] = last[l]
-    
-                    df = dd.concat(
-                        [
-                            df.set_index(time_index),
-                            df_scenario.set_index(time_index),
-                        ],
-                        axis=0,
-                    ).reset_index()"""
-
         for c in df.columns:
             if df[c].dtype == bool:
                 df[c] = df[c].astype(float)
@@ -433,10 +333,9 @@ class Experiment:
             df = df.set_index(self.time_index)
         return df
 
-
     @_divina_component
     def split_dataset(self, split: str, df: Union[str, dd.DataFrame], train_df: Output = None,
-                                 test_df: Output = None):
+                      test_df: Output = None):
 
         if df.index.name == '__target_dimension_index__':
             df_time = df.reset_index()['__target_dimension_index__'].str.split('__index__', expand=True, n=len(
@@ -449,14 +348,13 @@ class Experiment:
 
         return df_train, df_test
 
-
     @_divina_component
     def train(self, model_type: str,
-                         x: Union[str, dd.DataFrame],
-                         y: Union[str, dd.DataFrame],
-                         random_state: int = 11,
-                         model_params: dict = None,
-                         bootstrap_percentage: float = None, horizon: int = 0, model: Output = None):
+              x: Union[str, dd.DataFrame],
+              y: Union[str, dd.DataFrame],
+              random_state: int = 11,
+              model_params: dict = None,
+              bootstrap_percentage: float = None, horizon: int = 0, model: Output = None):
 
         if y.isna().sum().compute()[0] > 0:
             raise ValueError('Null values in target not permitted.')
@@ -469,27 +367,33 @@ class Experiment:
                 replace=False, frac=bootstrap_percentage, random_state=random_state
             )
 
-        for k in model_params:
-            if not type(model_params[k]) in [list, np.array]:
-                model_params[k] = [model_params[k]]
-        _model = eval(model_type)()
+        model = eval(model_type)()
+        if model_params:
+            for k in model_params:
+                if not type(model_params[k]) in [list, np.array]:
+                    model_params[k] = [model_params[k]]
 
-        ### https: // examples.dask.org / machine - learning / hyperparam - opt.html
-        model = GridSearchCV(
-                _model,
+            model = GridSearchCV(
+                model,
                 model_params,
-                scoring=make_scorer(lambda y, y_hat: -abs(np.mean(y_hat-y)), greater_is_better=True)
+                scoring=make_scorer(lambda y, y_hat: -abs(np.mean(y_hat - y)), greater_is_better=True)
             )
+            model.fit(
+                x.to_dask_array(lengths=True),
+                y.shift(-horizon).dropna().to_dask_array(lengths=True),
+            )
+            return model.best_estimator_
 
+        model = eval(model_type)()
         model.fit(
             x.to_dask_array(lengths=True),
             y.shift(-horizon).dropna().to_dask_array(lengths=True),
         )
-        return model.best_estimator_
+        return model
 
     @_divina_component
     def forecast(self, model: Union[str, BaseEstimator], x: Union[str, dd.DataFrame],
-                            predictions: Output = None):
+                 predictions: Output = None):
         features = x.columns
         for f in features:
             if not is_numeric_dtype(x[f].dtype):
@@ -519,17 +423,15 @@ class Experiment:
         y_hat.columns = ['y_hat']
         return y_hat
 
-
     @_divina_component
     def validate(self, truth_dataset: Union[str, dd.DataFrame],
-                            prediction_dataset: Union[str, dd.DataFrame], metrics: Output = None):
+                 prediction_dataset: Union[str, dd.DataFrame], metrics: Output = None):
 
         residuals = prediction_dataset[prediction_dataset.columns[0]] - truth_dataset[self.target]
 
         metrics = {"mse": residuals.pow(2).mean().compute()}
 
         return metrics
-
 
     @_divina_component
     def x_y_split(self, df: Union[str, dd.DataFrame], target=None, x: Output = None, y: Output = None):
@@ -542,7 +444,7 @@ class Experiment:
 
     @_divina_component
     def aggregate_forecasts(self, forecasts: list, interval: Output = None,
-                                       point_estimates: Output = None):
+                            point_estimates: Output = None):
 
         df_forecasts = dd.concat([dd.from_dask_array(s.to_dask_array(lengths=True)) for s in forecasts],
                                  axis=1)
@@ -576,17 +478,25 @@ class Experiment:
         return df_interval, df_point_estimate
 
     @_divina_component
-    def long_to_wide_residuals(self, prediction_series: Union[str, dd.DataFrame],
-                                          truth_series: Union[str, dd.DataFrame], horizon: int,
-                                          wide_format: Output = None):
-        if len(prediction_series) < horizon + self.boost_window:
-            raise ValueError('not enough observations to convert to wide format given window and horizon')
+    def subtract_residuals(self, truth_series: Union[str, dd.DataFrame], prediction_series: Union[str, dd.DataFrame],
+                           residuals: Output = None):
 
         series_name = prediction_series.columns[0]
 
         residual_series = (truth_series[truth_series.columns[0]] - prediction_series[series_name]).to_frame()
 
         residual_series.columns = [series_name]
+
+        return residual_series
+
+    @_divina_component
+    def long_to_wide(self, series: Union[str, dd.DataFrame],
+                     horizon: int,
+                     wide_format: Output = None):
+        if len(series) < horizon + self.boost_window:
+            raise ValueError('not enough observations to convert to wide format given window and horizon')
+
+        series_name = series.columns[0]
 
         lags = range(horizon, horizon + self.boost_window)
 
@@ -596,31 +506,30 @@ class Experiment:
             return df
 
         if self.target_dimensions:
-            target_dimensions_df = residual_series.reset_index()['__target_dimension_index__'].str.split('__index__',
-                                                                                                         expand=True,
-                                                                                                         n=len(
-                                                                                                             residual_series.head(
-                                                                                                                 1).index[
-                                                                                                                 0].split(
-                                                                                                                 '__index__')) - 1)
-            target_dimensions_df.index = residual_series.index
+            target_dimensions_df = series.reset_index()['__target_dimension_index__'].str.split('__index__',
+                                                                                                expand=True,
+                                                                                                n=len(
+                                                                                                    series.head(
+                                                                                                        1).index[
+                                                                                                        0].split(
+                                                                                                        '__index__')) - 1)
+            target_dimensions_df.index = series.index
             target_dimensions_df.columns = ['time'] + self.target_dimensions
             for c in self.target_dimensions:
-                residual_series[c] = target_dimensions_df[c]
-            residual_series = residual_series.groupby(self.target_dimensions).apply(
+                series[c] = target_dimensions_df[c]
+            residual_series = series.groupby(self.target_dimensions).apply(
                 partial(_create_lags, series_name, lags)).drop(columns=self.target_dimensions)
 
         else:
-            residual_series = _create_lags(series_name, lags, residual_series)
+            residual_series = _create_lags(series_name, lags, series)
 
-        residual_series.index = prediction_series.index
+        residual_series.index = series.index
 
         return residual_series
 
-
     @_divina_component
     def boost_forecast(self, forecast_series: Union[str, dd.DataFrame],
-                                  adjustment_series: Union[str, dd.DataFrame], boosted_forecast: Output = None):
+                       adjustment_series: Union[str, dd.DataFrame], boosted_forecast: Output = None):
 
         boosted_forecast = (forecast_series[forecast_series.columns[0]] + adjustment_series[
             adjustment_series.columns[0]]).to_frame()
@@ -629,51 +538,196 @@ class Experiment:
 
         return boosted_forecast
 
-    def run(self, df):
+    @_divina_component
+    def synthesize(self, df: Union[str, dd.DataFrame], scenarios: dict, frequency: str, start: str=None, end: str=None, synthetic_df:Output=None):
 
-            df = self.preprocess(df)
-            validation_splits = []
+        npartitions = (df.memory_usage(deep=True).sum().compute() // 104857600) + 1
 
-            ###TODO - aggregate on second in preprocess
+        df[self.time_index] = dd.to_datetime(df[self.time_index])
 
-            for s in self.validation_splits:
-                train_df, test_df = self.split_dataset(df=df, split=s)
-                bootstrap_predictions = []
-                bootstrap_validations = []
-                x_train, y_train = self.x_y_split(df=train_df)
-                x_test, y_test = self.x_y_split(df=test_df)
-                for n in self.bootstrap_seeds:
-                    bootstrap_model = self.train(model_type=self.causal_model_type, model_params=self.causal_model_params,
-                                                 x=x_train,
-                                                 y=y_train, bootstrap_percentage=0.8,
-                                                 random_state=n)
+        time_min, time_max = (
+            df[self.time_index].min().compute(),
+            df[self.time_index].max().compute(),
+        )
+        if end:
+            if start and pd.to_datetime(start) > time_max:
+                new_dates = pd.date_range(
+                    pd.to_datetime(str(start)),
+                    pd.to_datetime(str(end)),
+                    freq=frequency,
+                )
+            else:
+                new_dates = pd.date_range(
+                    time_max + pd.tseries.frequencies.to_offset(frequency),
+                    pd.to_datetime(str(end)),
+                    freq=frequency,
+                )
+            if len(new_dates) > 0:
 
-                    bootstrap_prediction = self.forecast(x=x_test, model=bootstrap_model)
-                    bootstrap_validation = self.validate(truth_dataset=y_test, prediction_dataset=bootstrap_prediction)
-                    bootstrap_predictions.append(bootstrap_prediction)
-                    bootstrap_validations.append(
-                        Validation(metrics=bootstrap_validation, predictions=bootstrap_prediction,
-                                   model=bootstrap_model))
-                confidence_intervals, point_estimates = self.aggregate_forecasts(bootstrap_predictions)
-                causal_validation = self.validate(truth_dataset=y_test, prediction_dataset=point_estimates)
-                boosted_validations = []
-                for h in self.time_horizons:
-                    wide_residuals = self.long_to_wide_residuals(prediction_series=point_estimates, truth_series=y_test,
-                                                                 horizon=h)
-                    x, y = self.x_y_split(df=wide_residuals, target='mean')
-                    boosted_model = self.train(model_type=self.boost_model_type, model_params=self.boost_model_params, x=x, y=y)
-                    residual_predictions = self.forecast(x=x, model=boosted_model)
-                    boosted_predictions = self.boost_forecast(forecast_series=point_estimates,
-                                                              adjustment_series=residual_predictions)
-                    boosted_validation = self.validate(prediction_dataset=boosted_predictions, truth_dataset=y_test)
-                    boosted_validations.append(
-                        BoostValidation(metrics=boosted_validation, horizon=h, predictions=boosted_predictions,
-                                        model=boosted_model))
+                combinations = list(new_dates)
+                if self.target_dimensions:
+                    combinations = [
+                        list(x)
+                        for x in product(
+                            combinations,
+                            *[
+                                df[s].unique().compute().values
+                                for s in self.target_dimensions
+                            ]
+                        )
+                    ]
+                    scenario_columns = [self.time_index] + self.target_dimensions
+                else:
+                    combinations = [[x] for x in combinations]
+                    scenario_columns = [self.time_index]
+                constant_columns = [
+                    c
+                    for c in scenarios
+                    if scenarios[c]["mode"] == "constant"
+                ]
+                for c in constant_columns:
+                    combinations = [
+                        x[0] + [x[1]]
+                        for x in product(
+                            combinations, scenarios[c]["constant_values"]
+                        )
+                    ]
+                df_scenario = dd.from_pandas(
+                    pd.DataFrame(
+                        combinations, columns=scenario_columns + constant_columns
+                    ),
+                    npartitions=npartitions,
+                )
+                last_columns = [
+                    c for c in scenarios if scenarios[c]["mode"] == "last"
+                ]
+                if len(last_columns) > 0:
+                    if self.target_dimensions:
+                        last = (
+                            df.groupby(self.target_dimensions)[last_columns]
+                            .last()
+                            .compute()
+                        )
+                        meta = df_scenario.join(
+                            last.reset_index(drop=True), how="right"
+                        )
 
-                validation_splits.append(
-                    ValidationSplit(
-                        causal_validation=CausalValidation(metrics=causal_validation, predictions=point_estimates,
-                                                           bootstrap_validations=bootstrap_validations),
-                        boosted_validations=boosted_validations,
-                        split=s, truth=test_df))
-            return ExperimentResult(split_validations=validation_splits)
+                        def join_func(target_dimension, time_index, df):
+                            return (
+                                df.set_index(target_dimension)
+                                .join(last)
+                                .reset_index()
+                                .set_index(time_index)
+                                .reset_index()
+                            )
+
+                        df_scenario = (
+                            df_scenario.groupby(self.target_dimensions)
+                            .apply(
+                                partial(
+                                    join_func,
+                                    self.target_dimensions,
+                                    self.time_index,
+                                ),
+                                meta=meta,
+                            )
+                            .reset_index(drop=True)
+                        )
+                    else:
+                        last = df[last_columns].tail(1)
+                        for l in last_columns:
+                            df_scenario[l] = last[l]
+
+                df = dd.concat(
+                    [
+                        df.set_index(self.time_index),
+                        df_scenario.set_index(self.time_index),
+                    ],
+                    axis=0,
+                )
+
+        return df
+
+    def fit(self, df, prefect=False):
+
+        df = self.preprocess(df, prefect=prefect)
+        validation_splits = []
+
+        ###TODO - aggregate on second in preprocess
+
+        for s in self.validation_splits:
+            train_df, test_df = self.split_dataset(df=df, split=s, prefect=prefect)
+            bootstrap_predictions = []
+            bootstrap_validations = []
+            x_train, y_train = self.x_y_split(df=train_df, prefect=prefect)
+            x_test, y_test = self.x_y_split(df=test_df, prefect=prefect)
+            for n in self.bootstrap_seeds:
+                bootstrap_model = self.train(model_type=self.causal_model_type,
+                                             model_params=self.causal_model_params,
+                                             x=x_train,
+                                             y=y_train, bootstrap_percentage=0.8,
+                                             random_state=n, prefect=prefect)
+
+                bootstrap_prediction = self.forecast(x=x_test, model=bootstrap_model, prefect=prefect)
+                bootstrap_validation = self.validate(truth_dataset=y_test,
+                                                     prediction_dataset=bootstrap_prediction, prefect=prefect)
+                self.bootstrap_models.append(bootstrap_model)
+                bootstrap_predictions.append(bootstrap_prediction)
+                bootstrap_validations.append(
+                    Validation(metrics=bootstrap_validation, predictions=bootstrap_prediction,
+                               model=bootstrap_model))
+            confidence_intervals, point_estimates = self.aggregate_forecasts(bootstrap_predictions, prefect=prefect)
+            causal_validation = self.validate(truth_dataset=y_test, prediction_dataset=point_estimates, prefect=prefect)
+            boosted_validations = []
+            residuals = self.subtract_residuals(prediction_series=point_estimates, truth_series=y_test, prefect=prefect)
+            for h in self.time_horizons:
+                wide_residuals = self.long_to_wide(series=residuals,
+                                                   horizon=h, prefect=prefect)
+                x, y = self.x_y_split(df=wide_residuals, target='mean', prefect=prefect)
+                boosted_model = self.train(model_type=self.boost_model_type,
+                                           model_params=self.boost_model_params, x=x, y=y, prefect=prefect)
+                residual_predictions = self.forecast(x=x, model=boosted_model, prefect=prefect)
+                boosted_predictions = self.boost_forecast(forecast_series=point_estimates,
+                                                          adjustment_series=residual_predictions, prefect=prefect)
+                boosted_validation = self.validate(prediction_dataset=boosted_predictions,
+                                                   truth_dataset=y_test, prefect=prefect)
+                boosted_validations.append(
+                    BoostValidation(metrics=boosted_validation, horizon=h, predictions=boosted_predictions,
+                                    model=boosted_model))
+                self.boost_models[h] = boosted_model
+
+            validation_splits.append(
+                ValidationSplit(
+                    causal_validation=CausalValidation(metrics=causal_validation,
+                                                       predictions=point_estimates,
+                                                       bootstrap_validations=bootstrap_validations),
+                    boosted_validations=boosted_validations,
+                    split=s, truth=test_df))
+        self.is_fit = True
+        return PipelineValidation(split_validations=validation_splits)
+
+    def simulate(self, df, horizons: [int], scenarios: dict, prefect=False):
+        if not self.is_fit:
+            raise ValueError('Pipeline must be fit before you can simulate.')
+        bootstrap_predictions = []
+        df = self.synthesize(df=df, frequency='s', scenarios=scenarios, prefect=prefect)
+        df = self.preprocess(df, prefect=prefect)
+        x, y = self.x_y_split(df=df, prefect=prefect)
+        for m in self.bootstrap_models:
+            ###TODO - start here - implement map so that things run in parallel
+            ###TODO then check the output of synthesize and write test
+            bootstrap_prediction = self.forecast(x=x, model=m, prefect=prefect)
+            bootstrap_predictions.append(bootstrap_prediction)
+        confidence_intervals, point_estimates = self.aggregate_forecasts(bootstrap_predictions, prefect=prefect)
+        boosted_preds = []
+        residuals = self.subtract_residuals(prediction_series=point_estimates, truth_series=y, prefect=prefect)
+        for h, m in zip(horizons, [self.boost_models[h] for h in horizons]):
+                wide_residuals = self.long_to_wide(series=residuals,
+                                                   horizon=h, prefect=prefect)
+                x, y = self.x_y_split(df=wide_residuals, target='mean', prefect=prefect)
+                residual_predictions = self.forecast(x=x, model=m, prefect=prefect)
+                boosted_predictions = self.boost_forecast(forecast_series=point_estimates,
+                                                          adjustment_series=residual_predictions, prefect=prefect)
+                boosted_preds.append(boosted_predictions)
+            ###TODO aggregate boosted predictions into single series
+        return boosted_preds

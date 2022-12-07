@@ -223,7 +223,8 @@ def generate_random_key(length):
 def _divina_component(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if not 'unit_test' in kwargs or not kwargs['unit_test']:
+        if 'prefect' in kwargs and kwargs['prefect']:
+            kwargs.pop('prefect')
             _task = task(_component_helper(func))
             self = args[0]
             from inspect import signature
@@ -233,7 +234,8 @@ def _divina_component(func):
                     kwargs[a] = '/'.join([self.pipeline_root, func.__name__, generate_random_key(15), a])
             return _task(*args, **kwargs)
         else:
-            kwargs.pop('unit_test')
+            if 'prefect' in kwargs:
+                kwargs.pop('prefect')
             return _component_helper(func)(*args, **kwargs)
     return wrapper
 

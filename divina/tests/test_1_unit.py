@@ -10,17 +10,16 @@ import numpy as np
 import s3fs
 import plotly.graph_objects as go
 
-from pipeline._experiment import Experiment, ExperimentResult, ValidationSplit, BoostValidation, CausalValidation
+from pipeline.pipeline import Pipeline, PipelineValidation, ValidationSplit, BoostValidation, CausalValidation
 from pipeline.utils import get_parameters, set_parameters
 
 
 def test_bin_features(
         test_data_1,
         test_df_1,
-        test_ed_1,
+        test_pipeline_1,
 ):
-    experiment = Experiment(**test_ed_1["experiment_definition"])
-    df = experiment.preprocess(test_data_1, unit_test=True)
+    df = test_pipeline_1.preprocess(test_data_1)
     pd.testing.assert_frame_equal(
         df.compute(),
         test_df_1.compute().set_index('a'),
@@ -30,26 +29,24 @@ def test_bin_features(
 ###TODO - update fixtures to match this output
 def test_glm_train(
         test_df_1,
-        test_ed_1,
+        test_pipeline_1,
         test_model_1,
         random_state,
 ):
-    experiment = Experiment(**test_ed_1["experiment_definition"])
-    model = experiment.train(
+    model = test_pipeline_1.train(
         x=test_df_1.set_index('a').drop(columns='c'), y=test_df_1[['c']], random_state=random_state, model_type='GLM',
-        model_params={'link_function': 'log'}, unit_test=True)
+        model_params={'link_function': 'log'})
     assert model == test_model_1[0]
 
 
 def test_glm_forecast(
         test_df_1,
-        test_ed_1,
+        test_pipeline_1,
         test_model_1,
         test_forecast_1,
 ):
-    experiment = Experiment(**test_ed_1["experiment_definition"])
-    result = experiment.forecast(
-        model=test_model_1[0], x=test_df_1.set_index('a').drop(columns='c'), unit_test=True
+    result = test_pipeline_1.forecast(
+        model=test_model_1[0], x=test_df_1.set_index('a').drop(columns='c')
     )
     ##TODO - start here figure out why forecasts and test values are so bad and then resume changing components to new format
     np.testing.assert_equal(
@@ -59,32 +56,31 @@ def test_glm_forecast(
 
 
 def test_validate(
-        test_ed_1,
+        test_pipeline_1,
         test_df_1,
         test_forecast_1,
         test_metrics_1
 ):
-    experiment = Experiment(**test_ed_1["experiment_definition"])
-    metrics = experiment.validate(truth_dataset=test_df_1[['c']], prediction_dataset=test_forecast_1, unit_test=True)
+    metrics = test_pipeline_1.validate(truth_dataset=test_df_1[['c']], prediction_dataset=test_forecast_1)
     assert metrics == test_metrics_1
 
 
 def test_get_params(test_model_1, test_params_1):
-    experiment_path = "divina-test/experiment/test1"
-    pathlib.Path(os.path.join(experiment_path, "models")).mkdir(
+    pipeline_path = "divina-test/pipeline/test1"
+    pathlib.Path(os.path.join(pipeline_path, "models")).mkdir(
         parents=True, exist_ok=True
     )
     joblib.dump(
         test_model_1,
         os.path.join(
-            experiment_path,
+            pipeline_path,
             "models",
             "s-19700101-000007_h-1",
         ),
     )
     with open(
             os.path.join(
-                experiment_path,
+                pipeline_path,
                 "models",
                 "s-19700101-000007_h-1_params",
             ),
@@ -93,7 +89,7 @@ def test_get_params(test_model_1, test_params_1):
         json.dump(test_model_1[1], f)
     params = get_parameters(
         model_path=os.path.join(
-            experiment_path,
+            pipeline_path,
             "models",
             "s-19700101-000007_h-1",
         )
@@ -103,21 +99,21 @@ def test_get_params(test_model_1, test_params_1):
 
 
 def test_set_params(test_model_1, test_params_1, test_params_2):
-    experiment_path = "divina-test/experiment/test1"
-    pathlib.Path(os.path.join(experiment_path, "models")).mkdir(
+    pipeline_path = "divina-test/pipeline/test1"
+    pathlib.Path(os.path.join(pipeline_path, "models")).mkdir(
         parents=True, exist_ok=True
     )
     joblib.dump(
         test_model_1,
         os.path.join(
-            experiment_path,
+            pipeline_path,
             "models",
             "s-19700101-000007_h-1",
         ),
     )
     with open(
             os.path.join(
-                experiment_path,
+                pipeline_path,
                 "models",
                 "s-19700101-000007_h-1_params",
             ),
@@ -126,7 +122,7 @@ def test_set_params(test_model_1, test_params_1, test_params_2):
         json.dump(test_params_1, f)
     set_parameters(
         model_path=os.path.join(
-            experiment_path,
+            pipeline_path,
             "models",
             "s-19700101-000007_h-1",
         ),
@@ -135,7 +131,7 @@ def test_set_params(test_model_1, test_params_1, test_params_2):
 
     with open(
             os.path.join(
-                experiment_path,
+                pipeline_path,
                 "models",
                 "s-19700101-000007_h-1_params",
             ),
@@ -146,20 +142,58 @@ def test_set_params(test_model_1, test_params_1, test_params_2):
     assert params == test_params_2
 
 
-def test_example_pipeline(
+def test_pipeline(
         test_df_4,
-        test_ed_2,
-        test_experiment_result
+        test_pipeline_2,
+        test_pipeline_result
 ):
-    experiment = Experiment(**test_ed_2["experiment_definition"])
-    result = experiment.run(test_df_4, boost_model_params={'window': 7, 'alpha': 0.08})
-    assert result == test_experiment_result
+    result = test_pipeline_2.fit(test_df_4)
+    assert result == test_pipeline_result
 
+
+def test_simulation_pipeline_prefect(
+        test_df_4,
+        test_pipeline_2,
+        test_pipeline_result,
+        test_boost_model_params,
+        test_bucket,
+        test_pipeline_root,
+        test_pipeline_name,
+        test_bootstrap_models,
+        test_boost_models,
+        test_horizons
+
+):
+    test_pipeline_2.env_variables = {'AWS_SECRET_ACCESS_KEY': os.environ['AWS_SECRET_ACCESS_KEY'],
+                       'AWS_ACCESS_KEY_ID': os.environ['AWS_ACCESS_KEY_ID']}
+    test_pipeline_2.storage_options = {'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}}
+    test_pipeline_2.is_fit = True
+    test_pipeline_2.bootstrap_models = test_bootstrap_models
+    test_pipeline_2.boost_models = test_boost_models
+    test_data_path = '{}/test-data'.format(test_pipeline_root)
+    fs = s3fs.S3FileSystem(**test_pipeline_2.storage_options)
+    if fs.exists(test_bucket):
+        fs.rm(test_bucket, True)
+    else:
+        fs.mkdir(test_bucket)
+    test_df_4.to_parquet(test_data_path,
+                         storage_options={'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}})
+    from prefect import flow
+    @flow(
+        name=test_pipeline_name, persist_result=True
+    )
+    def run_pipeline(df: str):
+        return test_pipeline_2.simulate(df=df, scenarios={
+                "b": {"mode": "constant", "constant_values": [0, 1, 2, 3, 4, 5]}
+            }, horizons=test_horizons, prefect=True)
+
+    result = run_pipeline(test_data_path)
+    assert result == test_pipeline_result
 
 '''def test_example_pipeline_kfp(
         test_df_4,
         test_ed_2,
-        test_experiment_result,
+        test_pipeline_result,
         test_kind_cluster,
         test_boost_model_params,
         test_bucket,
@@ -168,7 +202,7 @@ def test_example_pipeline(
         test_pipeline_name,
 
 ):
-    experiment = Experiment(**test_ed_2["experiment_definition"])
+    pipeline = Pipeline(**test_ed_2["pipeline_definition"])
 
     with test_kind_cluster.port_forward("service/ml-pipeline-ui", 80, "-n", "kubeflow", retries=1) as port:
         with test_kind_cluster.port_forward("service/minio-service", 9000, "-n", "kubeflow", retries=1) as minio_port:
@@ -177,10 +211,10 @@ def test_example_pipeline(
                 description="testing",
                 pipeline_root=test_pipeline_root,
             )
-            def run_experiment(data: str = 'test_uri', boost_model_params=json.dumps({"test": "test2"})):
+            def run_pipeline(data: str = 'test_uri', boost_model_params=json.dumps({"test": "test2"})):
                 storage_options['client_kwargs'].update({'endpoint_url': minio_endpoint})
                 component_kwargs = {'storage_options': storage_options}
-                experiment.run(data=data, boost_model_params=boost_model_params,
+                pipeline.train(data=data, boost_model_params=boost_model_params,
                                env_variables={'AWS_ACCESS_KEY_ID': 'minio', 'AWS_SECRET_ACCESS_KEY': 'minio123'},
                                component_kwargs=component_kwargs,
                                kfp=True)
@@ -198,7 +232,7 @@ def test_example_pipeline(
                 fs.mkdir(test_bucket)
             test_df_4.to_parquet(test_data_path, storage_options=storage_options)
             client = kfp.Client(host='http://127.0.0.1:{}'.format(port))
-            client.create_run_from_pipeline_func(run_experiment,
+            client.create_run_from_pipeline_func(run_pipeline,
                                                  arguments={'data': test_data_path,
                                                             "boost_model_params": json.dumps(
                                                                 test_boost_model_params)})
@@ -206,29 +240,28 @@ def test_example_pipeline(
             pass
             # with fs.open(pipeline_root + '/result.pkl', 'rb') as f:
             #    result = dill.load(f)
-            # assert result == test_experiment_result
+            # assert result == test_pipeline_result
 
         ###TODO start here - build result object from pipeline-root and compare - create parse method in result object
         ###TODO start here - test kfp pipeline with kind
         ###TODO then implement interpretability/analytics interface'''
 
 
-def test_example_pipeline_prefect(
+def test_pipeline_prefect(
         test_df_4,
-        test_ed_2,
-        test_experiment_result,
+        test_pipeline_2,
+        test_pipeline_result,
         test_boost_model_params,
         test_bucket,
         test_pipeline_root,
         test_pipeline_name,
 
 ):
-    experiment = Experiment(**test_ed_2["experiment_definition"])
-    experiment.env_variables = {'AWS_SECRET_ACCESS_KEY': os.environ['AWS_SECRET_ACCESS_KEY'],
+    test_pipeline_2.env_variables = {'AWS_SECRET_ACCESS_KEY': os.environ['AWS_SECRET_ACCESS_KEY'],
                        'AWS_ACCESS_KEY_ID': os.environ['AWS_ACCESS_KEY_ID']}
-    experiment.storage_options = {'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}}
+    test_pipeline_2.storage_options = {'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}}
     test_data_path = '{}/test-data'.format(test_pipeline_root)
-    fs = s3fs.S3FileSystem(**experiment.storage_options)
+    fs = s3fs.S3FileSystem(**test_pipeline_2.storage_options)
     if fs.exists(test_bucket):
         fs.rm(test_bucket, True)
     else:
@@ -239,11 +272,11 @@ def test_example_pipeline_prefect(
     @flow(
         name=test_pipeline_name, persist_result=True
     )
-    def run_experiment(df: str):
-        return experiment.run(df=df)
+    def run_pipeline(df: str):
+        return test_pipeline_2.fit(df=df, prefect=True)
 
-    result = run_experiment(test_data_path)
-    assert result == test_experiment_result
+    result = run_pipeline(test_data_path)
+    assert result == test_pipeline_result
 
 ###TODO start here - reset hardcoded values in conftest for this test - use same fixtures for unit and pieline tests
 ###TODO then implement interpretability/analytics interface
@@ -251,14 +284,14 @@ def test_example_pipeline_prefect(
 def test_quickstart(test_eds_quickstart, random_state):
     for k in test_eds_quickstart:
         ed = test_eds_quickstart[k]
-        experiment_path = "divina-test/experiment/test1"
-        experiment = Experiment(**ed["experiment_definition"])
-        result = experiment.run(write_path=experiment_path, random_state=11)
+        pipeline_path = "divina-test/pipeline/test1"
+        pipeline = Pipeline(**ed["pipeline_definition"])
+        result = pipeline.train(write_path=pipeline_path, random_state=11)
         result_df = result.compute().reset_index(drop=True)
         ###RESET
         """ddf.read_parquet(
             os.path.join(
-                experiment_path,
+                pipeline_path,
                 "forecast"
             )
         ).to_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
@@ -275,20 +308,20 @@ def test_quickstart(test_eds_quickstart, random_state):
             .compute()
             .reset_index(drop=True),
         )
-        ed["experiment_definition"]["time_horizons"] = [0]
-        if not "target_dimensions" in ed["experiment_definition"]:
+        ed["pipeline_definition"]["time_horizons"] = [0]
+        if not "target_dimensions" in ed["pipeline_definition"]:
             stores = [6]
         else:
             stores = [1, 2, 3]
         result_df = result_df[result_df["Date"] >= "2015-01-01"]
         for s in stores:
             fig = go.Figure()
-            for h in ed["experiment_definition"]["time_horizons"]:
-                if not "encode_features" in ed["experiment_definition"]:
+            for h in ed["pipeline_definition"]["time_horizons"]:
+                if not "encode_features" in ed["pipeline_definition"]:
                     store_df = result_df[result_df["Store"] == s]
                 else:
                     store_df = result_df[result_df["Store_{}".format(float(s))] == 1]
-                if "scenarios" in ed["experiment_definition"]:
+                if "scenarios" in ed["pipeline_definition"]:
                     store_df = store_df[
                         (store_df["Date"] < "2015-08-01") | (result_df["Promo"] == 1)
                         ]
@@ -299,19 +332,19 @@ def test_quickstart(test_eds_quickstart, random_state):
                         line_color="cadetblue",
                         annotation_text="Forecasts assuming promotions",
                     )
-                if "confidence_intervals" in ed["experiment_definition"]:
-                    if len(ed["experiment_definition"]["confidence_intervals"]) > 0:
-                        for i in ed["experiment_definition"]["confidence_intervals"]:
+                if "confidence_intervals" in ed["pipeline_definition"]:
+                    if len(ed["pipeline_definition"]["confidence_intervals"]) > 0:
+                        for i in ed["pipeline_definition"]["confidence_intervals"]:
                             fig.add_trace(
                                 go.Scatter(
                                     marker=dict(color="cyan"),
                                     mode="lines",
                                     x=store_df[
-                                        ed["experiment_definition"]["time_index"]
+                                        ed["pipeline_definition"]["time_index"]
                                     ],
                                     y=store_df[
                                         "{}_h_{}_pred_c_{}".format(
-                                            ed["experiment_definition"]["target"], h, i
+                                            ed["pipeline_definition"]["target"], h, i
                                         )
                                     ],
                                     name="h_{}_c_{}".format(h, i),
@@ -323,7 +356,7 @@ def test_quickstart(test_eds_quickstart, random_state):
                             selector=dict(
                                 name="h_{}_c_{}".format(
                                     h,
-                                    ed["experiment_definition"]["confidence_intervals"][
+                                    ed["pipeline_definition"]["confidence_intervals"][
                                         -1
                                     ],
                                 )
@@ -335,7 +368,7 @@ def test_quickstart(test_eds_quickstart, random_state):
                             selector=dict(
                                 name="h_{}_c_{}".format(
                                     h,
-                                    ed["experiment_definition"]["confidence_intervals"][
+                                    ed["pipeline_definition"]["confidence_intervals"][
                                         0
                                     ],
                                 )
@@ -346,19 +379,19 @@ def test_quickstart(test_eds_quickstart, random_state):
                         marker=dict(color="black"),
                         line=dict(dash="dash"),
                         mode="lines",
-                        x=store_df[ed["experiment_definition"]["time_index"]],
-                        y=store_df[ed["experiment_definition"]["target"]],
-                        name=ed["experiment_definition"]["target"],
+                        x=store_df[ed["pipeline_definition"]["time_index"]],
+                        y=store_df[ed["pipeline_definition"]["target"]],
+                        name=ed["pipeline_definition"]["target"],
                     )
                 )
                 fig.add_trace(
                     go.Scatter(
                         marker=dict(color="darkblue"),
                         mode="lines",
-                        x=store_df[ed["experiment_definition"]["time_index"]],
+                        x=store_df[ed["pipeline_definition"]["time_index"]],
                         y=store_df[
                             "{}_h_{}_pred".format(
-                                ed["experiment_definition"]["target"], h
+                                ed["pipeline_definition"]["target"], h
                             )
                         ],
                         name="Forecast".format(h),
@@ -382,17 +415,17 @@ def test_quickstart(test_eds_quickstart, random_state):
                 fig.write_html(path)
                 factor_fig = go.Figure()
                 factors = [c for c in store_df if c.split("_")[0] == "factor"]
-                if "scenarios" in ed["experiment_definition"]:
+                if "scenarios" in ed["pipeline_definition"]:
                     store_df = store_df[
                         (store_df["Date"] > "2015-08-01") | (result_df["Promo"] == 1)
                         ]
                 store_df = store_df[
-                    factors + [ed["experiment_definition"]["time_index"]]
+                    factors + [ed["pipeline_definition"]["time_index"]]
                     ]
                 for f in factors:
                     factor_fig.add_trace(
                         go.Bar(
-                            x=store_df[ed["experiment_definition"]["time_index"]],
+                            x=store_df[ed["pipeline_definition"]["time_index"]],
                             y=store_df[f],
                             name=("_".join(f.split("_")[1:])[:15] + "..")
                             if len("_".join(f.split("_")[1:])) > 17

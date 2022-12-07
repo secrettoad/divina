@@ -15,7 +15,8 @@ from pandas import Timestamp
 from pykube import Pod, PersistentVolume
 import time
 from pipeline.model import GLM, EWMA
-from pipeline._experiment import ExperimentResult, ValidationSplit, BoostValidation, CausalValidation, Validation
+from pipeline.pipeline import Pipeline, PipelineValidation, ValidationSplit, BoostValidation, CausalValidation, \
+    Validation
 from sklearn.base import BaseEstimator
 import kfp
 
@@ -26,7 +27,7 @@ def random_state():
 
 
 @pytest.fixture()
-def test_model_1(test_df_1, random_state, test_ed_1):
+def test_model_1(test_df_1, random_state, test_pipeline_1):
     params = [0.02160585, -0.3599889, 0.35998562]
     intercept = 2.13828632
     features = ["b", "b_(5, 10]", "b_(15, inf]"]
@@ -52,7 +53,7 @@ def test_params_1(test_model_1):
 
 
 @pytest.fixture()
-def test_bootstrap_models(test_df_1, random_state, test_ed_1):
+def test_bootstrap_models(test_df_1, random_state, test_pipeline_1):
     params = [
         [3.5208353651349817, 0.8890968752323547, -3.3105628218449574],
         [1.1717451589768473, 0.9272367214532506, -2.972442774585969],
@@ -76,14 +77,14 @@ def test_bootstrap_models(test_df_1, random_state, test_ed_1):
     ]
     states = range(
         random_state,
-        random_state + test_ed_1["experiment_definition"]["bootstrap_sample"],
+        random_state + test_pipeline_1.bootstrap_sample,
     )
-    bootstrap_models = {}
+    bootstrap_models = []
 
     for j, i, p, f, state in zip(
             range(0, len(states)), intercepts, params, features, states
     ):
-        model = LinearRegression()
+        model = GLM(link_function='log')
         model.fit(
             ddf.from_pandas(
                 pd.DataFrame([np.array(params[j]) + c for c in range(0, len(states))]),
@@ -96,16 +97,28 @@ def test_bootstrap_models(test_df_1, random_state, test_ed_1):
         model.coef_ = np.array(p)
         model.intercept_ = i
         model._coef = np.array(p + [i])
-        bootstrap_models[state] = (model, {"features": f})
+        bootstrap_models.append(model)
     return bootstrap_models
 
 
 @pytest.fixture()
-def test_validation_models(test_df_1, random_state, test_ed_1):
+def test_horizons():
+    return range(1, 20)
+
+@pytest.fixture()
+def test_boost_models(test_df_1, test_pipeline_1, test_horizons):
+    boost_models = {h: EWMA() for h in test_horizons}
+    for h in boost_models:
+        boost_models[h].window = test_pipeline_1.boost_window
+    return boost_models
+
+
+@pytest.fixture()
+def test_validation_models(test_df_1, random_state, test_pipeline_1):
     params = [[4.086805634357628, 0.7618639411983616, -1.6591807041382545]]
     intercepts = [1.6591672730002625]
     features = [["b", "b_(5, 10]", "b_(15, inf]"]]
-    splits = test_ed_1["experiment_definition"]["validation_splits"]
+    splits = test_pipeline_1["pipeline_definition"]["validation_splits"]
     validation_models = {}
 
     for j, i, p, f, split in zip(
@@ -159,7 +172,8 @@ def test_val_predictions_1():
 @pytest.fixture()
 def test_forecast_1():
     return ddf.from_array(np.array(
-        [7.036734548365541, 18.734915837966778, 16.81648558356344, 6.595098159594108, 34.30711407155736, 64.19481152099334])).to_frame()
+        [7.036734548365541, 18.734915837966778, 16.81648558356344, 6.595098159594108, 34.30711407155736,
+         64.19481152099334])).to_frame()
 
 
 @pytest.fixture()
@@ -173,73 +187,66 @@ def test_pipeline_root(test_pipeline_name, test_bucket):
 
 
 @pytest.fixture()
-def test_ed_1():
+def test_pipeline_1():
+    return Pipeline(
+        time_index="a",
+        target="c",
+        validation_splits=["1970-01-01 00:00:07"],
+        validate_start="1970-01-01 00:00:01",
+        validate_end="1970-01-01 00:00:09",
+        forecast_start="1970-01-01 00:00:05",
+        forecast_end="1970-01-01 00:00:14",
+        frequency="S",
+        confidence_intervals=[90],
+        bootstrap_sample=5,
+        bin_features={"b": [5, 10, 15]},
+        time_horizons=[1],
+        boost_window=7)
+
+
+@pytest.fixture()
+def test_pipeline_2(test_pipeline_root):
+    return Pipeline(time_index="a",
+                    target="c",
+                    validation_splits=["1970-01-01 00:00:07"],
+                    validate_start="1970-01-01 00:00:01",
+                    validate_end="1970-01-01 00:00:09",
+                    forecast_start="1970-01-01 00:00:05",
+                    forecast_end="1970-01-01 00:00:14",
+                    frequency="S",
+                    confidence_intervals=[90],
+                    bootstrap_sample=5,
+                    random_seed=11,
+                    bin_features={"b": [5, 10, 15]},
+                    time_horizons=[1],
+                    pipeline_root=test_pipeline_root,
+                    target_dimensions=['d', 'e'],
+                    boost_model_params={'alpha': 0.8},
+                    boost_window=7)
+
+
+@pytest.fixture()
+def test_scenarios():
     return {
-        "experiment_definition": {
-            "time_index": "a",
-            "target": "c",
-            "validation_splits": ["1970-01-01 00:00:07"],
-            "validate_start": "1970-01-01 00:00:01",
-            "validate_end": "1970-01-01 00:00:09",
-            "forecast_start": "1970-01-01 00:00:05",
-            "forecast_end": "1970-01-01 00:00:14",
-            "frequency": "S",
-            "confidence_intervals": [90],
-            "bootstrap_sample": 5,
-            "bin_features": {"b": [5, 10, 15]},
-            "scenarios": {
-                "b": {"mode": "constant", "constant_values": [0, 1, 2, 3, 4, 5]}
-            },
-            "time_horizons": [1],
-            "boost_window": 7
-        }
+        "b": {"mode": "constant", "constant_values": [0, 1, 2, 3, 4, 5]}
     }
 
 
 @pytest.fixture()
-def test_ed_2(test_pipeline_root):
-    return {
-        "experiment_definition": {
-            "time_index": "a",
-            "target": "c",
-            "validation_splits": ["1970-01-01 00:00:07"],
-            "validate_start": "1970-01-01 00:00:01",
-            "validate_end": "1970-01-01 00:00:09",
-            "forecast_start": "1970-01-01 00:00:05",
-            "forecast_end": "1970-01-01 00:00:14",
-            "frequency": "S",
-            "confidence_intervals": [90],
-            "bootstrap_sample": 5,
-            "random_seed": 11,
-            "bin_features": {"b": [5, 10, 15]},
-            "scenarios": {
-                "b": {"mode": "constant", "constant_values": [0, 1, 2, 3, 4, 5]}
-            },
-            "time_horizons": [1],
-            "pipeline_root": test_pipeline_root,
-            "target_dimensions": ['d', 'e'],
-            "boost_model_params": {'alpha': 0.8, 'window': 7},
-            "boost_window": 7
-            # "data_path": "divina-test/dataset/test1",
-        }
-    }
-
-
-@pytest.fixture()
-def test_eds_quickstart():
+def test_pipelines_quickstart():
     eds = {}
     for file in sorted(
             os.listdir(
                 pathlib.Path(
                     pathlib.Path(__file__).parent.parent.parent,
-                    "docs_src/_static/experiment_definitions",
+                    "docs_src/_static/pipeline_definitions",
                 )
             )
     ):
         with open(
                 pathlib.Path(
                     pathlib.Path(__file__).parent.parent.parent,
-                    "docs_src/_static/experiment_definitions",
+                    "docs_src/_static/pipeline_definitions",
                     file,
                 )
         ) as f:
@@ -248,12 +255,12 @@ def test_eds_quickstart():
 
 
 @pytest.fixture()
-def test_ed_3(test_bucket, test_ed_1):
-    test_ed = test_ed_1
-    # test_ed["experiment_definition"].update(
+def test_pipeline_3(test_bucket, test_pipeline_1):
+    test_pipeline = test_pipeline_1
+    # test_pipeline["pipeline_definition"].update(
     #    {"data_path": "{}/dataset/test1".format(test_bucket)}
     # )
-    return test_ed
+    return test_pipeline
 
 
 @pytest.fixture()
@@ -433,72 +440,76 @@ def test_truth():
 
 
 @pytest.fixture
-def test_bootstrap_validations():
-    state = [({'mse': 124.16190403858947}, np.array([3.54524468, 0.75499658, -1.1595055, 1.15946188]),
-              [[40.944542248313226], [62.83944297443861], [8.425711791823481], [19.804638098950782],
-               [16.02965521513606], [6.160722061534648], [40.944542248313226], [62.83944297443861], [8.425711791823481],
-               [19.804638098950782], [16.02965521513606], [6.160722061534648], [40.944542248313226],
-               [62.83944297443861], [8.425711791823481], [19.804638098950782], [16.02965521513606], [6.160722061534648],
-               [40.944542248313226], [62.83944297443861], [8.425711791823481], [19.804638098950782],
-               [16.02965521513606], [6.160722061534648], [40.944542248313226], [62.83944297443861]]), (
-                 {'mse': 229.0403771665481}, np.array([4.34323446, 0.61122715, -3.34270131, 3.34266718]),
-                 [[37.024804743734904], [54.75039203362197], [5.8903503351407185], [19.910444601774977],
-                  [16.854308862139277], [4.056668891359298], [37.024804743734904], [54.75039203362197],
-                  [5.8903503351407185], [19.910444601774977], [16.854308862139277], [4.056668891359298],
-                  [37.024804743734904], [54.75039203362197], [5.8903503351407185], [19.910444601774977],
-                  [16.854308862139277], [4.056668891359298], [37.024804743734904], [54.75039203362197],
-                  [5.8903503351407185], [19.910444601774977], [16.854308862139277], [4.056668891359298],
-                  [37.024804743734904], [54.75039203362197]]), (
-                 {'mse': 229.04037716654764}, np.array([4.34323446, 0.61122715, -3.34270131, 3.34266718]),
-                 [[37.02480474373492], [54.750392033622], [5.8903503351407185], [19.910444601774977],
-                  [16.854308862139277],
-                  [4.056668891359296], [37.02480474373492], [54.750392033622], [5.8903503351407185],
-                  [19.910444601774977],
-                  [16.854308862139277], [4.056668891359296], [37.02480474373492], [54.750392033622],
-                  [5.8903503351407185],
-                  [19.910444601774977], [16.854308862139277], [4.056668891359296], [37.02480474373492],
-                  [54.750392033622],
-                  [5.8903503351407185], [19.910444601774977], [16.854308862139277], [4.056668891359296],
-                  [37.02480474373492], [54.750392033622]]), (
-                 {'mse': 245.7282869286211}, np.array([6.97819441, 0.5519436, -3.42995856, 3.42994363]),
-                 [[36.901430624102545], [52.90779489234828], [7.9637846221382995], [21.447009951313554],
-                  [18.687291974029808], [6.307953835768051], [36.901430624102545], [52.90779489234828],
-                  [7.9637846221382995], [21.447009951313554], [18.687291974029808], [6.307953835768051],
-                  [36.901430624102545], [52.90779489234828], [7.9637846221382995], [21.447009951313554],
-                  [18.687291974029808], [6.307953835768051], [36.901430624102545], [52.90779489234828],
-                  [7.9637846221382995], [21.447009951313554], [18.687291974029808], [6.307953835768051],
-                  [36.901430624102545], [52.90779489234828]]), (
-                 {'mse': 188.34572704380332}, np.array([5.46736964, 0.6577846, -1.23726192, 1.23726118]),
-                 [[38.27829147810729], [57.35404479203078], [9.492384493649608], [19.86032276121565],
-                  [16.571399776056424],
-                  [7.519030702554074], [38.27829147810729], [57.35404479203078], [9.492384493649608],
-                  [19.86032276121565],
-                  [16.571399776056424], [7.519030702554074], [38.27829147810729], [57.35404479203078],
-                  [9.492384493649608],
-                  [19.86032276121565], [16.571399776056424], [7.519030702554074], [38.27829147810729],
-                  [57.35404479203078],
-                  [9.492384493649608], [19.86032276121565], [16.571399776056424], [7.519030702554074],
-                  [38.27829147810729],
-                  [57.35404479203078]])]
+def test_bootstrap_metrics():
+    return [{'mse': 124.16190403858947},
+            {'mse': 229.04037716654764},
+            {'mse': 245.7282869286211},
+            {'mse': 188.34572704380332}]
 
-    validations = [Validation(metrics=x[0], predictions=ddf.from_pandas(pd.DataFrame(x[2]), npartitions=2), model=GLM())
-                   for x in state]
-    for v, c in zip(validations, state):
-        v.model._coef = c[1]
+
+@pytest.fixture
+def test_bootstrap_predictions():
+    return [[[40.944542248313226], [62.83944297443861], [8.425711791823481], [19.804638098950782],
+             [16.02965521513606], [6.160722061534648], [40.944542248313226], [62.83944297443861], [8.425711791823481],
+             [19.804638098950782], [16.02965521513606], [6.160722061534648], [40.944542248313226],
+             [62.83944297443861], [8.425711791823481], [19.804638098950782], [16.02965521513606], [6.160722061534648],
+             [40.944542248313226], [62.83944297443861], [8.425711791823481], [19.804638098950782],
+             [16.02965521513606], [6.160722061534648], [40.944542248313226], [62.83944297443861]],
+            [[37.024804743734904], [54.75039203362197], [5.8903503351407185], [19.910444601774977],
+             [16.854308862139277], [4.056668891359298], [37.024804743734904], [54.75039203362197],
+             [5.8903503351407185], [19.910444601774977], [16.854308862139277], [4.056668891359298],
+             [37.024804743734904], [54.75039203362197], [5.8903503351407185], [19.910444601774977],
+             [16.854308862139277], [4.056668891359298], [37.024804743734904], [54.75039203362197],
+             [5.8903503351407185], [19.910444601774977], [16.854308862139277], [4.056668891359298],
+             [37.024804743734904], [54.75039203362197]],
+            [[37.02480474373492], [54.750392033622], [5.8903503351407185], [19.910444601774977],
+             [16.854308862139277],
+             [4.056668891359296], [37.02480474373492], [54.750392033622], [5.8903503351407185],
+             [19.910444601774977],
+             [16.854308862139277], [4.056668891359296], [37.02480474373492], [54.750392033622],
+             [5.8903503351407185],
+             [19.910444601774977], [16.854308862139277], [4.056668891359296], [37.02480474373492],
+             [54.750392033622],
+             [5.8903503351407185], [19.910444601774977], [16.854308862139277], [4.056668891359296],
+             [37.02480474373492], [54.750392033622]],
+            [[36.901430624102545], [52.90779489234828], [7.9637846221382995], [21.447009951313554],
+             [18.687291974029808], [6.307953835768051], [36.901430624102545], [52.90779489234828],
+             [7.9637846221382995], [21.447009951313554], [18.687291974029808], [6.307953835768051],
+             [36.901430624102545], [52.90779489234828], [7.9637846221382995], [21.447009951313554],
+             [18.687291974029808], [6.307953835768051], [36.901430624102545], [52.90779489234828],
+             [7.9637846221382995], [21.447009951313554], [18.687291974029808], [6.307953835768051],
+             [36.901430624102545], [52.90779489234828]],
+            [[38.27829147810729], [57.35404479203078], [9.492384493649608], [19.86032276121565],
+             [16.571399776056424],
+             [7.519030702554074], [38.27829147810729], [57.35404479203078], [9.492384493649608],
+             [19.86032276121565],
+             [16.571399776056424], [7.519030702554074], [38.27829147810729], [57.35404479203078],
+             [9.492384493649608],
+             [19.86032276121565], [16.571399776056424], [7.519030702554074], [38.27829147810729],
+             [57.35404479203078],
+             [9.492384493649608], [19.86032276121565], [16.571399776056424], [7.519030702554074],
+             [38.27829147810729],
+             [57.35404479203078]]]
+
+
+@pytest.fixture
+def test_bootstrap_validations(test_bootstrap_models, test_bootstrap_metrics, test_bootstrap_predictions):
+    validations = [Validation(metrics=_metric, predictions=ddf.from_pandas(pd.DataFrame(_df), npartitions=2), model=_model)
+                   for _metric, _df, _model in zip(test_bootstrap_metrics, test_bootstrap_predictions, test_bootstrap_models)]
     return validations
 
 
 @pytest.fixture
-def test_experiment_result(test_causal_predictions, test_boosted_predictions, test_truth, test_bootstrap_validations):
-    return ExperimentResult(split_validations=[ValidationSplit(split='1970-01-01 00:00:07', boosted_validations=[
+def test_pipeline_result(test_causal_predictions, test_boosted_predictions, test_truth, test_bootstrap_validations):
+    return PipelineValidation(split_validations=[ValidationSplit(split='1970-01-01 00:00:07', boosted_validations=[
         BoostValidation(metrics={'mse': 147.27655145967876}, horizon=1, predictions=test_boosted_predictions,
-                        model=EWMA(alpha=0.08, window=7))],
-                                                               causal_validation=CausalValidation(
-                                                                   metrics={'mse': 199.71788056125322},
-                                                                   predictions=test_causal_predictions,
-                                                                   bootstrap_validations=test_bootstrap_validations),
+                        model=EWMA(alpha=0.08))],
+                                                                 causal_validation=CausalValidation(
+                                                                     metrics={'mse': 199.71788056125322},
+                                                                     predictions=test_causal_predictions,
+                                                                     bootstrap_validations=test_bootstrap_validations),
 
-                                                               truth=test_truth)])
+                                                                 truth=test_truth)])
 
 
 @pytest.fixture
@@ -535,4 +546,4 @@ def test_bucket():
 
 @pytest.fixture
 def test_boost_model_params():
-    return {'window': 7, 'alpha': 0.08}
+    return {'alpha': 0.08}
