@@ -9,6 +9,9 @@ from pipeline.utils import create_write_directory, get_dask_client, Output, Inpu
 import dask.dataframe as dd
 from dask_ml.preprocessing import Categorizer, DummyEncoder
 import numpy as np
+from dask_ml.model_selection import GridSearchCV
+from sklearn.metrics import make_scorer
+
 
 
 class Validation():
@@ -466,16 +469,23 @@ class Experiment:
                 replace=False, frac=bootstrap_percentage, random_state=random_state
             )
 
-        if model_params:
-            model = eval(model_type)(**model_params)
-        else:
-            model = eval(model_type)()
+        for k in model_params:
+            if not type(model_params[k]) in [list, np.array]:
+                model_params[k] = [model_params[k]]
+        _model = eval(model_type)()
+
+        ### https: // examples.dask.org / machine - learning / hyperparam - opt.html
+        model = GridSearchCV(
+                _model,
+                model_params,
+                scoring=make_scorer(lambda y, y_hat: -abs(np.mean(y_hat-y)), greater_is_better=True)
+            )
 
         model.fit(
             x.to_dask_array(lengths=True),
             y.shift(-horizon).dropna().to_dask_array(lengths=True),
         )
-        return model
+        return model.best_estimator_
 
     @_divina_component
     def forecast(self, model: Union[str, BaseEstimator], x: Union[str, dd.DataFrame],

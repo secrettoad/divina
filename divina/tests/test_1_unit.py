@@ -27,7 +27,7 @@ def test_bin_features(
     )
 
 
-###TODO get rid of experiment definitions and make it all pythonic
+###TODO - update fixtures to match this output
 def test_glm_train(
         test_df_1,
         test_ed_1,
