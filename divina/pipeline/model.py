@@ -6,6 +6,8 @@ from sklearn.base import BaseEstimator
 import warnings
 import dask.array as da
 
+###TODO - implement consistent interface for models - check out abcs
+
 
 class EWMA(BaseEstimator):
     def __init__(self, alpha: float=0.8):
@@ -14,7 +16,7 @@ class EWMA(BaseEstimator):
         self.weights = None
         super().__init__()
 
-    def fit(self, X, y):
+    def fit(self, X, y, fit_features=None, drop_constants: bool=False):
         self.window = X.shape[1]
 
     def predict(self, X):
@@ -48,6 +50,7 @@ class GLM(BaseEstimator):
             self.linear_model = LinearRegression(**linear_parameters)
         else:
             self.linear_model = LinearRegression()
+        self.fit_indices = None
         super().__init__()
 
     @property
@@ -58,12 +61,21 @@ class GLM(BaseEstimator):
     def _coef(self, value: np.array):
         self.linear_model._coef = value
 
-    def fit(self, X, y):
+    def fit(self, X, y, drop_constants: bool=False):
+        if drop_constants:
+            da_std = X.std(axis=0)
+            constant_indices = [i for i, v in enumerate(da_std) if v == 0]
+            usable_indices = list(set(range(da_std.shape[0])) - set(constant_indices))
+            self.fit_indices = usable_indices
+        if self.fit_indices:
+            X = X[:, self.fit_indices]
         if self.link_function == 'log':
             y = np.log(y)
         self.linear_model.fit(X, y)
 
     def predict(self, X):
+        if self.fit_indices:
+            X = X[:, self.fit_indices]
         y_hat = self.linear_model.predict(X)
         if self.link_function == 'log':
             y_hat = np.exp(y_hat)

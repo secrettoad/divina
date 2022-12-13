@@ -161,7 +161,7 @@ def _component_helper(func):
         _args = dict(sig.parameters)
         new_args = []
         for a, v in zip(_args, args):
-            if _args[a].annotation == Union[str, dd.DataFrame] and type(v) == str:
+            if (_args[a].annotation == Union[str, dd.DataFrame] or _args[a].annotation == Union[str, dd.Series]) and type(v) == str:
                 new_args.append(dd.read_parquet(v, storage_options=self.storage_options))
             elif _args[a].annotation == Union[List[str], List[dd.DataFrame]] and type(v) == [str]:
                 new_args.append([dd.read_parquet(_df, storage_options=self.storage_options) for _df in

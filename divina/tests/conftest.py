@@ -28,9 +28,10 @@ def random_state():
 
 @pytest.fixture()
 def test_model_1(test_df_1, random_state, test_pipeline_1):
-    params = [0.02160585, -0.3599889, 0.35998562]
-    intercept = 2.13828632
-    features = ["b", "b_(5, 10]", "b_(15, inf]"]
+    params = [0.33754904224551174, 3.898442928579839, 3.898442928579839, 2.1651306296852373, 2.0252942534730707,
+              3.307291666666666]
+    intercept = -14.649630725378326
+    fit_indices = [0, 1, 2, 3, 4, 5]
 
     model = GLM(link_function='log')
     model.linear_model.fit(
@@ -44,7 +45,8 @@ def test_model_1(test_df_1, random_state, test_pipeline_1):
     model.linear_model.coef_ = np.array(params)
     model.linear_model.intercept_ = intercept
     model.linear_model._coef = np.array(params + [intercept])
-    return (model, {"features": features})
+    model.fit_indices = fit_indices
+    return model
 
 
 @pytest.fixture()
@@ -53,28 +55,17 @@ def test_params_1(test_model_1):
 
 
 @pytest.fixture()
-def test_bootstrap_models(test_df_1, random_state, test_pipeline_1):
+def test_bootstrap_models(random_state, test_pipeline_1):
     params = [
-        [3.5208353651349817, 0.8890968752323547, -3.3105628218449574],
-        [1.1717451589768473, 0.9272367214532506, -2.972442774585969],
-        [2.5578331046564813, 0.9201254489380151, -2.0817764266201166],
-        [2.557833104656474, 0.9201254489380154, -2.081776426620107],
-        [2.514451997020174, 0.930893974845844, -1.406470131803517],
+        [5.807879880277484, 5.996090135921985, -5.996103319528735],
+         [6.405775482139099, 8.275877252257798, -8.275879348428148],
+         [2.450067447370109, -0.04323536076015728, 0.043236724281565886],
+         [6.002238892041233, 6.9669916158632565, -6.966994085850243],
+         [7.518383561688452, 8.25293678195981, -8.252982252663998]
     ]
-    intercepts = [
-        3.310380317261251,
-        2.9723833353906963,
-        2.0817011992723984,
-        2.0817011992723877,
-        1.4064614399090596,
-    ]
-    features = [
-        ["b", "b_(5, 10]", "b_(15, inf]"],
-        ["b", "b_(5, 10]", "b_(15, inf]"],
-        ["b", "b_(5, 10]", "b_(15, inf]"],
-        ["b", "b_(5, 10]", "b_(15, inf]"],
-        ["b", "b_(5, 10]", "b_(15, inf]"],
-    ]
+    intercepts = [-15.632378932373904, -18.447719997424628, -2.8743744329911856, -16.331371393981936,
+                  -20.651160098319018]
+    indices = [[0, 1, 2], [0, 1, 2], [0, 1, 2], [0, 1, 2], [0, 1, 2]]
     states = range(
         random_state,
         random_state + test_pipeline_1.bootstrap_sample,
@@ -82,10 +73,10 @@ def test_bootstrap_models(test_df_1, random_state, test_pipeline_1):
     bootstrap_models = []
 
     for j, i, p, f, state in zip(
-            range(0, len(states)), intercepts, params, features, states
+            range(0, len(states)), intercepts, params, indices, states
     ):
         model = GLM(link_function='log')
-        model.fit(
+        model.linear_model.fit(
             ddf.from_pandas(
                 pd.DataFrame([np.array(params[j]) + c for c in range(0, len(states))]),
                 npartitions=1,
@@ -94,16 +85,18 @@ def test_bootstrap_models(test_df_1, random_state, test_pipeline_1):
                 lengths=True
             ),
         )
-        model.coef_ = np.array(p)
-        model.intercept_ = i
-        model._coef = np.array(p + [i])
+        model.linear_model.coef_ = np.array(p)
+        model.linear_model.intercept_ = i
+        model.linear_model._coef = np.array(p + [i])
+        model.fit_indices = f
         bootstrap_models.append(model)
     return bootstrap_models
 
 
 @pytest.fixture()
 def test_horizons():
-    return range(1, 20)
+    return range(3, 5)
+
 
 @pytest.fixture()
 def test_boost_models(test_df_1, test_pipeline_1, test_horizons):
@@ -114,44 +107,13 @@ def test_boost_models(test_df_1, test_pipeline_1, test_horizons):
 
 
 @pytest.fixture()
-def test_validation_models(test_df_1, random_state, test_pipeline_1):
-    params = [[4.086805634357628, 0.7618639411983616, -1.6591807041382545]]
-    intercepts = [1.6591672730002625]
-    features = [["b", "b_(5, 10]", "b_(15, inf]"]]
-    splits = test_pipeline_1["pipeline_definition"]["validation_splits"]
-    validation_models = {}
-
-    for j, i, p, f, split in zip(
-            range(0, len(splits)), intercepts, params, features, splits
-    ):
-        model = LinearRegression()
-        model.fit(
-            ddf.from_pandas(
-                pd.DataFrame(
-                    [np.array(params[j]) + c for c in range(1, len(splits) + 1)]
-                    + [np.array(params[j])]
-                ),
-                npartitions=1,
-            ).to_dask_array(lengths=True),
-            ddf.from_pandas(pd.Series(intercepts + [i]), npartitions=1).to_dask_array(
-                lengths=True
-            ),
-        )
-        model.coef_ = np.array(p)
-        model.intercept_ = i
-        model._coef = np.array(p + [i])
-        validation_models[split] = (model, {"features": f})
-    return validation_models
-
-
-@pytest.fixture()
 def test_params_2(test_model_1):
     return test_model_1[1]
 
 
 @pytest.fixture()
 def test_metrics_1():
-    return {'mse': 139.02753504162985}
+    return {'mse': 286.2579120259681}
 
 
 @pytest.fixture()
@@ -171,9 +133,16 @@ def test_val_predictions_1():
 
 @pytest.fixture()
 def test_forecast_1():
-    return ddf.from_array(np.array(
-        [7.036734548365541, 18.734915837966778, 16.81648558356344, 6.595098159594108, 34.30711407155736,
-         64.19481152099334])).to_frame()
+    df = pd.DataFrame()
+    df['a'] = pd.to_datetime(['1970-01-01 00:00:01', '1970-01-01 00:00:02',
+                              '1970-01-01 00:00:03', '1970-01-01 00:00:04',
+                              '1970-01-01 00:00:05', '1970-01-01 00:00:06',
+                              '1970-01-01 00:00:07', '1970-01-01 00:00:08',
+                              '1970-01-01 00:00:09', '1970-01-01 00:00:10'])
+    df['y_hat'] = [0.8921926222729465, 0.8921926222729465, 0.8921926222729465, 14.99863188613795, 0.04329555074033657,
+                   0.04329555074033657, 21.56055802208144, 21.56055802208144, 21.56055802208144, 101.79384189509244]
+    df = df.set_index('a')
+    return ddf.from_pandas(df, npartitions=2)['y_hat']
 
 
 @pytest.fixture()
@@ -194,42 +163,46 @@ def test_pipeline_1():
         validation_splits=["1970-01-01 00:00:07"],
         validate_start="1970-01-01 00:00:01",
         validate_end="1970-01-01 00:00:09",
-        forecast_start="1970-01-01 00:00:05",
-        forecast_end="1970-01-01 00:00:14",
         frequency="S",
         confidence_intervals=[90],
         bootstrap_sample=5,
         bin_features={"b": [5, 10, 15]},
         time_horizons=[1],
-        boost_window=7)
+        boost_window=5)
 
 
 @pytest.fixture()
-def test_pipeline_2(test_pipeline_root):
+def test_simulate_end():
+    return "1970-01-01 00:00:14"
+
+
+@pytest.fixture()
+def test_simulate_start():
+    return "1970-01-01 00:00:11"
+
+
+@pytest.fixture()
+def test_pipeline_2(test_pipeline_root, test_horizons):
     return Pipeline(time_index="a",
                     target="c",
                     validation_splits=["1970-01-01 00:00:07"],
                     validate_start="1970-01-01 00:00:01",
                     validate_end="1970-01-01 00:00:09",
-                    forecast_start="1970-01-01 00:00:05",
-                    forecast_end="1970-01-01 00:00:14",
                     frequency="S",
                     confidence_intervals=[90],
                     bootstrap_sample=5,
                     random_seed=11,
                     bin_features={"b": [5, 10, 15]},
-                    time_horizons=[1],
+                    time_horizons=test_horizons,
                     pipeline_root=test_pipeline_root,
                     target_dimensions=['d', 'e'],
                     boost_model_params={'alpha': 0.8},
-                    boost_window=7)
+                    boost_window=5)
 
 
 @pytest.fixture()
 def test_scenarios():
-    return {
-        "b": {"mode": "constant", "constant_values": [0, 1, 2, 3, 4, 5]}
-    }
+    return [{"b": x} for x in [0, 1]]
 
 
 @pytest.fixture()
@@ -296,21 +269,28 @@ def test_data_1():
         .reset_index(drop=True)
     )
     df.columns = ["a", "b", "c"]
+    for c in ['e', 'd']:
+        R = np.random.RandomState(11)
+        df[c] = R.randint(1, 3, df.shape[0])
     return ddf.from_pandas(df, npartitions=2)
 
 
 @pytest.fixture()
 def test_df_1():
     df = pd.DataFrame(
-        [[Timestamp('1970-01-01 00:00:01'), 8.0, 12.0, 1, 0],
-         [Timestamp('1970-01-01 00:00:04'), 20.0, 24.0, 0, 1],
-         [Timestamp('1970-01-01 00:00:05'), 15.0, 18.0, 0, 1],
-         [Timestamp('1970-01-01 00:00:06'), 5.0, 6.0, 1, 0],
-         [Timestamp('1970-01-01 00:00:07'), 48.0, 54.0, 0, 1],
-         [Timestamp('1970-01-01 00:00:10'), 77.0, 84.0, 0, 1]]
+        [[Timestamp('1970-01-01 00:00:01'), 2.0, 1.5, 1.5, 12.0, 1, 0, 0, 0],
+         [Timestamp('1970-01-01 00:00:02'), 2.0, 1.5, 1.5, 0.0, 1, 0, 0, 0],
+         [Timestamp('1970-01-01 00:00:03'), 2.0, 1.5, 1.5, 0.0, 1, 0, 0, 0],
+         [Timestamp('1970-01-01 00:00:04'), 5.0, 1.75, 1.75, 24.0, 0, 1, 0, 0],
+         [Timestamp('1970-01-01 00:00:05'), 5.0, 1.0, 1.0, 18.0, 0, 1, 0, 0],
+         [Timestamp('1970-01-01 00:00:06'), 5.0, 1.0, 1.0, 6.0, 0, 1, 0, 0],
+         [Timestamp('1970-01-01 00:00:07'), 8.0, 1.6666666666666667, 1.6666666666666667, 54.0, 0, 1, 0, 0],
+         [Timestamp('1970-01-01 00:00:08'), 8.0, 1.6666666666666667, 1.6666666666666667, 0.0, 0, 1, 0, 0],
+         [Timestamp('1970-01-01 00:00:09'), 8.0, 1.6666666666666667, 1.6666666666666667, 0.0, 0, 1, 0, 0],
+         [Timestamp('1970-01-01 00:00:10'), 11.0, 1.5714285714285714, 1.5714285714285714, 84.0, 0, 0, 1, 0]]
     )
-    df.columns = ['a', 'b', 'c', 'b_(5, 10]', 'b_(15, inf]']
-    return ddf.from_pandas(df, npartitions=2)
+    df.columns = ['a', 'b', 'e', 'd', 'c', 'b_(-inf, 5]', 'b_(5, 10]', 'b_(10, 15]', 'b_(15, inf]']
+    return ddf.from_pandas(df, npartitions=2).set_index('a')
 
 
 @pytest.fixture()
@@ -494,8 +474,9 @@ def test_bootstrap_predictions():
 
 @pytest.fixture
 def test_bootstrap_validations(test_bootstrap_models, test_bootstrap_metrics, test_bootstrap_predictions):
-    validations = [Validation(metrics=_metric, predictions=ddf.from_pandas(pd.DataFrame(_df), npartitions=2), model=_model)
-                   for _metric, _df, _model in zip(test_bootstrap_metrics, test_bootstrap_predictions, test_bootstrap_models)]
+    validations = [
+        Validation(metrics=_metric, predictions=ddf.from_pandas(pd.DataFrame(_df), npartitions=2), model=_model)
+        for _metric, _df, _model in zip(test_bootstrap_metrics, test_bootstrap_predictions, test_bootstrap_models)]
     return validations
 
 

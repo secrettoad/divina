@@ -4,8 +4,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from sklearn.pipeline import make_pipeline
 from pipeline.utils import _divina_component
-from datasets.load import _load
-from pipeline.utils import create_write_directory, get_dask_client, Output, Input
+from pipeline.utils import Output
 import dask.dataframe as dd
 from dask_ml.preprocessing import Categorizer, DummyEncoder
 import numpy as np
@@ -81,8 +80,6 @@ class Pipeline:
             time_horizons=None,
             train_start=None,
             train_end=None,
-            forecast_start=None,
-            forecast_end=None,
             validate_start=None,
             validate_end=None,
             validation_splits=None,
@@ -92,6 +89,7 @@ class Pipeline:
             bootstrap_sample=None,
             scenarios=None,
             frequency=None,
+            frequency_target_aggregation='sum',
             start=None,
             end=None,
             causal_model_type='GLM',
@@ -132,8 +130,6 @@ class Pipeline:
         self.interaction_features = interaction_features
         self.train_start = train_start
         self.train_end = train_end
-        self.forecast_start = forecast_start
-        self.forecast_end = forecast_end
         self.validate_start = validate_start
         self.validate_end = validate_end
         self.validation_splits = validation_splits
@@ -142,6 +138,7 @@ class Pipeline:
         self.time_index = time_index
         self.scenarios = scenarios
         self.frequency = frequency
+        self.frequency_target_aggregation = frequency_target_aggregation
         self.start = start
         self.end = end
         self.causal_model_type = causal_model_type
@@ -184,45 +181,35 @@ class Pipeline:
             df[self.time_index].min().compute(),
             df[self.time_index].max().compute(),
         )
+        agg_map = {
+                **{
+                    c: "mean"
+                    for c in df.columns
+                    if df[c].dtype in [int, float] and c not in [self.time_index, self.target]
+                },
+                **{
+                    c: "first"
+                    for c in df.columns
+                    if df[c].dtype not in [int, float] and c not in [self.time_index, self.target]
+                },
+                self.target: self.frequency_target_aggregation
+            }
+
+        def resample_agg(_df: pd.DataFrame):
+            _columns = _df.columns
+            _df = _df.set_index(self.time_index).resample(self.frequency).agg(agg_map)
+            _df[self.target] = _df[self.target].fillna(0)
+            _df = _df.fillna(method='ffill').reset_index()
+            _df = _df[_columns]
+            return _df
+
 
         if self.target_dimensions:
-            df = (
-                df.groupby([self.time_index] + self.target_dimensions)
-                .agg(
-                    {
-                        **{
-                            c: "sum"
-                            for c in df.columns
-                            if df[c].dtype in [int, float] and c != self.time_index
-                        },
-                        **{
-                            c: "first"
-                            for c in df.columns
-                            if df[c].dtype not in [int, float] and c != self.time_index
-                        },
-                    }
-                ).drop(columns=self.target_dimensions).reset_index()
-            )
+            df = df.groupby(self.target_dimensions).apply(resample_agg, meta=df.head(1))
         else:
-            df = (
-                df.groupby(self.time_index)
-                .agg(
-                    {
-                        **{
-                            c: "sum"
-                            for c in df.columns
-                            if df[c].dtype in [int, float] and c != self.time_index
-                        },
-                        **{
-                            c: "first"
-                            for c in df.columns
-                            if df[c].dtype not in [int, float] and c != self.time_index
-                        },
-                    }
-                )
-                .reset_index()
-            )
-
+            df = df.set_index(self.time_index).resample(self.frequency).agg(agg_map)
+            df[self.target] = df[self.target].fillna(0)
+            df = df.fillna(method='ffill').reset_index()
         if start:
             if pd.to_datetime(start) < time_min:
                 raise Exception(
@@ -318,10 +305,6 @@ class Pipeline:
         if self.drop_features:
             df = df.drop(columns=self.drop_features)
 
-        df_std = df[[c for c in df.columns if not c == self.target]].std().compute()
-        constant_columns = [c for c in df_std.index if df_std[c] == 0]
-        df = df.drop(columns=constant_columns)
-
         df[self.time_index] = dd.to_datetime(df[self.time_index])
         if self.target_dimensions:
             df["__target_dimension_index__"] = df[self.time_index].astype(str)
@@ -336,27 +319,31 @@ class Pipeline:
     @_divina_component
     def split_dataset(self, split: str, df: Union[str, dd.DataFrame], train_df: Output = None,
                       test_df: Output = None):
-
-        if df.index.name == '__target_dimension_index__':
-            df_time = df.reset_index()['__target_dimension_index__'].str.split('__index__', expand=True, n=len(
-                df.head(1).index[0].split('__index__')) - 1).set_index(0)
+        df = df.reset_index()
+        if self.target_dimensions:
+            expanded_df = df['__target_dimension_index__'].str.split('__index__', expand=True, n=len(df.head(
+                1)['__target_dimension_index__'][
+                0].split(
+                '__index__')) - 1)
+            expanded_df.columns = [self.time_index] + self.target_dimensions
+            df = dd.merge(df, expanded_df)
+            df = df.set_index('__target_dimension_index__').drop(columns=self.target_dimensions)
+            df_train = df[(df[self.time_index] < split)].drop(columns=self.time_index)
+            df_test = df[(df[self.time_index] >= split)].drop(columns=self.time_index)
         else:
-            df_time = df
-
-        df_train = df.loc[dd.to_datetime(df_time.index) < split]
-        df_test = df.loc[dd.to_datetime(df_time.index) >= split]
-
+            df_train = df[(df[self.time_index] < split)].set_index(self.time_index)
+            df_test = df[(df[self.time_index] >= split)].set_index(self.time_index)
         return df_train, df_test
 
     @_divina_component
     def train(self, model_type: str,
               x: Union[str, dd.DataFrame],
-              y: Union[str, dd.DataFrame],
+              y: Union[str, dd.Series],
               random_state: int = 11,
               model_params: dict = None,
               bootstrap_percentage: float = None, horizon: int = 0, model: Output = None):
 
-        if y.isna().sum().compute()[0] > 0:
+        if y.isna().sum().compute() > 0:
             raise ValueError('Null values in target not permitted.')
 
         if bootstrap_percentage:
@@ -379,8 +366,9 @@ class Pipeline:
                 scoring=make_scorer(lambda y, y_hat: -abs(np.mean(y_hat - y)), greater_is_better=True)
             )
             model.fit(
-                x.to_dask_array(lengths=True),
-                y.shift(-horizon).dropna().to_dask_array(lengths=True),
+                X=x.to_dask_array(lengths=True),
+                y=y.shift(-horizon).dropna().to_dask_array(lengths=True),
+                drop_constants=True
             )
             return model.best_estimator_
 
@@ -388,6 +376,7 @@ class Pipeline:
         model.fit(
             x.to_dask_array(lengths=True),
             y.shift(-horizon).dropna().to_dask_array(lengths=True),
+            drop_constants=True
         )
         return model
 
@@ -403,7 +392,7 @@ class Pipeline:
                     raise ValueError(
                         "{} could not be converted to float. "
                         "Please convert to numeric or encode with "
-                        '"encode_features: {}"'.format(f, f)
+                        "Experiment(encode_features=['{}'])".format(f, f)
                     )
 
         y_hat = dd.from_dask_array(model.predict(
@@ -421,13 +410,13 @@ class Pipeline:
             df[c] = factor_df[c]
         '''
         y_hat.columns = ['y_hat']
-        return y_hat
+        return y_hat['y_hat']
 
     @_divina_component
     def validate(self, truth_dataset: Union[str, dd.DataFrame],
-                 prediction_dataset: Union[str, dd.DataFrame], metrics: Output = None):
+                 prediction_dataset: Union[str, dd.Series], metrics: Output = None):
 
-        residuals = prediction_dataset[prediction_dataset.columns[0]] - truth_dataset[self.target]
+        residuals = prediction_dataset - truth_dataset
 
         metrics = {"mse": residuals.pow(2).mean().compute()}
 
@@ -438,9 +427,25 @@ class Pipeline:
 
         target = target or self.target
         x = df[[c for c in df.columns if not c == target]]
-        y = df[[target]]
+        y = df[target]
 
         return x, y
+
+    @_divina_component
+    def filter_and_join_predictions(self, x: Union[str, dd.DataFrame], y: Union[str, dd.DataFrame], start: str,
+                                    end: str, filtered_df: Output = None):
+        x['y_hat_boosted'] = y
+        if self.target_dimensions:
+            x = x.reset_index()
+            expanded_x = x['__target_dimension_index__'].str.split('__index__', expand=True, n=len(x.head(
+                1)['__target_dimension_index__'][
+                0].split(
+                '__index__')) - 1)
+            expanded_x.columns = [self.time_index] + self.target_dimensions
+            x = dd.merge(x, expanded_x).drop(columns=['__target_dimension_index__'])
+        else:
+            x = x.reset_index()
+        return x[(x[self.time_index] >= start) & (x[self.time_index] <= end)]
 
     @_divina_component
     def aggregate_forecasts(self, forecasts: list, interval: Output = None,
@@ -459,9 +464,9 @@ class Pipeline:
 
         df_point_estimate = dd.from_dask_array(
             dd.from_dask_array(df_forecasts.to_dask_array(lengths=True).T).mean().to_dask_array(
-                lengths=True).T).to_frame()
+                lengths=True).T)
 
-        df_point_estimate.columns = ['mean']
+        df_point_estimate.name = 'mean'
 
         df_interval = df_interval.repartition(
             divisions=df_forecasts.divisions
@@ -478,31 +483,31 @@ class Pipeline:
         return df_interval, df_point_estimate
 
     @_divina_component
-    def subtract_residuals(self, truth_series: Union[str, dd.DataFrame], prediction_series: Union[str, dd.DataFrame],
+    def subtract_residuals(self, truth_series: Union[str, dd.Series], prediction_series: Union[str, dd.Series],
                            residuals: Output = None):
 
-        series_name = prediction_series.columns[0]
-
-        residual_series = (truth_series[truth_series.columns[0]] - prediction_series[series_name]).to_frame()
-
-        residual_series.columns = [series_name]
+        residual_series = truth_series - prediction_series
+        residual_series.name = prediction_series.name
 
         return residual_series
 
     @_divina_component
-    def long_to_wide(self, series: Union[str, dd.DataFrame],
+    def long_to_wide(self, series: Union[str, dd.Series],
                      horizon: int,
-                     wide_format: Output = None):
-        if len(series) < horizon + self.boost_window:
-            raise ValueError('not enough observations to convert to wide format given window and horizon')
+                     lag_df: Output = None):
 
-        series_name = series.columns[0]
+        if len(series) < horizon + self.boost_window:
+            raise ValueError('not enough observations to convert to wide format given window and horizon. shorten your window or horizon, or provide more truth data')
+
+        if not series.name:
+            series.name = 'series'
+        series_name = series.name
 
         lags = range(horizon, horizon + self.boost_window)
 
         def _create_lags(series_name, lags, df):
             for lag in lags:
-                df['lag_{}'.format(lag)] = df[series_name].shift(-lag)
+                df['lag_{}'.format(lag)] = df[series_name].shift(lag)
             return df
 
         if self.target_dimensions:
@@ -515,31 +520,38 @@ class Pipeline:
                                                                                                         '__index__')) - 1)
             target_dimensions_df.index = series.index
             target_dimensions_df.columns = ['time'] + self.target_dimensions
+            df = series.to_frame()
             for c in self.target_dimensions:
-                series[c] = target_dimensions_df[c]
-            residual_series = series.groupby(self.target_dimensions).apply(
-                partial(_create_lags, series_name, lags)).drop(columns=self.target_dimensions)
+                df[c] = target_dimensions_df[c]
+            lag_df = df.groupby(self.target_dimensions).apply(partial(_create_lags, series_name, lags)).drop(columns=self.target_dimensions).reset_index().set_index('__target_dimension_index__')
 
         else:
-            residual_series = _create_lags(series_name, lags, series)
+            lag_df = _create_lags(series_name, lags, series.to_frame())
 
-        residual_series.index = series.index
-
-        return residual_series
+        return lag_df
 
     @_divina_component
-    def boost_forecast(self, forecast_series: Union[str, dd.DataFrame],
-                       adjustment_series: Union[str, dd.DataFrame], boosted_forecast: Output = None):
+    def boost_forecast(self, forecast_series: Union[str, dd.Series],
+                       adjustment_series: Union[str, dd.Series], boosted_forecast: Output = None):
 
-        boosted_forecast = (forecast_series[forecast_series.columns[0]] + adjustment_series[
-            adjustment_series.columns[0]]).to_frame()
+        boosted_forecast = forecast_series + adjustment_series
 
-        boosted_forecast.columns = ['y_hat_boosted']
+        boosted_forecast.name = 'y_hat_boosted'
 
         return boosted_forecast
 
     @_divina_component
-    def synthesize(self, df: Union[str, dd.DataFrame], scenarios: dict, frequency: str, start: str=None, end: str=None, synthetic_df:Output=None):
+    def synthesize(self, df: Union[str, dd.DataFrame], scenario: dict, frequency: str, end: str, start: str = None,
+                   synthetic_df: Output = None):
+
+        supplied_columns = list(scenario.keys()) + [self.time_index, self.target]
+        if self.target_dimensions:
+            supplied_columns += self.target_dimensions
+
+        if not all([c in supplied_columns for c in df.columns]):
+            raise ValueError(
+                'Not all columns passed in base dataframe present in scenario config. Please add a constant value or "last" for columns: {}'.format(
+                    [c for c in df.columns if not c in supplied_columns]))
 
         npartitions = (df.memory_usage(deep=True).sum().compute() // 104857600) + 1
 
@@ -549,112 +561,108 @@ class Pipeline:
             df[self.time_index].min().compute(),
             df[self.time_index].max().compute(),
         )
-        if end:
-            if start and pd.to_datetime(start) > time_max:
-                new_dates = pd.date_range(
-                    pd.to_datetime(str(start)),
-                    pd.to_datetime(str(end)),
-                    freq=frequency,
+        if start and not pd.to_datetime(start) > time_max:
+            raise ValueError('simulation start must be after the end of the truth data provided')
+        if start:
+            new_dates = pd.date_range(
+                pd.to_datetime(str(start)),
+                pd.to_datetime(str(end)),
+                freq=frequency,
+            )
+        else:
+            new_dates = pd.date_range(
+                time_max + pd.tseries.frequencies.to_offset(frequency),
+                pd.to_datetime(str(end)),
+                freq=frequency,
+            )
+        if not len(new_dates) > 0:
+            raise ValueError('Check start and end - no dates to synthesize')
+        combinations = list(new_dates)
+        if self.target_dimensions:
+            combinations = [
+                list(x)
+                for x in product(
+                    combinations,
+                    *[
+                        df[s].unique().compute().values
+                        for s in self.target_dimensions
+                    ]
+                )
+            ]
+            scenario_columns = [self.time_index] + self.target_dimensions
+        else:
+            combinations = [[x] for x in combinations]
+            scenario_columns = [self.time_index]
+        constant_columns = [
+            c
+            for c in scenario
+        ]
+        for c in constant_columns:
+            combinations = [
+                x[0] + [x[1]]
+                for x in product(
+                    combinations, [scenario[c]]
+                )
+            ]
+        df_scenario = dd.from_pandas(
+            pd.DataFrame(
+                combinations, columns=scenario_columns + constant_columns
+            ),
+            npartitions=int(npartitions),
+        )
+        last_columns = [
+            c for c in scenario if scenario[c] == "last"
+        ]
+        if len(last_columns) > 0:
+            if self.target_dimensions:
+                last = (
+                    df.groupby(self.target_dimensions)[last_columns]
+                    .last()
+                    .compute()
+                )
+                meta = df_scenario.join(
+                    last.reset_index(drop=True), how="right"
+                )
+
+                def join_func(target_dimension, time_index, df):
+                    return (
+                        df.set_index(target_dimension)
+                        .join(last)
+                        .reset_index()
+                        .set_index(time_index)
+                        .reset_index()
+                    )
+
+                df_scenario = (
+                    df_scenario.groupby(self.target_dimensions)
+                    .apply(
+                        partial(
+                            join_func,
+                            self.target_dimensions,
+                            self.time_index,
+                        ),
+                        meta=meta,
+                    )
+                    .reset_index(drop=True)
                 )
             else:
-                new_dates = pd.date_range(
-                    time_max + pd.tseries.frequencies.to_offset(frequency),
-                    pd.to_datetime(str(end)),
-                    freq=frequency,
-                )
-            if len(new_dates) > 0:
+                last = df[last_columns].tail(1)
+                for l in last_columns:
+                    df_scenario[l] = last[l]
 
-                combinations = list(new_dates)
-                if self.target_dimensions:
-                    combinations = [
-                        list(x)
-                        for x in product(
-                            combinations,
-                            *[
-                                df[s].unique().compute().values
-                                for s in self.target_dimensions
-                            ]
-                        )
-                    ]
-                    scenario_columns = [self.time_index] + self.target_dimensions
-                else:
-                    combinations = [[x] for x in combinations]
-                    scenario_columns = [self.time_index]
-                constant_columns = [
-                    c
-                    for c in scenarios
-                    if scenarios[c]["mode"] == "constant"
-                ]
-                for c in constant_columns:
-                    combinations = [
-                        x[0] + [x[1]]
-                        for x in product(
-                            combinations, scenarios[c]["constant_values"]
-                        )
-                    ]
-                df_scenario = dd.from_pandas(
-                    pd.DataFrame(
-                        combinations, columns=scenario_columns + constant_columns
-                    ),
-                    npartitions=npartitions,
-                )
-                last_columns = [
-                    c for c in scenarios if scenarios[c]["mode"] == "last"
-                ]
-                if len(last_columns) > 0:
-                    if self.target_dimensions:
-                        last = (
-                            df.groupby(self.target_dimensions)[last_columns]
-                            .last()
-                            .compute()
-                        )
-                        meta = df_scenario.join(
-                            last.reset_index(drop=True), how="right"
-                        )
-
-                        def join_func(target_dimension, time_index, df):
-                            return (
-                                df.set_index(target_dimension)
-                                .join(last)
-                                .reset_index()
-                                .set_index(time_index)
-                                .reset_index()
-                            )
-
-                        df_scenario = (
-                            df_scenario.groupby(self.target_dimensions)
-                            .apply(
-                                partial(
-                                    join_func,
-                                    self.target_dimensions,
-                                    self.time_index,
-                                ),
-                                meta=meta,
-                            )
-                            .reset_index(drop=True)
-                        )
-                    else:
-                        last = df[last_columns].tail(1)
-                        for l in last_columns:
-                            df_scenario[l] = last[l]
-
-                df = dd.concat(
-                    [
-                        df.set_index(self.time_index),
-                        df_scenario.set_index(self.time_index),
-                    ],
-                    axis=0,
-                )
-
+        df = dd.concat(
+            [
+                df.set_index(self.time_index),
+                df_scenario.set_index(self.time_index),
+            ],
+            axis=0,
+        ).reset_index()
         return df
 
     def fit(self, df, prefect=False):
-
         df = self.preprocess(df, prefect=prefect)
+
         validation_splits = []
-
-        ###TODO - aggregate on second in preprocess
-
         for s in self.validation_splits:
             train_df, test_df = self.split_dataset(df=df, split=s, prefect=prefect)
             bootstrap_predictions = []
@@ -681,8 +689,7 @@ class Pipeline:
             boosted_validations = []
             residuals = self.subtract_residuals(prediction_series=point_estimates, truth_series=y_test, prefect=prefect)
             for h in self.time_horizons:
-                wide_residuals = self.long_to_wide(series=residuals,
-                                                   horizon=h, prefect=prefect)
+                wide_residuals = self.long_to_wide(series=residuals, horizon=h, prefect=prefect)
                 x, y = self.x_y_split(df=wide_residuals, target='mean', prefect=prefect)
                 boosted_model = self.train(model_type=self.boost_model_type,
                                            model_params=self.boost_model_params, x=x, y=y, prefect=prefect)
@@ -706,28 +713,35 @@ class Pipeline:
         self.is_fit = True
         return PipelineValidation(split_validations=validation_splits)
 
-    def simulate(self, df, horizons: [int], scenarios: dict, prefect=False):
+    def simulate(self, truth, horizons: [int], scenarios: list, end: str, start: str, prefect=False):
         if not self.is_fit:
             raise ValueError('Pipeline must be fit before you can simulate.')
-        bootstrap_predictions = []
-        df = self.synthesize(df=df, frequency='s', scenarios=scenarios, prefect=prefect)
-        df = self.preprocess(df, prefect=prefect)
-        x, y = self.x_y_split(df=df, prefect=prefect)
-        for m in self.bootstrap_models:
-            ###TODO - start here - implement map so that things run in parallel
-            ###TODO then check the output of synthesize and write test
-            bootstrap_prediction = self.forecast(x=x, model=m, prefect=prefect)
-            bootstrap_predictions.append(bootstrap_prediction)
-        confidence_intervals, point_estimates = self.aggregate_forecasts(bootstrap_predictions, prefect=prefect)
-        boosted_preds = []
-        residuals = self.subtract_residuals(prediction_series=point_estimates, truth_series=y, prefect=prefect)
-        for h, m in zip(horizons, [self.boost_models[h] for h in horizons]):
+        scenario_preds = []
+        for s in scenarios:
+            ###TODO - make synthesize yield a single frequency
+            synthetic_df = self.synthesize(df=truth, frequency='s', scenario=s, end=end, start=start, prefect=prefect)
+            df = self.preprocess(df=synthetic_df, prefect=prefect)
+            causal_x, y = self.x_y_split(df=df, prefect=prefect)
+            bootstrap_predictions = []
+            for m in self.bootstrap_models:
+                ###TODO - implement map so that things run in parallel
+                ###TODO then check the output of synthesize and write test
+                bootstrap_prediction = self.forecast(x=causal_x, model=m, prefect=prefect)
+                bootstrap_predictions.append(bootstrap_prediction)
+            confidence_intervals, point_estimates = self.aggregate_forecasts(forecasts=bootstrap_predictions,
+                                                                             prefect=prefect)
+            boosted_preds = {}
+            residuals = self.subtract_residuals(prediction_series=point_estimates, truth_series=y, prefect=prefect)
+            for h, m in zip(horizons, [self.boost_models[h] for h in horizons]):
                 wide_residuals = self.long_to_wide(series=residuals,
                                                    horizon=h, prefect=prefect)
                 x, y = self.x_y_split(df=wide_residuals, target='mean', prefect=prefect)
                 residual_predictions = self.forecast(x=x, model=m, prefect=prefect)
                 boosted_predictions = self.boost_forecast(forecast_series=point_estimates,
                                                           adjustment_series=residual_predictions, prefect=prefect)
-                boosted_preds.append(boosted_predictions)
+                filtered_predictions = self.filter_and_join_predictions(x=x, y=boosted_predictions, start=start,
+                                                                        end=end)
+                boosted_preds[h] = filtered_predictions
+            scenario_preds.append(boosted_preds)
             ###TODO aggregate boosted predictions into single series
-        return boosted_preds
+        return scenario_preds
