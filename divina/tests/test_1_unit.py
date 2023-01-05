@@ -11,8 +11,9 @@ import pytest
 import s3fs
 import plotly.graph_objects as go
 
-from pipeline.pipeline import Pipeline, PipelineValidation, ValidationSplit, BoostValidation, CausalValidation
+from pipeline.pipeline import Pipeline, PipelineFitResult, ValidationSplit, BoostValidation, CausalValidation, assert_pipeline_fit_result_equal
 from pipeline.utils import get_parameters, set_parameters
+from pandas.testing import assert_frame_equal
 
 
 def test_preprocess(
@@ -64,94 +65,71 @@ def test_validate(
     metrics = test_pipeline_1.validate(truth_dataset=test_df_1['c'], prediction_dataset=test_forecast_1)
     assert metrics == test_metrics_1
 
-@pytest.mark.skip()
-def test_get_params(test_model_1, test_params_1):
-    pipeline_path = "divina-test/pipeline/test1"
-    pathlib.Path(os.path.join(pipeline_path, "models")).mkdir(
-        parents=True, exist_ok=True
-    )
-    joblib.dump(
-        test_model_1,
-        os.path.join(
-            pipeline_path,
-            "models",
-            "s-19700101-000007_h-1",
-        ),
-    )
-    with open(
-            os.path.join(
-                pipeline_path,
-                "models",
-                "s-19700101-000007_h-1_params",
-            ),
-            "w+",
-    ) as f:
-        json.dump(test_model_1[1], f)
-    params = get_parameters(
-        model_path=os.path.join(
-            pipeline_path,
-            "models",
-            "s-19700101-000007_h-1",
-        )
-    )
 
-    assert params == test_params_1
-
-@pytest.mark.skip()
-def test_set_params(test_model_1, test_params_1, test_params_2):
-    pipeline_path = "divina-test/pipeline/test1"
-    pathlib.Path(os.path.join(pipeline_path, "models")).mkdir(
-        parents=True, exist_ok=True
-    )
-    joblib.dump(
-        test_model_1,
-        os.path.join(
-            pipeline_path,
-            "models",
-            "s-19700101-000007_h-1",
-        ),
-    )
-    with open(
-            os.path.join(
-                pipeline_path,
-                "models",
-                "s-19700101-000007_h-1_params",
-            ),
-            "w+",
-    ) as f:
-        json.dump(test_params_1, f)
-    set_parameters(
-        model_path=os.path.join(
-            pipeline_path,
-            "models",
-            "s-19700101-000007_h-1",
-        ),
-        params=test_params_2["features"],
-    )
-
-    with open(
-            os.path.join(
-                pipeline_path,
-                "models",
-                "s-19700101-000007_h-1_params",
-            ),
-            "rb",
-    ) as f:
-        params = json.load(f)
-
-    assert params == test_params_2
-
-
-def test_pipeline(
+def test_pipeline_fit(
         test_data_1,
         test_pipeline_2,
         test_pipeline_result
 ):
     result = test_pipeline_2.fit(test_data_1)
-    assert result == test_pipeline_result
+    assert_pipeline_fit_result_equal(result, test_pipeline_result)
 
 
-def test_simulation_pipeline_prefect(
+def test_pipeline_predict(
+        test_data_1,
+        test_pipeline_2,
+        test_horizons,
+        test_scenarios,
+        test_simulate_end,
+        test_simulate_start,
+        test_bootstrap_models,
+        test_boost_models,
+        test_scenario_predictions
+):
+
+    test_pipeline_2.is_fit = True
+    test_pipeline_2.bootstrap_models = test_bootstrap_models
+    test_pipeline_2.boost_models = test_boost_models
+    result = test_pipeline_2.predict(truth=test_data_1, scenarios=test_scenarios, start=test_simulate_start, end=test_simulate_end, horizons=test_horizons)
+    for df1, df2 in zip(result, test_scenario_predictions):
+        assert df1.keys() == df2.keys()
+        for k in df1:
+            assert_frame_equal(df1[k].compute().reset_index(drop=True), df2[k].compute().reset_index(drop=True))
+
+
+def test_pipeline_fit_prefect(
+        test_data_1,
+        test_pipeline_2,
+        test_pipeline_result,
+        test_boost_model_params,
+        test_bucket,
+        test_pipeline_root,
+        test_pipeline_name,
+
+):
+    test_pipeline_2.env_variables = {'AWS_SECRET_ACCESS_KEY': os.environ['AWS_SECRET_ACCESS_KEY'],
+                       'AWS_ACCESS_KEY_ID': os.environ['AWS_ACCESS_KEY_ID']}
+    test_pipeline_2.storage_options = {'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}}
+    test_data_path = '{}/test-data'.format(test_pipeline_root)
+    fs = s3fs.S3FileSystem(**test_pipeline_2.storage_options)
+    if fs.exists(test_bucket):
+        fs.rm(test_bucket, True)
+    else:
+        fs.mkdir(test_bucket)
+    test_data_1.to_parquet(test_data_path,
+                         storage_options={'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}})
+    from prefect import flow
+    @flow(
+        name=test_pipeline_name, persist_result=True
+    )
+    def run_pipeline(df: str):
+        return test_pipeline_2.fit(df=df, prefect=True)
+
+    result = run_pipeline(test_data_path)
+    assert_pipeline_fit_result_equal(result, test_pipeline_result)
+
+###TODO - start here - create simulation result object with assert function and then create test with simulation but not prefect and get passing
+def test_pipeline_predict_prefect(
         test_data_1,
         test_pipeline_2,
         test_pipeline_result,
@@ -164,7 +142,8 @@ def test_simulation_pipeline_prefect(
         test_horizons,
         test_scenarios,
         test_simulate_end,
-        test_simulate_start
+        test_simulate_start,
+        test_scenario_predictions
 
 ):
     test_pipeline_2.env_variables = {'AWS_SECRET_ACCESS_KEY': os.environ['AWS_SECRET_ACCESS_KEY'],
@@ -186,100 +165,14 @@ def test_simulation_pipeline_prefect(
         name=test_pipeline_name, persist_result=True
     )
     def run_simulation(df: str):
-        return test_pipeline_2.simulate(truth=df, scenarios=test_scenarios, start=test_simulate_start, end=test_simulate_end, horizons=test_horizons, prefect=True)
+        return test_pipeline_2.predict(truth=df, scenarios=test_scenarios, start=test_simulate_start, end=test_simulate_end, horizons=test_horizons, prefect=True)
 
     ###TODO - start here - start updating fixtures
     result = run_simulation(test_data_path)
-    test_simulation_result = None
-    assert result == test_simulation_result
-
-'''def test_example_pipeline_kfp(
-        test_df_4,
-        test_ed_2,
-        test_pipeline_result,
-        test_kind_cluster,
-        test_boost_model_params,
-        test_bucket,
-        minio_endpoint,
-        test_pipeline_root,
-        test_pipeline_name,
-
-):
-    pipeline = Pipeline(**test_ed_2["pipeline_definition"])
-
-    with test_kind_cluster.port_forward("service/ml-pipeline-ui", 80, "-n", "kubeflow", retries=1) as port:
-        with test_kind_cluster.port_forward("service/minio-service", 9000, "-n", "kubeflow", retries=1) as minio_port:
-            @pipeline(
-                name=test_pipeline_name,
-                description="testing",
-                pipeline_root=test_pipeline_root,
-            )
-            def run_pipeline(data: str = 'test_uri', boost_model_params=json.dumps({"test": "test2"})):
-                storage_options['client_kwargs'].update({'endpoint_url': minio_endpoint})
-                component_kwargs = {'storage_options': storage_options}
-                pipeline.train(data=data, boost_model_params=boost_model_params,
-                               env_variables={'AWS_ACCESS_KEY_ID': 'minio', 'AWS_SECRET_ACCESS_KEY': 'minio123'},
-                               component_kwargs=component_kwargs,
-                               kfp=True)
-
-            import sys
-            import s3fs
-            sys.stderr.write('Kubeflow listening on 127.0.0.1:{}\n'.format(port))
-            sys.stderr.write('Minio listening on 127.0.0.1:{}\n'.format(minio_port))
-            storage_options = {'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(minio_port)}}
-            test_data_path = '{}/test-data'.format(test_pipeline_root)
-            fs = s3fs.S3FileSystem(**storage_options)
-            if fs.exists(test_bucket):
-                fs.rm(test_bucket, True)
-            else:
-                fs.mkdir(test_bucket)
-            test_df_4.to_parquet(test_data_path, storage_options=storage_options)
-            client = kfp.Client(host='http://127.0.0.1:{}'.format(port))
-            client.create_run_from_pipeline_func(run_pipeline,
-                                                 arguments={'data': test_data_path,
-                                                            "boost_model_params": json.dumps(
-                                                                test_boost_model_params)})
-
-            pass
-            # with fs.open(pipeline_root + '/result.pkl', 'rb') as f:
-            #    result = dill.load(f)
-            # assert result == test_pipeline_result
-
-        ###TODO start here - build result object from pipeline-root and compare - create parse method in result object
-        ###TODO start here - test kfp pipeline with kind
-        ###TODO then implement interpretability/analytics interface'''
-
-
-def test_pipeline_prefect(
-        test_df_4,
-        test_pipeline_2,
-        test_pipeline_result,
-        test_boost_model_params,
-        test_bucket,
-        test_pipeline_root,
-        test_pipeline_name,
-
-):
-    test_pipeline_2.env_variables = {'AWS_SECRET_ACCESS_KEY': os.environ['AWS_SECRET_ACCESS_KEY'],
-                       'AWS_ACCESS_KEY_ID': os.environ['AWS_ACCESS_KEY_ID']}
-    test_pipeline_2.storage_options = {'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}}
-    test_data_path = '{}/test-data'.format(test_pipeline_root)
-    fs = s3fs.S3FileSystem(**test_pipeline_2.storage_options)
-    if fs.exists(test_bucket):
-        fs.rm(test_bucket, True)
-    else:
-        fs.mkdir(test_bucket)
-    test_df_4.to_parquet(test_data_path,
-                         storage_options={'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}})
-    from prefect import flow
-    @flow(
-        name=test_pipeline_name, persist_result=True
-    )
-    def run_pipeline(df: str):
-        return test_pipeline_2.fit(df=df, prefect=True)
-
-    result = run_pipeline(test_data_path)
-    assert result == test_pipeline_result
+    for df1, df2 in zip(result, test_scenario_predictions):
+        assert df1.keys() == df2.keys()
+        for k in df1:
+            assert_frame_equal(df1[k].compute().reset_index(drop=True), df2[k].compute().reset_index(drop=True))
 
 
 @pytest.mark.skip()

@@ -137,26 +137,27 @@ def create_write_directory(func):
     return wrapper
 
 
+def cull_empty_partitions(df):
+    ll = list(df.map_partitions(len).compute())
+    df_delayed = df.to_delayed()
+    df_delayed_new = list()
+    pempty = None
+    for ix, n in enumerate(ll):
+        if 0 == n:
+            pempty = df.get_partition(ix)
+        else:
+            df_delayed_new.append(df_delayed[ix])
+    if pempty is not None:
+        df = dd.from_delayed(df_delayed_new, meta=pempty)
+    return df
+
+
 def _component_helper(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         import inspect
         sig = inspect.signature(func)
         self = args[0]
-
-        def cull_empty_partitions(df):
-            ll = list(df.map_partitions(len).compute())
-            df_delayed = df.to_delayed()
-            df_delayed_new = list()
-            pempty = None
-            for ix, n in enumerate(ll):
-                if 0 == n:
-                    pempty = df.get_partition(ix)
-                else:
-                    df_delayed_new.append(df_delayed[ix])
-            if pempty is not None:
-                df = dd.from_delayed(df_delayed_new, meta=pempty)
-            return df
 
         _args = dict(sig.parameters)
         new_args = []

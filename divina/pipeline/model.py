@@ -66,6 +66,8 @@ class GLM(BaseEstimator):
             da_std = X.std(axis=0)
             constant_indices = [i for i, v in enumerate(da_std) if v == 0]
             usable_indices = list(set(range(da_std.shape[0])) - set(constant_indices))
+            if usable_indices == []:
+                X = X + np.random.normal(0, 1, X.shape)
             self.fit_indices = usable_indices
         if self.fit_indices:
             X = X[:, self.fit_indices]

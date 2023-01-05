@@ -4,13 +4,15 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from sklearn.pipeline import make_pipeline
 from pipeline.utils import _divina_component
-from pipeline.utils import Output
+from pipeline.utils import Output, cull_empty_partitions
 import dask.dataframe as dd
 from dask_ml.preprocessing import Categorizer, DummyEncoder
 import numpy as np
 from dask_ml.model_selection import GridSearchCV
 from sklearn.metrics import make_scorer
 from itertools import product
+from pandas.testing import assert_frame_equal, assert_series_equal
+from itertools import zip_longest
 
 
 class Validation():
@@ -20,7 +22,7 @@ class Validation():
         self.model = model
 
     def __eq__(self, other):
-        return self.metrics == other.metrics and self.predictions.compute().values == other.predictions.compute().values and self.model == other.model
+        return self.metrics == other.metrics and (self.predictions.compute().values == other.predictions.compute().values).all() and self.model == other.model
 
 
 class CausalValidation(Validation):
@@ -29,7 +31,7 @@ class CausalValidation(Validation):
         super().__init__(metrics, predictions)
 
     def __eq__(self, other):
-        return self.bootstrap_validations == other.bootstrap_validations and self.metrics == other.metrics
+        return self.bootstrap_validations == other.bootstrap_validations and super().__eq__(other)
 
 
 class BoostValidation(Validation):
@@ -38,8 +40,7 @@ class BoostValidation(Validation):
         super().__init__(metrics, predictions, model)
 
     def __eq__(self, other):
-        return self.horizon == other.horizon and self.metrics == other.metrics and (
-                self.predictions.compute().values == other.predictions.compute().values).all() and self.model == other.model
+        return self.horizon == other.horizon and super().__eq__(other)
 
 
 class ValidationSplit:
@@ -55,14 +56,37 @@ class ValidationSplit:
                 self.truth.compute().values == other.truth.compute().values).all() and self.boosted_validations == other.boosted_validations
 
 
-class PipelineValidation:
+class PipelineFitResult:
     def __init__(self, split_validations: [ValidationSplit]):
         self.split_validations = split_validations
 
     def __eq__(self, other):
-        if not type(other) == PipelineValidation:
+        if not type(other) == PipelineFitResult:
             return False
         return self.split_validations == other.split_validations
+
+    def __getitem__(self, key):
+        return self.split_validations[key]
+
+    def __len__(self):
+        return len(self.split_validations)
+
+
+def assert_pipeline_fit_result_equal(pr1: PipelineFitResult, pr2: PipelineFitResult):
+    for s1, s2 in zip_longest(pr1, pr2):
+        assert s1.split == s2.split
+        for bs1, bs2 in zip_longest(s1.causal_validation.bootstrap_validations, s2.causal_validation.bootstrap_validations):
+            assert bs1.model == bs2.model
+            assert_series_equal(bs1.predictions.compute(), bs2.predictions.compute())
+            assert bs1.metrics == bs2.metrics
+        assert_frame_equal(s1.truth.compute(), s2.truth.compute())
+        assert_series_equal(s1.causal_validation.predictions.compute(), s2.causal_validation.predictions.compute())
+        assert s1.causal_validation.metrics == s2.causal_validation.metrics
+        for b1, b2 in zip_longest(s1.boosted_validations, s2.boosted_validations):
+            assert b1.horizon == b2.horizon
+            assert b1.model == b2.model
+            assert_series_equal(b1.predictions.compute(), b2.predictions.compute())
+            assert b1.metrics == b2.metrics
 
 
 class Pipeline:
@@ -203,7 +227,6 @@ class Pipeline:
             _df = _df[_columns]
             return _df
 
-
         if self.target_dimensions:
             df = df.groupby(self.target_dimensions).apply(resample_agg, meta=df.head(1))
         else:
@@ -220,6 +243,7 @@ class Pipeline:
             else:
                 df = df[dd.to_datetime(df[self.time_index]) >= start]
 
+        ###TODO - start here - somewhere between here and end of function random partition sizes are being assigned and messing up everything via the bootstrap sample
         if end:
             if pd.to_datetime(end) > time_max:
                 if not self.scenarios:
@@ -305,13 +329,18 @@ class Pipeline:
         if self.drop_features:
             df = df.drop(columns=self.drop_features)
 
+        ####TODO - somehwere in this last part of the function random partition sizes are being assigned and messing up everything via the bootstrap sample
+        #####TODO - write test checking partition size of output for preprocess - add assert to existing test
+
         df[self.time_index] = dd.to_datetime(df[self.time_index])
         if self.target_dimensions:
             df["__target_dimension_index__"] = df[self.time_index].astype(str)
             for i, col in enumerate(self.target_dimensions):
                 df["__target_dimension_index__"] += "__index__".format(i) + df[col].astype(str)
             df = df.drop(columns=[self.time_index] + self.target_dimensions)
-            df = df.set_index("__target_dimension_index__")
+            print([p.compute().shape for p in df.partitions])
+            df = df.set_index("__target_dimension_index__", npartitions='auto', partition_size=104857600)
+            print([p.compute().shape for p in df.partitions])
         else:
             df = df.set_index(self.time_index)
         return df
@@ -319,20 +348,17 @@ class Pipeline:
     @_divina_component
     def split_dataset(self, split: str, df: Union[str, dd.DataFrame], train_df: Output = None,
                       test_df: Output = None):
-        df = df.reset_index()
         if self.target_dimensions:
-            expanded_df = df['__target_dimension_index__'].str.split('__index__', expand=True, n=len(df.head(
-                1)['__target_dimension_index__'][
-                0].split(
-                '__index__')) - 1)
+            expanded_df = df.reset_index().set_index('__target_dimension_index__', drop=False)['__target_dimension_index__'].str.split('__index__', expand=True, n=len(df.head(1).reset_index()['__target_dimension_index__'][0].split('__index__')) - 1)
             expanded_df.columns = [self.time_index] + self.target_dimensions
-            df = dd.merge(df, expanded_df)
-            df = df.set_index('__target_dimension_index__').drop(columns=self.target_dimensions)
-            df_train = df[(df[self.time_index] < split)].drop(columns=self.time_index)
-            df_test = df[(df[self.time_index] >= split)].drop(columns=self.time_index)
+            df[self.time_index] = expanded_df[self.time_index]
+            df_train = df[(dd.to_datetime(df[self.time_index]) < split)].drop(columns=self.time_index)
+            df_test = df[(dd.to_datetime(df[self.time_index]) >= split)].drop(columns=self.time_index)
         else:
-            df_train = df[(df[self.time_index] < split)].set_index(self.time_index)
-            df_test = df[(df[self.time_index] >= split)].set_index(self.time_index)
+            df_train = df[(dd.to_datetime(df[self.time_index]) < split)].set_index(self.time_index)
+            df_test = df[(dd.to_datetime(df[self.time_index]) >= split)].set_index(self.time_index)
+        df_test = cull_empty_partitions(df_test).reset_index().set_index(df_test.index.name)
+        df_train = cull_empty_partitions(df_train).reset_index().set_index(df_train.index.name)
         return df_train, df_test
 
     @_divina_component
@@ -353,6 +379,8 @@ class Pipeline:
             y = y.sample(
                 replace=False, frac=bootstrap_percentage, random_state=random_state
             )
+            x = cull_empty_partitions(x)
+            y = cull_empty_partitions(y)
 
         model = eval(model_type)()
         if model_params:
@@ -378,6 +406,7 @@ class Pipeline:
             y.shift(-horizon).dropna().to_dask_array(lengths=True),
             drop_constants=True
         )
+
         return model
 
     @_divina_component
@@ -505,11 +534,6 @@ class Pipeline:
 
         lags = range(horizon, horizon + self.boost_window)
 
-        def _create_lags(series_name, lags, df):
-            for lag in lags:
-                df['lag_{}'.format(lag)] = df[series_name].shift(lag)
-            return df
-
         if self.target_dimensions:
             target_dimensions_df = series.reset_index()['__target_dimension_index__'].str.split('__index__',
                                                                                                 expand=True,
@@ -523,12 +547,16 @@ class Pipeline:
             df = series.to_frame()
             for c in self.target_dimensions:
                 df[c] = target_dimensions_df[c]
-            lag_df = df.groupby(self.target_dimensions).apply(partial(_create_lags, series_name, lags)).drop(columns=self.target_dimensions).reset_index().set_index('__target_dimension_index__')
+            for lag in lags:
+                df['lag_{}'.format(lag)] = df.groupby(self.target_dimensions)[series_name].shift(lag).reset_index().set_index('__target_dimension_index__')[series_name]
+            df = df.drop(columns=self.target_dimensions).reset_index().set_index('__target_dimension_index__')
 
         else:
-            lag_df = _create_lags(series_name, lags, series.to_frame())
+            df = series.to_frame()
+            for lag in lags:
+                df['lag_{}'.format(lag)] = df.groupby(self.target_dimensions).shift(lag)[series_name]
 
-        return lag_df
+        return df
 
     @_divina_component
     def boost_forecast(self, forecast_series: Union[str, dd.Series],
@@ -661,7 +689,6 @@ class Pipeline:
 
     def fit(self, df, prefect=False):
         df = self.preprocess(df, prefect=prefect)
-
         validation_splits = []
         for s in self.validation_splits:
             train_df, test_df = self.split_dataset(df=df, split=s, prefect=prefect)
@@ -670,6 +697,7 @@ class Pipeline:
             x_train, y_train = self.x_y_split(df=train_df, prefect=prefect)
             x_test, y_test = self.x_y_split(df=test_df, prefect=prefect)
             for n in self.bootstrap_seeds:
+                ###TODO - get this to properly paralellize on prefect
                 bootstrap_model = self.train(model_type=self.causal_model_type,
                                              model_params=self.causal_model_params,
                                              x=x_train,
@@ -711,21 +739,19 @@ class Pipeline:
                     boosted_validations=boosted_validations,
                     split=s, truth=test_df))
         self.is_fit = True
-        return PipelineValidation(split_validations=validation_splits)
+        return PipelineFitResult(split_validations=validation_splits)
 
-    def simulate(self, truth, horizons: [int], scenarios: list, end: str, start: str, prefect=False):
+    def predict(self, truth, horizons: [int], scenarios: list, end: str, start: str, prefect=False):
         if not self.is_fit:
             raise ValueError('Pipeline must be fit before you can simulate.')
         scenario_preds = []
         for s in scenarios:
-            ###TODO - make synthesize yield a single frequency
             synthetic_df = self.synthesize(df=truth, frequency='s', scenario=s, end=end, start=start, prefect=prefect)
             df = self.preprocess(df=synthetic_df, prefect=prefect)
             causal_x, y = self.x_y_split(df=df, prefect=prefect)
             bootstrap_predictions = []
             for m in self.bootstrap_models:
                 ###TODO - implement map so that things run in parallel
-                ###TODO then check the output of synthesize and write test
                 bootstrap_prediction = self.forecast(x=causal_x, model=m, prefect=prefect)
                 bootstrap_predictions.append(bootstrap_prediction)
             confidence_intervals, point_estimates = self.aggregate_forecasts(forecasts=bootstrap_predictions,
