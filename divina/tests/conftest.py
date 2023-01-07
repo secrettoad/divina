@@ -19,6 +19,7 @@ from pipeline.pipeline import Pipeline, PipelineFitResult, ValidationSplit, Boos
     Validation
 from sklearn.base import BaseEstimator
 import kfp
+from docs_src._static.pipeline_definitions import quickstart_pipelines
 
 
 @pytest.fixture()
@@ -204,24 +205,7 @@ def test_scenarios():
 
 @pytest.fixture()
 def test_pipelines_quickstart():
-    eds = {}
-    for file in sorted(
-            os.listdir(
-                pathlib.Path(
-                    pathlib.Path(__file__).parent.parent.parent,
-                    "docs_src/_static/pipeline_definitions",
-                )
-            )
-    ):
-        with open(
-                pathlib.Path(
-                    pathlib.Path(__file__).parent.parent.parent,
-                    "docs_src/_static/pipeline_definitions",
-                    file,
-                )
-        ) as f:
-            eds[file.split(".")[0]] = json.load(f)
-    return eds
+    return quickstart_pipelines
 
 
 @pytest.fixture()

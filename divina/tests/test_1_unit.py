@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 from pipeline.pipeline import Pipeline, PipelineFitResult, ValidationSplit, BoostValidation, CausalValidation, assert_pipeline_fit_result_equal
 from pipeline.utils import get_parameters, set_parameters
 from pandas.testing import assert_frame_equal
-
+from datasets.load import _load
 
 def test_preprocess(
         test_data_1,
@@ -37,6 +37,8 @@ def test_train(
     model = test_pipeline_1.train(
         x=test_df_1.drop(columns='c'), y=test_df_1['c'], random_state=random_state, model_type='GLM',
         model_params={'link_function': 'log'})
+    ###TODO - start here - update all fixtures - but FIRST remove synthesis logic and then get quickstart passing
+    ###TODO - use concept of scenario group - stick with concept of supplying scenario for each price point and signal_dimension - created with list comprehension
     assert model == test_model_1
 
 
@@ -167,7 +169,6 @@ def test_pipeline_predict_prefect(
     def run_simulation(df: str):
         return test_pipeline_2.predict(truth=df, scenarios=test_scenarios, start=test_simulate_start, end=test_simulate_end, horizons=test_horizons, prefect=True)
 
-    ###TODO - start here - start updating fixtures
     result = run_simulation(test_data_path)
     for df1, df2 in zip(result, test_scenario_predictions):
         assert df1.keys() == df2.keys()
@@ -175,51 +176,46 @@ def test_pipeline_predict_prefect(
             assert_frame_equal(df1[k].compute().reset_index(drop=True), df2[k].compute().reset_index(drop=True))
 
 
-@pytest.mark.skip()
-###TODO start here - reset hardcoded values in conftest for this test - use same fixtures for unit and pieline tests
-###TODO then implement interpretability/analytics interface
+def test_quickstart(test_pipelines_quickstart, random_state):
+    ###TODO - debug and get this to work - add time features to preprocess and then filter retail sales to whatever dates are in time dataset
+    for i, pipeline in enumerate(test_pipelines_quickstart):
+        from prefect import flow
+        @flow(
+            name='test_quickstart_{}'.format(i), persist_result=True
+        )
+        def pipeline_fit():
+            return pipeline.fit(_load('divina://retail_sales'), prefect=True)
 
-def test_quickstart(test_eds_quickstart, random_state):
-    for k in test_eds_quickstart:
-        ed = test_eds_quickstart[k]
-        pipeline_path = "divina-test/pipeline/test1"
-        pipeline = Pipeline(**ed["pipeline_definition"])
-        result = pipeline.train(write_path=pipeline_path, random_state=11)
-        result_df = result.compute().reset_index(drop=True)
+        result = pipeline_fit()
+        result_df = result.causal_predictions.compute()
         ###RESET
-        """ddf.read_parquet(
-            os.path.join(
-                pipeline_path,
-                "forecast"
-            )
-        ).to_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
-                               k))"""
+        result.causal_predictions.to_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
+                               "quickstart{}".format(i)))
         pd.testing.assert_frame_equal(
             result_df,
             ddf.read_parquet(
                 pathlib.Path(
                     pathlib.Path(__file__).parent.parent.parent,
                     "docs_src/results/forecasts",
-                    k,
+                    "quickstart{}".format(i)
                 )
             )
             .compute()
             .reset_index(drop=True),
         )
-        ed["pipeline_definition"]["time_horizons"] = [0]
-        if not "target_dimensions" in ed["pipeline_definition"]:
+        if not pipeline.target_dimensions:
             stores = [6]
         else:
             stores = [1, 2, 3]
         result_df = result_df[result_df["Date"] >= "2015-01-01"]
         for s in stores:
             fig = go.Figure()
-            for h in ed["pipeline_definition"]["time_horizons"]:
-                if not "encode_features" in ed["pipeline_definition"]:
+            for h in pipeline.time_horizons:
+                if not pipeline.encode_features:
                     store_df = result_df[result_df["Store"] == s]
                 else:
                     store_df = result_df[result_df["Store_{}".format(float(s))] == 1]
-                if "scenarios" in ed["pipeline_definition"]:
+                if pipeline.scenarios:
                     store_df = store_df[
                         (store_df["Date"] < "2015-08-01") | (result_df["Promo"] == 1)
                         ]
@@ -230,19 +226,19 @@ def test_quickstart(test_eds_quickstart, random_state):
                         line_color="cadetblue",
                         annotation_text="Forecasts assuming promotions",
                     )
-                if "confidence_intervals" in ed["pipeline_definition"]:
-                    if len(ed["pipeline_definition"]["confidence_intervals"]) > 0:
-                        for i in ed["pipeline_definition"]["confidence_intervals"]:
+                if pipeline.confidence_intervals:
+                    if len(pipeline.confidence_intervals) > 0:
+                        for i in pipeline.confidence_intervals:
                             fig.add_trace(
                                 go.Scatter(
                                     marker=dict(color="cyan"),
                                     mode="lines",
                                     x=store_df[
-                                        ed["pipeline_definition"]["time_index"]
+                                        pipeline.time_index
                                     ],
                                     y=store_df[
                                         "{}_h_{}_pred_c_{}".format(
-                                            ed["pipeline_definition"]["target"], h, i
+                                            pipeline.target, h, i
                                         )
                                     ],
                                     name="h_{}_c_{}".format(h, i),
@@ -254,7 +250,7 @@ def test_quickstart(test_eds_quickstart, random_state):
                             selector=dict(
                                 name="h_{}_c_{}".format(
                                     h,
-                                    ed["pipeline_definition"]["confidence_intervals"][
+                                    pipeline.confidence_intervals[
                                         -1
                                     ],
                                 )
@@ -266,7 +262,7 @@ def test_quickstart(test_eds_quickstart, random_state):
                             selector=dict(
                                 name="h_{}_c_{}".format(
                                     h,
-                                    ed["pipeline_definition"]["confidence_intervals"][
+                                    pipeline.confidence_intervals[
                                         0
                                     ],
                                 )
@@ -277,19 +273,19 @@ def test_quickstart(test_eds_quickstart, random_state):
                         marker=dict(color="black"),
                         line=dict(dash="dash"),
                         mode="lines",
-                        x=store_df[ed["pipeline_definition"]["time_index"]],
-                        y=store_df[ed["pipeline_definition"]["target"]],
-                        name=ed["pipeline_definition"]["target"],
+                        x=store_df[pipeline.time_index],
+                        y=store_df[pipeline.target],
+                        name=pipeline.target,
                     )
                 )
                 fig.add_trace(
                     go.Scatter(
                         marker=dict(color="darkblue"),
                         mode="lines",
-                        x=store_df[ed["pipeline_definition"]["time_index"]],
+                        x=store_df[pipeline.time_index],
                         y=store_df[
                             "{}_h_{}_pred".format(
-                                ed["pipeline_definition"]["target"], h
+                                pipeline.target, h
                             )
                         ],
                         name="Forecast".format(h),
@@ -298,7 +294,7 @@ def test_quickstart(test_eds_quickstart, random_state):
                 path = pathlib.Path(
                     pathlib.Path(__file__).parent.parent.parent,
                     "docs_src/_static/plots/quickstart/{}_h_{}_s_{}_2d.html".format(
-                        k, h, s
+                        i, h, s
                     ),
                 )
                 fig.update_layout(legend=dict(
@@ -313,17 +309,17 @@ def test_quickstart(test_eds_quickstart, random_state):
                 fig.write_html(path)
                 factor_fig = go.Figure()
                 factors = [c for c in store_df if c.split("_")[0] == "factor"]
-                if "scenarios" in ed["pipeline_definition"]:
+                if pipeline.scenarios:
                     store_df = store_df[
                         (store_df["Date"] > "2015-08-01") | (result_df["Promo"] == 1)
                         ]
                 store_df = store_df[
-                    factors + [ed["pipeline_definition"]["time_index"]]
+                    factors + [pipeline.time_index]
                     ]
                 for f in factors:
                     factor_fig.add_trace(
                         go.Bar(
-                            x=store_df[ed["pipeline_definition"]["time_index"]],
+                            x=store_df[pipeline.time_index],
                             y=store_df[f],
                             name=("_".join(f.split("_")[1:])[:15] + "..")
                             if len("_".join(f.split("_")[1:])) > 17
@@ -341,7 +337,7 @@ def test_quickstart(test_eds_quickstart, random_state):
                 path = pathlib.Path(
                     pathlib.Path(__file__).parent.parent.parent,
                     "docs_src/_static/plots/quickstart/{}_test_forecast_retail_h_{}_s_{}_factors.html".format(
-                        k, h, s
+                        i, h, s
                     ),
                 )
                 path.parent.mkdir(parents=True, exist_ok=True)

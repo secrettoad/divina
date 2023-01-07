@@ -232,7 +232,10 @@ def _divina_component(func):
             _args = dict(signature(func).parameters)
             for a in _args:
                 if _args[a].annotation == Output:
-                    kwargs[a] = '/'.join([self.pipeline_root, func.__name__, generate_random_key(15), a])
+                    if self.pipeline_root:
+                        kwargs[a] = '/'.join([self.pipeline_root, func.__name__, generate_random_key(15), a])
+                    else:
+                        kwargs[a] = None
             return _task(*args, **kwargs)
         else:
             if 'prefect' in kwargs:

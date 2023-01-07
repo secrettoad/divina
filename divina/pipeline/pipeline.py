@@ -15,6 +15,7 @@ from pandas.testing import assert_frame_equal, assert_series_equal
 from itertools import zip_longest
 
 
+
 class Validation():
     def __init__(self, metrics: dict, predictions: dd, model: BaseEstimator = None):
         self.metrics = metrics
@@ -94,6 +95,7 @@ class Pipeline:
             self,
             target,
             time_index,
+            frequency,
             target_dimensions=None,
             include_features=None,
             drop_features=None,
@@ -112,7 +114,6 @@ class Pipeline:
             random_seed=None,
             bootstrap_sample=None,
             scenarios=None,
-            frequency=None,
             frequency_target_aggregation='sum',
             start=None,
             end=None,
@@ -243,7 +244,6 @@ class Pipeline:
             else:
                 df = df[dd.to_datetime(df[self.time_index]) >= start]
 
-        ###TODO - start here - somewhere between here and end of function random partition sizes are being assigned and messing up everything via the bootstrap sample
         if end:
             if pd.to_datetime(end) > time_max:
                 if not self.scenarios:
@@ -328,9 +328,6 @@ class Pipeline:
 
         if self.drop_features:
             df = df.drop(columns=self.drop_features)
-
-        ####TODO - somehwere in this last part of the function random partition sizes are being assigned and messing up everything via the bootstrap sample
-        #####TODO - write test checking partition size of output for preprocess - add assert to existing test
 
         df[self.time_index] = dd.to_datetime(df[self.time_index])
         if self.target_dimensions:
@@ -623,7 +620,7 @@ class Pipeline:
             scenario_columns = [self.time_index]
         constant_columns = [
             c
-            for c in scenario
+            for c in scenario if not scenario[c] == 'last'
         ]
         for c in constant_columns:
             combinations = [
