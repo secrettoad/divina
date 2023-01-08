@@ -6,7 +6,7 @@
 divina
 ********************
 
-**Date**: |today| **Version**: |version|
+**Date**: |today|
 
 **Useful links**:
 `Binary Installers <https://pypi.org/project/divina>`__ |
@@ -18,13 +18,17 @@ divina
    :maxdepth: 1
 
    quickstart
-   experiments
-   aws
+   orchestration
+   scale
 
 :mod:`divina` is an open source, BSD3-licensed library providing scalable and hyper-interpretable causal forecasting capabilities written in `Python <https://www.python.org/>`__ and consumable via CLI.
 
 The aim of :mod:`divina` is to deliver performance-oriented and hypter-interpretable exogenous time series forecasting models by producing accurate and bootstrapped predictions, local and overridable factor summaries and easily configurable feature engineering and experiment management capabilities.
 
+Ensemble Architecture
+***********************
+
+:mod:`divina` is essentially a convenience wrapper that facilitates training, prediction, validation and deployment of an ensemble consisting of a causal, interpretable model that is boosted by an endogenous time-series model, allowing for high levels of automation and accuracy while still emphasizing and relying on the causal relationships discovered by the user. This ensemble structure is delivered with swappable model types to be able to suit many different kinds of forecasting problems. :mod:`divina` is also fully integrated with both Dask and Prefect meaning that distributed compute and pipeline orchestration can be enabled with the flip of a switch. For more information of :mod:`divina`'s features, check out the :doc:`quickstart` page.
 
 Installation
 ************
@@ -39,24 +43,7 @@ Installation
 Getting Started
 ************************
 
-To run an experiment with divina, first install it and then create an experiment definition that describes your experiment. Here we create a minimal experiment definition that allows us to run a forecasting experiment using the retail sales and time data included with divina.
+To train and predict using a :mod:`divina` pipeline, we first create a :mod:`pandas` dataframe full of dummy data, convert that to a dask dataframe, and call the `fit()` method of our pipeline. Once the pipeline is fit, it can be used to predict on out-of-sample feature sets.
 
-.. code-block:: json
-
-    {
-      "experiment_definition": {
-        "target": "Sales",
-        "time_index": "Date",
-        "data_path": "divina://retail_sales"
-      }
-    }
-
-
-Use
-************
-
-:mod:`divina` is consumable via CLI, or command line interface. In order to run an experiment with :mod:`divina`, first create your experiment definition and then run the below command in your console of choice.
-
-.. code-block:: bash
-
-    divina experiment /path/to/my/experiment_definition.json
+.. literalinclude:: _static/examples/base.py
+   :language: python

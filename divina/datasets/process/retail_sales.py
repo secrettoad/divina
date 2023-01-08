@@ -22,6 +22,9 @@ sales_df["StateHoliday"] = sales_df["StateHoliday"].astype("category").cat.codes
 sales_df = sales_df.set_index("Store").join(store_df.set_index("Store")).reset_index()
 sales_df = sales_df[sales_df["Store"].isin(range(1, 4))]
 
+sales_df = sales_df[[c for c in sales_df.columns if not c in ['Promo2', 'Promo2SinceWeek',
+       'Promo2SinceYear', 'PromoInterval']]]
+
 dd.from_pandas(sales_df, npartitions=6).to_parquet(
     pathlib.Path(pathlib.Path(__file__).parent.parent, "datasets", "retail_sales"),
     schema="infer",
