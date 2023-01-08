@@ -1,31 +1,22 @@
 from divina.divina.pipeline.pipeline import Pipeline
 
-###TODO - add time dataset to retail dataset
 quickstart_pipeline_6 = Pipeline(
     target="Sales",
-    causal_model_params={"link_function": "log"},
+    causal_model_params=[{"link_function": "log"}, {"link_function": "None"}],
     target_dimensions=[
       "Store"
     ],
     time_index="Date",
-    frequency="S",
-    include_features=[
-      "Store",
-      "Weekday",
-      "Month",
-      "Holiday",
-      "HolidayType",
-      "StoreType",
-      "Assortment",
-      "LastDayOfMonth"
-    ],
+    frequency="D",
+    drop_features=['Customers', 'StoreType', 'Assortment', 'Promo2SinceWeek', 'Promo2SinceYear', 'PromoInterval',
+                   'Weekday', 'Month', 'Holiday', 'Year', ],
+    time_features=True,
     encode_features=[
       "Store",
       "Month",
       "StoreType",
       "Weekday",
       "HolidayType",
-      "Assortment"
     ],
     bin_features={
       "Month": [
@@ -36,16 +27,11 @@ quickstart_pipeline_6 = Pipeline(
     },
     interaction_features={
       "Store": [
-        "Holiday"
+        "HolidayType"
       ]
     },
     validation_splits=[
-      "2015-07-18"
-    ],
-    scenarios=[{
-        "Promo": v,
-        "StoreType": "last",
-        "Assortment": "last"
-      } for v in [0, 1]]
+      "2014-06-01"
+    ]
 )
 

@@ -22,10 +22,10 @@ At its core, divina aims to reduce the complexity and increase the consistency o
 ## Main Features
 Here are just a few of the things that divina does well:
 
-  - Abstraction of all necessary configuration of an experiment, from feature selection and engineering to target transformations and confidence intervals, is abstracted to a single JSON file for ease of consumption and ease of transparency.
-  - A user-centric, two-way [**interpretation interface**][interpretation] that allows for granular interpretation of models and predictions while also allowing domain experts to override factors.
-  - Abstracted and scalable feature engineering. Encoding, interaction, normalization, binning and joining of datasets are handled scalably by the Dask back-end with minimal configuration required by the user.
-  - Simulation of user-defined factors in support of forward-looking, multi-signal and decision-enabling causal forecasts.   
+  - Abstraction of all necessary configuration of a pipeline, from feature selection and engineering to target transformations and confidence intervals, is abstracted to a single python Pipeline object that follows the scikit interface for ease of consumption and ease of transparency.
+  - A user-centric, two-way [**interpretation interface**][interpretation] that allows for granular interpretation of models and predictions while also allowing domain experts to override factors. (In progress)
+  - Abstracted and scalable feature engineering. Computation is handled scalably by the Dask back-end with minimal configuration required by the user and on the cloud provider of the user's choice by leveraging [Dask Cloud Provider](https://cloudprovider.dask.org/en/latest/)
+  - Built-in pipeline orchestration tools, such as log collection, task graph synthesis, task parallelization, task automation and artifact tracing leveraging [Prefect](https://www.prefect.io/)
   - Automatic persistence of all experiment artifacts, including models, predictions and validation metrics, to s3 for posterity, traceability and easy integration.
   
   
@@ -34,16 +34,19 @@ Here are just a few of the things that divina does well:
 ## Roadmap
 Current development priorities and improvements slated for next and beta release are:
 
-  - Addition of automated experiment summaries as persisted artifacts enabling ease of consumption and increased transparency into the forecasts and models divina produces.
-  - Improvement of the core model's performance, with the addition of attention mechanisms and the ability to adapt to signals with dynamic mean and variance.  
-  - Addition of more realistic test cases, useful error messages and robust documentation.
-  - Cleanup of various pieces of the codebase and addition of convenience features such as filepath validation, signal filtering and a maximum lifespan for all EC2 instances divina creates.
+  - Addition of interpretability and interference application that makes consuming, understanding and interacting with forecasts easy and seamless
+  - Additional boosting options, such as RNNs, LSTMs, ARIMA, SARIMA, etc.
+  - Addition of more realistic test cases, useful error messages and robust documentation
+  - Inversion of control of Dask cluster creation, allowing for customization of location and size of cloud compute clusters
    
    
 
 ## Where to get it
 The source code is currently hosted on GitHub at:
 https://github.com/secrettoad/divina
+
+## Documentation
+``divina``'s documentation is available [here](https://secrettoad.github.io/divina/#). 
 
 Binary installers for the latest released version are available at the [Python
 Package Index (PyPI)](https://pypi.org/project/divina)
@@ -56,15 +59,22 @@ pip install divina
 - [dask - Adds support for arbitrarily large datasets via remote, parallelized compute](https://www.dask.org)
 - [dask-ml - Provides distributed-optimized implementations of many popular models](https://ml.dask.org)
 - [s3fs - Allows for easy and efficient access to S3](https://github.com/dask/s3fs)
-- [pyarrow - Enabled persistence of datasets as storage and compute efficent parquet files](https://arrow.apache.org/docs/python/)
+- [pyarrow - Enables persistence of datasets as storage and compute efficent parquet files](https://arrow.apache.org/docs/python/)
+- [prefect - Enables task orchestration, tracking and persistence](https://prefect.io)
 
 
+## Testing
+For local integration testing, run the following commands in order to create the necessary Prefect and Min.io containers.
+```sh
+docker pull jhurdle/divina-storage
+docker pull jhurdle/divina-prefect
+docker run jhurdle/divina-storage -p 9000:9000
+docker run jhurdle/divina-prefect -p 4200:4200
+pytest divina/divina/tests
+```
 
 ## License
 [AGPL](LICENSE)
-
-## Documentation
-``divina``'s documentation is available [here](https://secrettoad.github.io/divina/#). 
 
 ## Background
 Work on ``divina`` started at [Coysu Consulting](https://www.coysu.com/) (a technology consulting firm) in 2020 and

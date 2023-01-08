@@ -1,6 +1,7 @@
 import json
 import os
 import pathlib
+import pdb
 
 import dask.dataframe as ddf
 import joblib
@@ -11,10 +12,11 @@ import pytest
 import s3fs
 import plotly.graph_objects as go
 
-from pipeline.pipeline import Pipeline, PipelineFitResult, ValidationSplit, BoostValidation, CausalValidation, assert_pipeline_fit_result_equal
-from pipeline.utils import get_parameters, set_parameters
-from pandas.testing import assert_frame_equal
+from pipeline.pipeline import Pipeline, PipelineFitResult, ValidationSplit, BoostValidation, CausalValidation, \
+    assert_pipeline_fit_result_equal
+from pandas.testing import assert_frame_equal, assert_series_equal
 from datasets.load import _load
+
 
 def test_preprocess(
         test_data_1,
@@ -51,7 +53,6 @@ def test_forecast(
     result = test_pipeline_1.forecast(
         model=test_model_1, x=test_df_1.set_index('a').drop(columns='c')
     )
-    ##TODO - start here figure out why forecasts and test values are so bad and then resume changing components to new format
     np.testing.assert_equal(
         result.compute().values,
         test_forecast_1.compute().values
@@ -86,189 +87,137 @@ def test_pipeline_predict(
         test_simulate_start,
         test_bootstrap_models,
         test_boost_models,
-        test_scenario_predictions
+        test_horizon_predictions
 ):
-
     test_pipeline_2.is_fit = True
     test_pipeline_2.bootstrap_models = test_bootstrap_models
     test_pipeline_2.boost_models = test_boost_models
-    result = test_pipeline_2.predict(truth=test_data_1, scenarios=test_scenarios, start=test_simulate_start, end=test_simulate_end, horizons=test_horizons)
-    for df1, df2 in zip(result, test_scenario_predictions):
-        assert df1.keys() == df2.keys()
-        for k in df1:
-            assert_frame_equal(df1[k].compute().reset_index(drop=True), df2[k].compute().reset_index(drop=True))
-
-
-def test_pipeline_fit_prefect(
-        test_data_1,
-        test_pipeline_2,
-        test_pipeline_result,
-        test_boost_model_params,
-        test_bucket,
-        test_pipeline_root,
-        test_pipeline_name,
-
-):
-    test_pipeline_2.env_variables = {'AWS_SECRET_ACCESS_KEY': os.environ['AWS_SECRET_ACCESS_KEY'],
-                       'AWS_ACCESS_KEY_ID': os.environ['AWS_ACCESS_KEY_ID']}
-    test_pipeline_2.storage_options = {'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}}
-    test_data_path = '{}/test-data'.format(test_pipeline_root)
-    fs = s3fs.S3FileSystem(**test_pipeline_2.storage_options)
-    if fs.exists(test_bucket):
-        fs.rm(test_bucket, True)
-    else:
-        fs.mkdir(test_bucket)
-    test_data_1.to_parquet(test_data_path,
-                         storage_options={'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}})
-    from prefect import flow
-    @flow(
-        name=test_pipeline_name, persist_result=True
-    )
-    def run_pipeline(df: str):
-        return test_pipeline_2.fit(df=df, prefect=True)
-
-    result = run_pipeline(test_data_path)
-    assert_pipeline_fit_result_equal(result, test_pipeline_result)
-
-###TODO - start here - create simulation result object with assert function and then create test with simulation but not prefect and get passing
-def test_pipeline_predict_prefect(
-        test_data_1,
-        test_pipeline_2,
-        test_pipeline_result,
-        test_boost_model_params,
-        test_bucket,
-        test_pipeline_root,
-        test_pipeline_name,
-        test_bootstrap_models,
-        test_boost_models,
-        test_horizons,
-        test_scenarios,
-        test_simulate_end,
-        test_simulate_start,
-        test_scenario_predictions
-
-):
-    test_pipeline_2.env_variables = {'AWS_SECRET_ACCESS_KEY': os.environ['AWS_SECRET_ACCESS_KEY'],
-                       'AWS_ACCESS_KEY_ID': os.environ['AWS_ACCESS_KEY_ID']}
-    test_pipeline_2.storage_options = {'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}}
-    test_pipeline_2.is_fit = True
-    test_pipeline_2.bootstrap_models = test_bootstrap_models
-    test_pipeline_2.boost_models = test_boost_models
-    test_data_path = '{}/test-data'.format(test_pipeline_root)
-    fs = s3fs.S3FileSystem(**test_pipeline_2.storage_options)
-    if fs.exists(test_bucket):
-        fs.rm(test_bucket, True)
-    else:
-        fs.mkdir(test_bucket)
-    test_data_1.to_parquet(test_data_path,
-                         storage_options={'client_kwargs': {'endpoint_url': 'http://127.0.0.1:{}'.format(9000)}})
-    from prefect import flow
-    @flow(
-        name=test_pipeline_name, persist_result=True
-    )
-    def run_simulation(df: str):
-        return test_pipeline_2.predict(truth=df, scenarios=test_scenarios, start=test_simulate_start, end=test_simulate_end, horizons=test_horizons, prefect=True)
-
-    result = run_simulation(test_data_path)
-    for df1, df2 in zip(result, test_scenario_predictions):
-        assert df1.keys() == df2.keys()
-        for k in df1:
-            assert_frame_equal(df1[k].compute().reset_index(drop=True), df2[k].compute().reset_index(drop=True))
+    result = test_pipeline_2.predict(x=test_data_1, boost_y=test_pipeline_2.target, horizons=test_horizons)
+    assert result.keys() == test_horizon_predictions.keys()
+    for k1 in result:
+        assert_series_equal(result[k1].compute(), test_horizon_predictions[k1].compute())
 
 
 def test_quickstart(test_pipelines_quickstart, random_state):
-    ###TODO - debug and get this to work - add time features to preprocess and then filter retail sales to whatever dates are in time dataset
     for i, pipeline in enumerate(test_pipelines_quickstart):
+        print('testing quickstart {}'.format(i))
         from prefect import flow
         @flow(
             name='test_quickstart_{}'.format(i), persist_result=True
         )
         def pipeline_fit():
-            return pipeline.fit(_load('divina://retail_sales'), prefect=True)
+            return pipeline.fit(_load('divina://retail_sales'), start='2013-01-01 00:00:00', end='2015-03-31 00:00:00',
+                                prefect=True)
 
         result = pipeline_fit()
-        result_df = result.causal_predictions.compute()
-        ###RESET
-        result.causal_predictions.to_parquet(pathlib.Path(pathlib.Path(__file__).parent.parent.parent, 'docs_src/results/forecasts',
-                               "quickstart{}".format(i)))
-        pd.testing.assert_frame_equal(
-            result_df,
-            ddf.read_parquet(
-                pathlib.Path(
-                    pathlib.Path(__file__).parent.parent.parent,
-                    "docs_src/results/forecasts",
-                    "quickstart{}".format(i)
-                )
-            )
-            .compute()
-            .reset_index(drop=True),
-        )
+        result_df = result[0].truth
+        factors = result[0].causal_validation.factors
+        if type(factors) != type(None):
+            for c in factors:
+                result_df[c] = factors[c]
+        result_df['y_hat'] = result[0].causal_validation.predictions
+
+        if result_df.index.name == "__target_dimension_index__":
+            result_df = pipeline.extract_dask_multiindex(result_df)
+        else:
+            result_df = result_df.reset_index()
+        if i in [6, 7, 8]:
+            x = _load('divina://retail_sales')
+            x = x[(x['Date'] >= '2015-04-01 00:00:00') & (x['Date'] < '2015-08-01 00:00:00')]
+            if i == 8:
+                predict_result = pipeline.predict(x, horizons=pipeline.time_horizons, boost_y=pipeline.target)
+            else:
+                predict_result = pipeline.predict(x.drop(columns=pipeline.target), horizons=pipeline.time_horizons)
+            predict_result_df = predict_result.truth
+            x['Store'] = x['Store'].astype(float)
+            y = pipeline.set_dask_multiindex(x[[pipeline.target, pipeline.time_index] + pipeline.target_dimensions])
+            predict_result_df[pipeline.target] = y[pipeline.target]
+            predict_result_df['y_hat'] = predict_result.causal_predictions.predictions
+            if i == 8:
+                for h in pipeline.time_horizons:
+                    predict_result_df['y_hat_h_{}'.format(h)] = predict_result[h].predictions
+                    confidence_intervals = predict_result[h].confidence_intervals
+                    if type(confidence_intervals) != type(None):
+                        for _c in confidence_intervals:
+                            predict_result_df[_c.replace('Sales_pred', 'y_hat_h_{}'.format(h))] = confidence_intervals[_c]
+            confidence_intervals = predict_result.causal_predictions.confidence_intervals
+            if type(confidence_intervals) != type(None):
+                for _c in confidence_intervals:
+                    predict_result_df[_c.replace('Sales_pred', 'y_hat')] = confidence_intervals[_c]
+            factors = predict_result.causal_predictions.factors
+            if type(factors) != type(None):
+                for c in factors:
+                    predict_result_df[c] = factors[c]
+            result_df = pipeline.extract_dask_multiindex(result_df.append(predict_result_df))
+            result_df.Store = ddf.to_numeric(result_df.Store).astype(int)
+        if i == 6:
+            pass
+        result_df = result_df.compute()
         if not pipeline.target_dimensions:
-            stores = [6]
+            stores = [2]
         else:
             stores = [1, 2, 3]
         result_df = result_df[result_df["Date"] >= "2015-01-01"]
+        if i in [0, 1, 2, 3, 4, 5]:
+            result_df = result_df[result_df["Date"] < "2017-08-01"]
         for s in stores:
             fig = go.Figure()
-            for h in pipeline.time_horizons:
-                if not pipeline.encode_features:
-                    store_df = result_df[result_df["Store"] == s]
-                else:
-                    store_df = result_df[result_df["Store_{}".format(float(s))] == 1]
-                if pipeline.scenarios:
-                    store_df = store_df[
-                        (store_df["Date"] < "2015-08-01") | (result_df["Promo"] == 1)
-                        ]
-                    fig.add_vrect(
+            if i in [0, 1, 2, 3]:
+                store_df = result_df[result_df["Store"] == s]
+            else:
+                store_df = result_df[result_df["Store_{}".format(float(s))] == 1]
+                ###TODO - START HERE - IMPLEMENT PREDICTION OBJECT AS DESIGNED THEN USE HERE - SPLIT INTO 7 PIPELINE TEST
+                ###TODO -  AND THEN MOVE CHARTS TO DOCS SCRIPT
+            if pipeline.scenarios:
+                store_df = store_df[(store_df["Date"] < "2015-08-01") | (result_df["Promo"] == 1)]
+                fig.add_vrect(
                         x0=pd.to_datetime("07-31-2015").timestamp() * 1000,
                         x1=pd.to_datetime("01-01-2016").timestamp() * 1000,
                         line_width=2,
                         line_color="cadetblue",
                         annotation_text="Forecasts assuming promotions",
-                    )
-                if pipeline.confidence_intervals:
-                    if len(pipeline.confidence_intervals) > 0:
-                        for i in pipeline.confidence_intervals:
-                            fig.add_trace(
-                                go.Scatter(
+                )
+            if pipeline.confidence_intervals:
+                if len(pipeline.confidence_intervals) > 0:
+                    for _c in pipeline.confidence_intervals:
+                        fig.add_trace(
+                            go.Scatter(
                                     marker=dict(color="cyan"),
                                     mode="lines",
                                     x=store_df[
                                         pipeline.time_index
                                     ],
                                     y=store_df[
-                                        "{}_h_{}_pred_c_{}".format(
-                                            pipeline.target, h, i
+                                        "y_hat_c_{}".format(
+                                            _c
                                         )
                                     ],
-                                    name="h_{}_c_{}".format(h, i),
+                                    name="y_hat_c_{}".format(_c),
                                 )
                             )
-                        fig.update_traces(
+                    fig.update_traces(
                             fill="tonexty",
                             name="Confidence Bound",
                             selector=dict(
-                                name="h_{}_c_{}".format(
-                                    h,
+                                name="y_hat_c_{}".format(
                                     pipeline.confidence_intervals[
                                         -1
                                     ],
                                 )
                             ),
                         )
-                        fig.update_traces(
+                    fig.update_traces(
                             showlegend=False,
                             name="Upper Confidence Bound",
                             selector=dict(
-                                name="h_{}_c_{}".format(
-                                    h,
+                                name="y_hat_c_{}".format(
                                     pipeline.confidence_intervals[
                                         0
                                     ],
                                 )
                             ),
                         )
-                fig.add_trace(
+            fig.add_trace(
                     go.Scatter(
                         marker=dict(color="black"),
                         line=dict(dash="dash"),
@@ -278,67 +227,79 @@ def test_quickstart(test_pipelines_quickstart, random_state):
                         name=pipeline.target,
                     )
                 )
-                fig.add_trace(
+            fig.add_trace(
                     go.Scatter(
                         marker=dict(color="darkblue"),
                         mode="lines",
                         x=store_df[pipeline.time_index],
-                        y=store_df[
-                            "{}_h_{}_pred".format(
-                                pipeline.target, h
-                            )
-                        ],
-                        name="Forecast".format(h),
+                        y=store_df["y_hat"],
+                        name="Forecast",
                     )
                 )
-                path = pathlib.Path(
-                    pathlib.Path(__file__).parent.parent.parent,
-                    "docs_src/_static/plots/quickstart/{}_h_{}_s_{}_2d.html".format(
-                        i, h, s
-                    ),
+            for h, t in zip(pipeline.time_horizons, ["red", "green", "purple"]):
+                fig.add_trace(
+                    go.Scatter(
+                        marker=dict(color=t),
+                        mode="lines",
+                        x=store_df[pipeline.time_index],
+                        y=store_df["y_hat_h_{}".format(h)],
+                        name="Boost Horizon {}".format(h),
+                    )
                 )
-                fig.update_layout(legend=dict(
+            path = pathlib.Path(
+                    pathlib.Path(__file__).parent.parent,
+                    "docs_src/_static/plots/quickstart/{}_s_{}_2d.html".format(
+                        i, s
+                    ),
+            )
+            fig.update_layout(legend=dict(
                     orientation="h",
                     yanchor="top",
                     y=-0.02,
                     xanchor="center",
                     x=0.5
-                ))
-                fig.update_xaxes(side="top")
-                path.parent.mkdir(parents=True, exist_ok=True)
-                fig.write_html(path)
-                factor_fig = go.Figure()
-                factors = [c for c in store_df if c.split("_")[0] == "factor"]
-                if pipeline.scenarios:
-                    store_df = store_df[
-                        (store_df["Date"] > "2015-08-01") | (result_df["Promo"] == 1)
-                        ]
+            ))
+            fig.update_xaxes(side="top")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fig.write_html(path)
+            factor_fig = go.Figure()
+            _factors = [c for c in store_df if c.split("_")[0] == "factor"]
+            if pipeline.scenarios:
                 store_df = store_df[
-                    factors + [pipeline.time_index]
+                    (store_df["Date"] > "2015-08-01") | (result_df["Promo"] == 1)
                     ]
-                for f in factors:
-                    factor_fig.add_trace(
-                        go.Bar(
+            store_df = store_df[
+                _factors + [pipeline.time_index]
+                ]
+            for f in _factors:
+                if f.split('_')[1] in ['Open', 'CompetitionOpenSinceMonth',
+                                           'CompetitionOpenSinceYear']:
+                    visible = "legendonly"
+                else:
+                    visible = None
+                factor_fig.add_trace(
+                    go.Bar(
                             x=store_df[pipeline.time_index],
                             y=store_df[f],
                             name=("_".join(f.split("_")[1:])[:15] + "..")
                             if len("_".join(f.split("_")[1:])) > 17
                             else "_".join(f.split("_")[1:]),
+                            visible=visible
                         )
                     )
-                factor_fig.update_layout(barmode="relative", legend=dict(
+            factor_fig.update_layout(barmode="relative", legend=dict(
                     orientation="h",
                     yanchor="top",
                     y=-0.05,
                     xanchor="center",
                     x=0.5,
                 ))
-                factor_fig.update_xaxes(side="top")
-                path = pathlib.Path(
-                    pathlib.Path(__file__).parent.parent.parent,
-                    "docs_src/_static/plots/quickstart/{}_test_forecast_retail_h_{}_s_{}_factors.html".format(
-                        i, h, s
+            factor_fig.update_xaxes(side="top")
+            path = pathlib.Path(
+                    pathlib.Path(__file__).parent.parent,
+                    "docs_src/_static/plots/quickstart/{}_test_forecast_retail_s_{}_factors.html".format(
+                        i, s
                     ),
                 )
-                path.parent.mkdir(parents=True, exist_ok=True)
-                factor_fig.write_html(path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            factor_fig.write_html(path)

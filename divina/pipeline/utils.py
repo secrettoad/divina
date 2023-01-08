@@ -162,8 +162,15 @@ def _component_helper(func):
         _args = dict(sig.parameters)
         new_args = []
         for a, v in zip(_args, args):
-            if (_args[a].annotation == Union[str, dd.DataFrame] or _args[a].annotation == Union[str, dd.Series]) and type(v) == str:
+            if (_args[a].annotation == Union[str, dd.DataFrame]) and type(v) == str:
                 new_args.append(dd.read_parquet(v, storage_options=self.storage_options))
+            elif (_args[a].annotation == Union[
+                str, dd.Series]) and type(v) == str:
+                s = dd.read_parquet(v, storage_options=self.storage_options)
+                if len(s.columns) > 1:
+                    raise ValueError('Dask Series expected but multi-column dataframe encountered.')
+                s = s[s.columns[0]]
+                new_args.append(s)
             elif _args[a].annotation == Union[List[str], List[dd.DataFrame]] and type(v) == [str]:
                 new_args.append([dd.read_parquet(_df, storage_options=self.storage_options) for _df in
                              v])
@@ -187,11 +194,12 @@ def _component_helper(func):
                 'The same number of Outputs must be designated in component signature as returned within component function')
 
         for o, r in zip(outputs, result):
-            if type(r) == dd.DataFrame and o:
-                npartitions = (r.memory_usage(deep=True).sum().compute() // 104857600) + 1
-                r = cull_empty_partitions(r)
-                r = r.repartition(npartitions=npartitions)
-                r.to_parquet(o, storage_options=self.storage_options)
+            if (type(r) == dd.Series or type(r) == dd.DataFrame) and o:
+                r = r.repartition(partition_size=104857600)
+                if type(r) == dd.DataFrame:
+                    r.to_parquet(o, storage_options=self.storage_options)
+                elif type(r) == dd.Series:
+                    r.to_frame().to_parquet(o, storage_options=self.storage_options)
             if type(r) == dict and o:
                 fs = s3fs.S3FileSystem(**self.storage_options)
                 with fs.open(o + '.json', 'w') as f:
@@ -208,11 +216,9 @@ def _component_helper(func):
 
     return wrapper
 
-
 class testClass:
     def __init__(self, value):
         self.value = value
-
 
 from prefect import task
 
@@ -242,6 +248,9 @@ def _divina_component(func):
                 kwargs.pop('prefect')
             return _component_helper(func)(*args, **kwargs)
     return wrapper
+
+
+
 
 
 def create_dask_aws_cluster(aws_workers, ec2_key, keep_alive):
