@@ -14,7 +14,7 @@
 
 ## What is it?
 
-`divina` is essentially a convenience wrapper that facilitates training, prediction, validation and deployment of an ensemble consisting of a causal, interpretable model that is boosted by an endogenous time-series model, allowing for high levels of automation and accuracy while still emphasizing and relying on the causal relationships discovered by the user. This ensemble structure is delivered with swappable model types to be able to suit many different kinds of forecasting problems. :mod:`divina` is also fully integrated with both `dask` and `prefect` meaning that distributed compute and pipeline orchestration can be enabled with the flip of a switch. For more information of `divina`'s features, check out the [documentation](https://secrettoad.github.io/divina/#).
+`divina` is essentially a convenience wrapper that facilitates training, prediction, validation and deployment of an ensemble consisting of a causal, interpretable model that is boosted by an endogenous time-series model, allowing for high levels of automation and accuracy while still emphasizing and relying on the causal relationships discovered by the user. This ensemble structure is delivered with swappable model types to be able to suit many different kinds of forecasting problems. `divina` is also fully integrated with both `dask` and `prefect` meaning that distributed compute and pipeline orchestration can be enabled with the flip of a switch. For more information of `divina`'s features, check out the [documentation](https://secrettoad.github.io/divina/#).
 
 
 ## Main Features
