@@ -9,7 +9,7 @@ quickstart
 Getting Started
 ###############
 
-A minimal experiment definition supplies the path to the dataset, the name of the column that holds the time index and the name of the column that holds the target to predict. In the minimal example below, an experiment is conducting using the retail sales data included with divina and using the log link function best suited towards sales data.
+At a minimum, a :mod:`divina` pipeline must know which column represents the time index, which column represents the target and the frequency of the time index. Below is a minimal example of a pipeline trained on used to make in-sample predictions on the retail sales dataset from the M5 competition.
 
 
 .. literalinclude:: _static/pipeline_definitions/quickstart0.py
@@ -18,7 +18,7 @@ A minimal experiment definition supplies the path to the dataset, the name of th
 .. raw:: html
     :file: _static/plots/quickstart/0_s_2_2d.html
 
-As you can see, Divina automatically uses the non-target data in the file to make insample predictions that are quite accurate.
+As you can see, Divina automatically uses the non-target columns that we don't tell it to drop in the file to make in-sample predictions that are reasonably accurate.
 
 **Hyperparameter Optimization**
 
@@ -45,27 +45,27 @@ Below we use the target_dimensions option to tell divina to individually aggrega
 .. raw:: html
     :file: _static/plots/quickstart/2_s_1_2d.html
 
-We can see through the interpretability interface what information is influencing the forecasts and how.
+We can see above that the forecast for an individual store is even more accurate and through the interpretability interface below what information is influencing the forecasts and how.
 
 .. raw:: html
     :file: _static/plots/quickstart/2_test_forecast_retail_s_1_factors.html
 
 **Time Features**
 
-An important part of forecasting and feature of divina is the ability to derive time-related features from the time index of a dataset. This is automatically handled by setting the `time_features` attribute of a Divina pipeline to `True`. If only a subset of time features are needed, those that aren't needed can be dropped with the `drop_features` attribute.
+An important part of forecasting and feature of divina is the ability to derive time-related features from the time index of a dataset. This is automatically handled by setting the `time_features` attribute of a :mod:`divina`` pipeline to `True`. If only a subset of time features are needed, those that aren't needed can be dropped with the `drop_features` attribute.
 
 .. literalinclude:: _static/pipeline_definitions/quickstart3.py
    :language: python
    :emphasize-lines: 10-19
 
-We can see through the interpretablity interface that the new time information is now informing the forecasts. This is important because in order to make long-range forecasts, datasets with forward-looking information or assumptions present through the forecast period must be used.
+We can see through the interpretablity interface that the new time information is now informing the forecasts.
 
 .. raw:: html
     :file: _static/plots/quickstart/3_test_forecast_retail_s_1_factors.html
 
 **Feature Engineering**
 
-Information encoding, binning and interaction terms are all powerful features of divina that bring its performance in line with that of tree-based models and neural networks. Here the interpetation interface shows us
+Information encoding, binning and interaction terms are all powerful features of divina that bring its performance in line with that of tree-based models and neural networks. Here the interpetation interface shows us that our newly engineered features are informing the forecasts.
 
 .. literalinclude:: _static/pipeline_definitions/quickstart4.py
    :language: python
@@ -82,20 +82,7 @@ While visual inspection is a powerful tool for validating a model, programmatic 
    :language: python
    :emphasize-lines: 51-53
 
-**Out-of-sample Prediction**
-
-A key feature of divina is the ability to easily simulate potential future values as information to feed the model. In our retail example, we simulate promotions as both occuring and not every day, so that we have both scenarios to consider during the decision-making process.
-
-.. literalinclude:: _static/pipeline_definitions/quickstart6.py
-   :language: python
-   :emphasize-lines: 56-70
-
-.. raw:: html
-    :file: _static/plots/quickstart/6_s_1_2d.html
-
-.. raw:: html
-    :file: _static/plots/quickstart/6_test_forecast_retail_s_1_factors.html
-
+The resulting validation split metrics can be accessed through the `PipelineFitResult` object that is returned from `pipeline.fit()`.
 
 **Confidence Intervals**
 

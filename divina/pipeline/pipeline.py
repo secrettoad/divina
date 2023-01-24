@@ -11,9 +11,6 @@ from pipeline.utils import Output, cull_empty_partitions
 import dask.dataframe as dd
 from dask_ml.preprocessing import Categorizer, DummyEncoder
 import numpy as np
-from dask_ml.model_selection import GridSearchCV
-from sklearn.metrics import make_scorer
-from itertools import product
 from pandas.testing import assert_frame_equal, assert_series_equal
 from itertools import zip_longest
 from datetime import datetime, timedelta
@@ -552,7 +549,6 @@ class Pipeline:
 
     @_divina_component
     def aggregate_factors(self, factors: list, aggregated_factors: Output = None):
-
         aggregated_factors = factors[0]
         for df in factors[1:]:
             aggregated_factors += df
@@ -673,7 +669,6 @@ class Pipeline:
                 bootstrap_factors = None
             bootstrap_validation = self.validate(truth_dataset=y_test,
                                                  prediction_dataset=bootstrap_prediction, prefect=prefect)
-            self.bootstrap_models.append(bootstrap_model)
             return Validation(metrics=bootstrap_validation, predictions=bootstrap_prediction, factors=bootstrap_factors,
                               model=bootstrap_model)
 
@@ -687,10 +682,9 @@ class Pipeline:
                     for c in self.causal_model_params:
                         cv_validations.append(_causal_fit(x_train=x_train, y_train=y_train, x_test=x_test, y_test=y_test, random_state=n,
                               bootstrap_percentage=0.8, model_params=c,  prefect=prefect))
-                    ###TODO - get this to properly paralellize on prefect - map instead of for
-                    ###TODO - add cv validations to result object
-                    ###TODO - START HERE - create _coef of pipeline then use that to calculate factors in quickstart tests
-                    bootstrap_validations.append(max(cv_validations, key=lambda _cv: _cv.metrics['mse']))
+                    best_cv_validation = max(cv_validations, key=lambda _cv: _cv.metrics['mse'])
+                    bootstrap_validations.append(best_cv_validation)
+                    self.bootstrap_models.append(best_cv_validation.model)
                 confidence_intervals, point_estimates = self.aggregate_forecasts([v.predictions for v in bootstrap_validations], prefect=prefect)
                 if self.causal_model_type in supports_factors:
                     factors = self.aggregate_factors([v.factors for v in bootstrap_validations])
@@ -705,6 +699,7 @@ class Pipeline:
                 ###TODO - get this to properly paralellize on prefect - map instead of for
                 ###TODO - add cv validations to result object
                 best_cv_validation = min(cv_validations, key=lambda _cv: _cv.metrics['mse'])
+                self.bootstrap_models.append(best_cv_validation.model)
                 point_estimates = best_cv_validation.predictions
                 if self.causal_model_type in supports_factors:
                     factors = best_cv_validation.factors

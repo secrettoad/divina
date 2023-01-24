@@ -150,8 +150,8 @@ def test_quickstart(test_pipelines_quickstart, random_state):
                     predict_result_df[c] = factors[c]
             result_df = pipeline.extract_dask_multiindex(result_df.append(predict_result_df))
             result_df.Store = ddf.to_numeric(result_df.Store).astype(int)
-        if i == 6:
-            pass
+
+
         result_df = result_df.compute()
         if not pipeline.target_dimensions:
             stores = [2]
@@ -273,7 +273,7 @@ def test_quickstart(test_pipelines_quickstart, random_state):
                 ]
             for f in _factors:
                 if f.split('_')[1] in ['Open', 'CompetitionOpenSinceMonth',
-                                           'CompetitionOpenSinceYear']:
+                                           'CompetitionOpenSinceYear', 'T']:
                     visible = "legendonly"
                 else:
                     visible = None

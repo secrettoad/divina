@@ -17,4 +17,5 @@ example_pipeline = Pipeline(target="c",
 
 y_hat_insample = example_pipeline.fit(example_data_dask)[0].causal_validation.predictions
 
-y_hat_out_of_sample = example_pipeline.predict(example_data_dask.drop(columns='c')).causal_predictions.predictions
+y_hat_out_of_sample = example_pipeline.predict(example_data_dask.drop(columns='c')).\
+    causal_predictions.predictions
