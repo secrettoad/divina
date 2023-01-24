@@ -6,7 +6,7 @@
 divina
 ********************
 
-**Date**: |today| **Version**: |version|
+**Date**: |today|
 
 **Useful links**:
 `Binary Installers <https://pypi.org/project/divina>`__ |
