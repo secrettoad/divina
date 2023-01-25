@@ -5,20 +5,13 @@ import shutil
 from unittest.mock import patch
 
 import dask.dataframe as ddf
-import fsspec
 import numpy as np
 import pandas as pd
 import pytest
-from dask.distributed import Client
-from dask_ml.linear_model import LinearRegression
 from pandas import Timestamp
-from pykube import Pod, PersistentVolume
-import time
 from pipeline.model import GLM, EWMA
 from pipeline.pipeline import Pipeline, CausalPrediction, BoostPrediction, PipelineFitResult, PipelinePredictResult, ValidationSplit, BoostValidation, CausalValidation, \
     Validation
-from sklearn.base import BaseEstimator
-import kfp
 from docs_src._static.pipeline_definitions import quickstart_pipelines
 
 
