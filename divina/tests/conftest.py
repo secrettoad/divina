@@ -384,6 +384,52 @@ def test_boosted_validations(test_boosted_models, test_boosted_metrics, test_boo
 
 
 @pytest.fixture
+def test_causal_factors():
+    df = pd.DataFrame([['1970-01-01 00:00:05__index__1__index__1', 0.17074284373414553, 0.0, 0.10244570624048759], ['1970-01-01 00:00:06__index__1__index__1', 0.17074284373414553, 0.0, 0.10244570624048759], ['1970-01-01 00:00:07__index__1__index__1', 0.2731885499746328, 0.0, 0.10244570624048759], ['1970-01-01 00:00:07__index__2__index__2', 0.2731885499746328, 0.0, 0.10244570624048759], ['1970-01-01 00:00:10__index__1__index__1', 0.3756342562151201, 0.0, 0.0], ['1970-01-01 00:00:10__index__2__index__2', 0.3756342562151201, 0.0, 0.0]])
+    df.columns = ['__target_dimension_index__', 'factor_b', 'factor_b_(-inf, 5]', 'factor_b_(5, 10]']
+    return ddf.from_pandas(df, npartitions=2).set_index('__target_dimension_index__')
+
+@pytest.fixture
+def test_causal_confidence_intervals():
+    df = pd.DataFrame([['1970-01-01 00:00:05__index__1__index__1', 7.362751820227464], ['1970-01-01 00:00:06__index__1__index__1', 7.362751820227464], ['1970-01-01 00:00:07__index__1__index__1', 10.06401161215427], ['1970-01-01 00:00:07__index__2__index__2', 10.06401161215427], ['1970-01-01 00:00:10__index__1__index__1', 13.193943171049375], ['1970-01-01 00:00:10__index__2__index__2', 15.950627394175989]])
+    df.columns = ['__target_dimension_index__', 'c_pred_c_90']
+    return ddf.from_pandas(df, npartitions=2).set_index('__target_dimension_index__')
+
+
+@pytest.fixture
+def test_boosted_residual_predictions():
+    dfs = [[['1970-01-01 00:00:05__index__1__index__1', 0.0], ['1970-01-01 00:00:06__index__1__index__1', 0.0], ['1970-01-01 00:00:07__index__1__index__1', 0.0], ['1970-01-01 00:00:07__index__2__index__2', 0.0], ['1970-01-01 00:00:10__index__1__index__1', 2.4271684115005776], ['1970-01-01 00:00:10__index__2__index__2', 5.88661578202168]], [['1970-01-01 00:00:05__index__1__index__1', 0.0], ['1970-01-01 00:00:06__index__1__index__1', 0.0], ['1970-01-01 00:00:07__index__1__index__1', 0.0], ['1970-01-01 00:00:07__index__2__index__2', 0.0], ['1970-01-01 00:00:10__index__1__index__1', 0.7027631473944885], ['1970-01-01 00:00:10__index__2__index__2', 0.0]]]
+    return [ddf.from_pandas(pd.DataFrame(data=df, columns=['__target_dimension_index__', 'y_hat']).set_index('__target_dimension_index__'), npartitions=2)['y_hat'] for df in dfs]
+
+@pytest.fixture
+def test_boosted_confidence_intervals():
+    dfs = [[['1970-01-01 00:00:05__index__1__index__1', 7.362751820227464],
+      ['1970-01-01 00:00:06__index__1__index__1', 7.362751820227464],
+      ['1970-01-01 00:00:07__index__1__index__1', 10.06401161215427],
+      ['1970-01-01 00:00:07__index__2__index__2', 10.06401161215427],
+      ['1970-01-01 00:00:10__index__1__index__1', 13.193943171049375],
+      ['1970-01-01 00:00:10__index__2__index__2', 15.950627394175989]],
+     [['1970-01-01 00:00:05__index__1__index__1', 7.362751820227464],
+      ['1970-01-01 00:00:06__index__1__index__1', 7.362751820227464],
+      ['1970-01-01 00:00:07__index__1__index__1', 10.06401161215427],
+      ['1970-01-01 00:00:07__index__2__index__2', 10.06401161215427],
+      ['1970-01-01 00:00:10__index__1__index__1', 13.193943171049375],
+      ['1970-01-01 00:00:10__index__2__index__2', 15.950627394175989]]]
+    return [ddf.from_pandas(pd.DataFrame(data=df, columns=['__target_dimension_index__', 'c_pred_c_90']).set_index(
+        '__target_dimension_index__'), npartitions=2) for df in dfs]
+
+
+@pytest.fixture
+def test_lag_features():
+    dfs = [[['1970-01-01 00:00:05__index__1__index__1', np.NaN, np.NaN, np.NaN, np.NaN, np.NaN], ['1970-01-01 00:00:06__index__1__index__1', np.NaN, np.NaN, np.NaN, np.NaN, np.NaN], ['1970-01-01 00:00:07__index__1__index__1', np.NaN, np.NaN, np.NaN, np.NaN, np.NaN], ['1970-01-01 00:00:07__index__2__index__2', np.NaN, np.NaN, np.NaN, np.NaN, np.NaN], ['1970-01-01 00:00:10__index__1__index__1', 11.4330789101084, 0.9281797808103693, 12.92817978081037, np.NaN, np.NaN], ['1970-01-01 00:00:10__index__2__index__2', 29.4330789101084, np.NaN, np.NaN, np.NaN, np.NaN]], [['1970-01-01 00:00:05__index__1__index__1', np.NaN, np.NaN, np.NaN, np.NaN, np.NaN], ['1970-01-01 00:00:06__index__1__index__1', np.NaN, np.NaN, np.NaN, np.NaN, np.NaN], ['1970-01-01 00:00:07__index__1__index__1', np.NaN, np.NaN, np.NaN, np.NaN, np.NaN], ['1970-01-01 00:00:07__index__2__index__2', np.NaN, np.NaN, np.NaN, np.NaN, np.NaN], ['1970-01-01 00:00:10__index__1__index__1', 0.9281797808103693, 12.92817978081037, np.NaN, np.NaN, np.NaN], ['1970-01-01 00:00:10__index__2__index__2', np.NaN, np.NaN, np.NaN, np.NaN, np.NaN]]]
+    columns = [['__target_dimension_index__', 'lag_3', 'lag_4', 'lag_5', 'lag_6', 'lag_7'],
+               ['__target_dimension_index__', 'lag_4', 'lag_5', 'lag_6', 'lag_7', 'lag_8']]
+    return [ddf.from_pandas(pd.DataFrame(data=df, columns=c).set_index('__target_dimension_index__'), npartitions=2) for
+            df, c in zip(dfs, columns)]
+
+
+
+@pytest.fixture
 def test_pipeline_fit_result(test_causal_predictions, test_boosted_predictions, test_truth, test_bootstrap_validations,
                          test_boosted_validations):
     return PipelineFitResult(
@@ -395,12 +441,13 @@ def test_pipeline_fit_result(test_causal_predictions, test_boosted_predictions, 
 
 
 @pytest.fixture
-def test_pipeline_predict_result(test_causal_predictions, test_boosted_predictions, test_truth, test_bootstrap_validations,
+def test_pipeline_predict_result(test_horizons, test_causal_predictions, test_causal_factors, test_causal_confidence_intervals, test_boosted_predictions, test_truth, test_bootstrap_validations, test_boosted_residual_predictions, test_boosted_confidence_intervals, test_lag_features,
                          test_boosted_validations):
     ###TODO - start here - add fixtures for each missing attribute of the boost predictions
-    boost_predictions = [BoostPrediction() for z in zip(test_boosted_predictions, test_boosted_models, test_boosted_residual_predictions, test_boosted_confidence_intervals) ]
+    causal_prediction = CausalPrediction(predictions=test_causal_predictions, factors=test_causal_factors, confidence_intervals=test_causal_confidence_intervals)
+    boost_predictions = [BoostPrediction(horizon=h, causal_predictions=causal_prediction, predictions=p, model=v.model, residual_predictions=r, confidence_intervals=i, lag_features=l) for h, p, v, r, i, l in zip(test_horizons, test_boosted_predictions, test_boosted_validations, test_boosted_residual_predictions, test_boosted_confidence_intervals, test_lag_features)]
     return PipelinePredictResult(
-        causal_predictions=CausalPrediction(predictions=test_causal_predictions, factors=None, confidence_intervals=None), boost_predictions=boost_predictions, truth=test_truth)
+        causal_predictions=causal_prediction, boost_predictions=boost_predictions, truth=test_truth.drop(columns='c'))
 
 @pytest.fixture
 def test_horizon_predictions():

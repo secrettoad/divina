@@ -3,7 +3,7 @@ import pytest
 
 import s3fs
 from pandas.testing import assert_series_equal
-from pipeline.pipeline import assert_pipeline_fit_result_equal
+from pipeline.pipeline import assert_pipeline_fit_result_equal, assert_pipeline_predict_result_equal
 
 def test_pipeline_fit_prefect(
         test_data_1,
@@ -34,6 +34,7 @@ def test_pipeline_fit_prefect(
     result = run_pipeline(test_data_path)
     assert_pipeline_fit_result_equal(result, test_pipeline_fit_result)
 
+
 def test_pipeline_predict_prefect(
         test_data_1,
         test_pipeline_2,
@@ -63,11 +64,9 @@ def test_pipeline_predict_prefect(
     @flow(
         name=test_pipeline_name, persist_result=True
     )
-    def run_simulation():
+    def run_pipeline():
         return test_pipeline_2.predict(x=test_data_1, boost_y=test_pipeline_2.target, horizons=test_horizons)
 
-    result = run_simulation()
-    assert result.keys() == test_horizon_predictions.keys()
-    for k1 in result:
-        assert_series_equal(result[k1].compute(), test_horizon_predictions[k1].compute())
+    result = run_pipeline()
+    assert_pipeline_predict_result_equal(result, test_pipeline_predict_result)
 

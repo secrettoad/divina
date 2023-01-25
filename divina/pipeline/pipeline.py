@@ -66,10 +66,17 @@ class PipelinePredictResult:
         return self.boost_predictions == other.boost_predictions and self.causal_predictions == other.causal_predictions
 
     def __getitem__(self, key):
-        return [p for p in self.boost_predictions if p.horizon == key][0]
+        if key == 0:
+            return self.causal_predictions
+        else:
+            return [p for p in self.boost_predictions if p.horizon == key][0]
 
     def __len__(self):
-        return len(self.boost_predictions)
+        return len(self.boost_predictions) + 1
+
+    def __iter__(self):
+        for p in [self.causal_predictions] + self.boost_predictions:
+            yield p
 
 
 class Validation():
@@ -155,20 +162,21 @@ def assert_pipeline_fit_result_equal(pr1: PipelineFitResult, pr2: PipelineFitRes
 
 
 def assert_pipeline_predict_result_equal(pr1: PipelinePredictResult, pr2: PipelinePredictResult):
+    assert_frame_equal(pr1.truth.compute(), pr2.truth.compute())
     for s1, s2 in zip_longest(pr1, pr2):
-        assert s1.split == s2.split
-        for bs1, bs2 in zip_longest(s1.causal_validation.bootstrap_validations, s2.causal_validation.bootstrap_validations):
-            assert bs1.model == bs2.model
-            assert_series_equal(bs1.predictions.compute(), bs2.predictions.compute())
-            assert bs1.metrics == bs2.metrics
-        assert_frame_equal(s1.truth.compute(), s2.truth.compute())
-        assert_series_equal(s1.causal_validation.predictions.compute(), s2.causal_validation.predictions.compute())
-        assert s1.causal_validation.metrics == s2.causal_validation.metrics
-        for b1, b2 in zip_longest(s1.boosted_validations, s2.boosted_validations):
-            assert b1.horizon == b2.horizon
-            assert b1.model == b2.model
-            assert_series_equal(b1.predictions.compute(), b2.predictions.compute())
-            assert b1.metrics == b2.metrics
+        if type(s1) == CausalPrediction:
+            assert type(s2) == CausalPrediction
+            assert_series_equal(s1.predictions.compute(), s2.predictions.compute())
+            assert_frame_equal(s1.factors.compute(), s2.factors.compute())
+            assert_frame_equal(s1.confidence_intervals.compute(), s2.confidence_intervals.compute())
+        elif type(s1) == BoostPrediction:
+            assert type(s2) == BoostPrediction
+            assert s1.model == s2.model
+            assert s1.horizon == s1.horizon
+            assert_series_equal(s1.predictions.compute(), s2.predictions.compute())
+            assert_frame_equal(s1.confidence_intervals.compute(), s2.confidence_intervals.compute())
+            assert_frame_equal(s1.lag_features.compute(), s2.lag_features.compute())
+            assert_series_equal(s1.residual_predictions.compute(), s2.residual_predictions.compute())
 
 
 
