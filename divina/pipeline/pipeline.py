@@ -6,8 +6,8 @@ import pandas as pd
 import time
 from pandas.api.types import is_numeric_dtype
 from sklearn.pipeline import make_pipeline
-from pipeline.utils import _divina_component
-from pipeline.utils import Output, cull_empty_partitions
+from divina.divina.pipeline.utils import _divina_component
+from divina.divina.pipeline.utils import Output, cull_empty_partitions
 import dask.dataframe as dd
 from dask_ml.preprocessing import Categorizer, DummyEncoder
 import numpy as np
@@ -177,7 +177,6 @@ def assert_pipeline_predict_result_equal(pr1: PipelinePredictResult, pr2: Pipeli
             assert_frame_equal(s1.confidence_intervals.compute(), s2.confidence_intervals.compute())
             assert_frame_equal(s1.lag_features.compute(), s2.lag_features.compute())
             assert_series_equal(s1.residual_predictions.compute(), s2.residual_predictions.compute())
-
 
 
 class Pipeline:
