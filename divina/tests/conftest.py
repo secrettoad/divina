@@ -12,7 +12,7 @@ from pandas import Timestamp
 from divina.divina.pipeline.model import GLM, EWMA
 from divina.divina.pipeline.pipeline import Pipeline, CausalPrediction, BoostPrediction, PipelineFitResult, PipelinePredictResult, ValidationSplit, BoostValidation, CausalValidation, \
     Validation
-from docs_src._static.pipeline_definitions import quickstart_pipelines
+from divina.divina.docs_src._static.pipeline_definitions import quickstart_pipelines
 
 
 @pytest.fixture()
