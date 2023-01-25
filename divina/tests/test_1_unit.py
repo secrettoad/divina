@@ -90,15 +90,8 @@ def test_pipeline_predict(
 def test_quickstart(test_pipelines_quickstart, random_state):
     for i, pipeline in enumerate(test_pipelines_quickstart):
         print('testing quickstart {}'.format(i))
-        from prefect import flow
-        @flow(
-            name='test_quickstart_{}'.format(i), persist_result=True
-        )
-        def pipeline_fit():
-            return pipeline.fit(_load('divina://retail_sales'), start='2013-01-01 00:00:00', end='2015-03-31 00:00:00',
+        result = pipeline.fit(_load('divina://retail_sales'), start='2013-01-01 00:00:00', end='2015-03-31 00:00:00',
                                 prefect=True)
-
-        result = pipeline_fit()
         result_df = result[0].truth
         factors = result[0].causal_validation.factors
         if type(factors) != type(None):
