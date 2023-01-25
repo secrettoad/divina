@@ -13,7 +13,7 @@ import s3fs
 import plotly.graph_objects as go
 
 from pipeline.pipeline import Pipeline, PipelineFitResult, ValidationSplit, BoostValidation, CausalValidation, \
-    assert_pipeline_fit_result_equal
+    assert_pipeline_fit_result_equal, assert_pipeline_predict_result_equal
 from pandas.testing import assert_frame_equal, assert_series_equal
 from datasets.load import _load
 
@@ -72,10 +72,10 @@ def test_validate(
 def test_pipeline_fit(
         test_data_1,
         test_pipeline_2,
-        test_pipeline_result
+        test_pipeline_fit_result
 ):
     result = test_pipeline_2.fit(test_data_1)
-    assert_pipeline_fit_result_equal(result, test_pipeline_result)
+    assert_pipeline_fit_result_equal(result, test_pipeline_fit_result)
 
 
 def test_pipeline_predict(
@@ -87,15 +87,13 @@ def test_pipeline_predict(
         test_simulate_start,
         test_bootstrap_models,
         test_boost_models,
-        test_horizon_predictions
+        test_pipeline_predict_result
 ):
     test_pipeline_2.is_fit = True
     test_pipeline_2.bootstrap_models = test_bootstrap_models
     test_pipeline_2.boost_models = test_boost_models
-    result = test_pipeline_2.predict(x=test_data_1, boost_y=test_pipeline_2.target, horizons=test_horizons)
-    assert result.keys() == test_horizon_predictions.keys()
-    for k1 in result:
-        assert_series_equal(result[k1].compute(), test_horizon_predictions[k1].compute())
+    result = test_pipeline_2.predict(x=test_data_1[test_data_1['a'] >= '1970-01-01 00:00:05'], boost_y=test_pipeline_2.target, horizons=test_horizons)
+    assert_pipeline_predict_result_equal(result, test_pipeline_predict_result)
 
 
 def test_quickstart(test_pipelines_quickstart, random_state):

@@ -33,7 +33,7 @@ Ensemble Architecture
 Installation
 ************
 
-:mod:`divina` is available via pypi and can be install using the python package manager pip as shown below.
+:mod:`divina` is available via pypi and can be installed using the python package manager pip as shown below.
 
 .. code-block:: bash
 

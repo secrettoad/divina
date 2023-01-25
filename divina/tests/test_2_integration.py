@@ -8,7 +8,7 @@ from pipeline.pipeline import assert_pipeline_fit_result_equal
 def test_pipeline_fit_prefect(
         test_data_1,
         test_pipeline_2,
-        test_pipeline_result,
+        test_pipeline_fit_result,
         test_boost_model_params,
         test_bucket,
         test_pipeline_root,
@@ -32,12 +32,12 @@ def test_pipeline_fit_prefect(
         return test_pipeline_2.fit(df=df, prefect=True)
 
     result = run_pipeline(test_data_path)
-    assert_pipeline_fit_result_equal(result, test_pipeline_result)
+    assert_pipeline_fit_result_equal(result, test_pipeline_fit_result)
 
 def test_pipeline_predict_prefect(
         test_data_1,
         test_pipeline_2,
-        test_pipeline_result,
+        test_pipeline_predict_result,
         test_boost_model_params,
         test_bucket,
         test_pipeline_root,

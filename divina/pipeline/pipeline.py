@@ -115,8 +115,9 @@ class ValidationSplit:
                 self.truth.compute().values == other.truth.compute().values).all() and self.boosted_validations == other.boosted_validations
 
 class PipelineFitResult:
-    def __init__(self, split_validations: [ValidationSplit]):
+    def __init__(self, split_validations: [ValidationSplit], *args):
         self.split_validations = split_validations
+        self.tpl = args
 
     def __eq__(self, other):
         if not type(other) == PipelineFitResult:
@@ -128,6 +129,12 @@ class PipelineFitResult:
 
     def __len__(self):
         return len(self.split_validations)
+
+    def __hash__(self):
+        return hash(self.tpl)
+
+    def __repr__(self):
+        return repr(self.tpl)
 
 
 def assert_pipeline_fit_result_equal(pr1: PipelineFitResult, pr2: PipelineFitResult):
@@ -145,6 +152,24 @@ def assert_pipeline_fit_result_equal(pr1: PipelineFitResult, pr2: PipelineFitRes
             assert b1.model == b2.model
             assert_series_equal(b1.predictions.compute(), b2.predictions.compute())
             assert b1.metrics == b2.metrics
+
+
+def assert_pipeline_predict_result_equal(pr1: PipelinePredictResult, pr2: PipelinePredictResult):
+    for s1, s2 in zip_longest(pr1, pr2):
+        assert s1.split == s2.split
+        for bs1, bs2 in zip_longest(s1.causal_validation.bootstrap_validations, s2.causal_validation.bootstrap_validations):
+            assert bs1.model == bs2.model
+            assert_series_equal(bs1.predictions.compute(), bs2.predictions.compute())
+            assert bs1.metrics == bs2.metrics
+        assert_frame_equal(s1.truth.compute(), s2.truth.compute())
+        assert_series_equal(s1.causal_validation.predictions.compute(), s2.causal_validation.predictions.compute())
+        assert s1.causal_validation.metrics == s2.causal_validation.metrics
+        for b1, b2 in zip_longest(s1.boosted_validations, s2.boosted_validations):
+            assert b1.horizon == b2.horizon
+            assert b1.model == b2.model
+            assert_series_equal(b1.predictions.compute(), b2.predictions.compute())
+            assert b1.metrics == b2.metrics
+
 
 
 class Pipeline:
