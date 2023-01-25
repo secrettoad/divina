@@ -6,7 +6,6 @@ from functools import wraps
 import dask.dataframe as dd
 import numpy as np
 import s3fs
-from jsonschema import validate
 from divina.divina.pipeline.model import GLM
 from sklearn.base import BaseEstimator
 from sklearn.pipeline import Pipeline
@@ -89,21 +88,6 @@ def compare_sk_models(model1, model2):
             assert np.allclose(s[1].linear_model.coef_, o[1].linear_model.coef_)
             assert np.allclose([s[1].linear_model.intercept_], [o[1].linear_model.intercept_])
         return None
-
-
-def validate_experiment_definition(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        with open(
-                pathlib.Path(pathlib.Path(__file__).parent, "config/ed_schema.json"), "r"
-        ) as f:
-            validate(
-                instance={"experiment_definition": kwargs["experiment_definition"]},
-                schema=json.load(f),
-            )
-        return func(*args, **kwargs)
-
-    return wrapper
 
 
 def create_write_directory(func):
