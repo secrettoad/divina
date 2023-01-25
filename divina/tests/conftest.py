@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 from pandas import Timestamp
-from pipeline.model import GLM, EWMA
-from pipeline.pipeline import Pipeline, CausalPrediction, BoostPrediction, PipelineFitResult, PipelinePredictResult, ValidationSplit, BoostValidation, CausalValidation, \
+from divina.divina.pipeline.model import GLM, EWMA
+from divina.divina.pipeline.pipeline import Pipeline, CausalPrediction, BoostPrediction, PipelineFitResult, PipelinePredictResult, ValidationSplit, BoostValidation, CausalValidation, \
     Validation
 from docs_src._static.pipeline_definitions import quickstart_pipelines
 
