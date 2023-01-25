@@ -6,22 +6,14 @@ from functools import wraps
 import dask.dataframe as dd
 import numpy as np
 import s3fs
-from dask_ml.linear_model import LinearRegression
 from jsonschema import validate
-from pipeline.model import GLM
+from divina.divina.pipeline.model import GLM
 from sklearn.base import BaseEstimator
 from sklearn.pipeline import Pipeline
 from dask.distributed import Client, LocalCluster
-from kfp.components import create_component_from_func
-from kubernetes.client.models import V1EnvVar
-import collections
 import dill
 from typing import Union, List
-
-
-# import kfp
-# kfp.components._data_passing._converters.append(kfp.components._data_passing.Converter)
-
+from prefect import task
 
 class Output(str):
     pass
@@ -216,16 +208,17 @@ def _component_helper(func):
 
     return wrapper
 
+
 class testClass:
     def __init__(self, value):
         self.value = value
 
-from prefect import task
 
 def generate_random_key(length):
     import random
     import string
     return ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(length))
+
 
 def _divina_component(func):
     @wraps(func)
