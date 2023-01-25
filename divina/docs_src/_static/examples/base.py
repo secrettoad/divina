@@ -1,4 +1,4 @@
-from divina.divina.pipeline.pipeline import Pipeline
+from divina import Divina
 import pandas as pd
 import dask.dataframe as dd
 
@@ -11,7 +11,7 @@ example_data = pd.DataFrame(
 
 example_data_dask = dd.from_pandas(example_data, npartitions=1)
 
-example_pipeline = Pipeline(target="c",
+example_pipeline = Divina(target="c",
                                  time_index="a",
                                  frequency="D")
 

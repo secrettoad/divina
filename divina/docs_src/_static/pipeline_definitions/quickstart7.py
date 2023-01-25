@@ -1,6 +1,6 @@
-from divina.divina.pipeline.pipeline import Pipeline
+from divina import Divina
 
-quickstart_pipeline_7 = Pipeline(
+quickstart_pipeline_7 = Divina(
     target="Sales",
     causal_model_params=[{"link_function": "log"}, {"link_function": "None"}],
     target_dimensions=[

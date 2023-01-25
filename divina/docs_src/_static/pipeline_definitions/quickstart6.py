@@ -1,4 +1,4 @@
-from divina.divina.pipeline.pipeline import Pipeline
+from divina import Divina
 
 quickstart_pipeline_6 = Pipeline(
     target="Sales",

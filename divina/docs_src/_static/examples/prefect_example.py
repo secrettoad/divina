@@ -1,4 +1,4 @@
-from divina.divina.pipeline.pipeline import Pipeline
+from divina import Divina
 import pandas as pd
 import dask.dataframe as dd
 
