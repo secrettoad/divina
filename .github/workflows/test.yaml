@@ -34,15 +34,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Test with pytest
         run: |
-          python3 -m pytest --cov-report term --cov-report html --cov ./
+          python3 -m pytest
         env:
           AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
           AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
           AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
           ACCOUNT_NUMBER: '${{ secrets.ACCOUNT_NUMBER }}'
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: htmlcov/*
-          fail_ci_if_error: true
 
