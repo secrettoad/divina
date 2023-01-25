@@ -1,9 +1,5 @@
-import os
-import pytest
-
 import s3fs
-from pandas.testing import assert_series_equal
-from pipeline.pipeline import assert_pipeline_fit_result_equal, assert_pipeline_predict_result_equal
+from divina.divina.pipeline.pipeline import assert_pipeline_fit_result_equal, assert_pipeline_predict_result_equal
 
 def test_pipeline_fit_prefect(
         test_data_1,
