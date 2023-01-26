@@ -22,9 +22,18 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-  unit_test:
+  test:
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
+    services:
+      minio:
+        image: jhurdle/divina-storage
+        ports:
+          - 9000:9000
+      prefect:
+        image: jhurdle/divina-pipeline
+        ports:
+          - 4200:4200
     env:
       PYTHONHASHSEED: 11
     steps:
@@ -35,7 +44,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Test with pytest
         run: |
-          python3 -m pytest divina/tests/test_1_unit.py
+          python3 -m pytest
   docs:
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
