@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from pandas import Timestamp
 
-from divina.divina.docs_src._static.pipeline_definitions import \
+from divina.docs_src._static.pipeline_definitions import \
     quickstart_pipelines
 from divina.divina.pipeline.model import EWMA, GLM
 from divina.divina.pipeline.pipeline import (BoostPrediction, BoostValidation,
