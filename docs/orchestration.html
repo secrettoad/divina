@@ -207,17 +207,17 @@
 
 <span class="nd">@flow</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;divina_example_pipeline&quot;</span><span class="p">,</span> <span class="n">persist_result</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">def</span> <span class="nf">run_pipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
-<span class="hll">    <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">prefect</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span class="hll">    <span class="k">return</span> <span class="n">example_pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
-</span><span class="hll">        <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">pipeline</span><span class="o">.</span><span class="n">target</span><span class="p">),</span> <span class="n">prefect</span><span class="o">=</span><span class="kc">True</span>
-</span><span class="hll">    <span class="p">)</span>
-</span><span class="hll">
-</span><span class="hll">
-</span><span class="hll"><span class="n">example_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
-</span><span class="hll">    <span class="n">data</span><span class="o">=</span><span class="p">[</span>
-</span><span class="hll">        <span class="p">[</span><span class="s2">&quot;2011-01-01&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
-</span><span class="hll">        <span class="p">[</span><span class="s2">&quot;2011-01-02&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span>
-</span>        <span class="p">[</span><span class="s2">&quot;2011-01-03&quot;</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
+    <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">prefect</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">example_pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">pipeline</span><span class="o">.</span><span class="n">target</span><span class="p">),</span> <span class="n">prefect</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+
+<span class="n">example_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-01&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-02&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-03&quot;</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
         <span class="p">[</span><span class="s2">&quot;2011-01-04&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
         <span class="p">[</span><span class="s2">&quot;2011-01-05&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span>
     <span class="p">],</span>
@@ -243,17 +243,17 @@
 
 <span class="nd">@flow</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;divina_example_pipeline&quot;</span><span class="p">,</span> <span class="n">persist_result</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">def</span> <span class="nf">run_pipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
-<span class="hll">    <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">prefect</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span class="hll">    <span class="k">return</span> <span class="n">example_pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
-</span><span class="hll">        <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">pipeline</span><span class="o">.</span><span class="n">target</span><span class="p">),</span> <span class="n">prefect</span><span class="o">=</span><span class="kc">True</span>
-</span><span class="hll">    <span class="p">)</span>
-</span><span class="hll">
-</span><span class="hll">
-</span><span class="hll"><span class="n">example_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
-</span><span class="hll">    <span class="n">data</span><span class="o">=</span><span class="p">[</span>
-</span><span class="hll">        <span class="p">[</span><span class="s2">&quot;2011-01-01&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
-</span><span class="hll">        <span class="p">[</span><span class="s2">&quot;2011-01-02&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span>
-</span>        <span class="p">[</span><span class="s2">&quot;2011-01-03&quot;</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
+    <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">prefect</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">example_pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">pipeline</span><span class="o">.</span><span class="n">target</span><span class="p">),</span> <span class="n">prefect</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+
+<span class="n">example_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-01&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-02&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-03&quot;</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
         <span class="p">[</span><span class="s2">&quot;2011-01-04&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
         <span class="p">[</span><span class="s2">&quot;2011-01-05&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span>
     <span class="p">],</span>
@@ -282,17 +282,17 @@
 
 <span class="nd">@flow</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;divina_example_pipeline&quot;</span><span class="p">,</span> <span class="n">persist_result</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">def</span> <span class="nf">run_pipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
-<span class="hll">    <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">prefect</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span class="hll">    <span class="k">return</span> <span class="n">example_pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
-</span><span class="hll">        <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">pipeline</span><span class="o">.</span><span class="n">target</span><span class="p">),</span> <span class="n">prefect</span><span class="o">=</span><span class="kc">True</span>
-</span><span class="hll">    <span class="p">)</span>
-</span><span class="hll">
-</span><span class="hll">
-</span><span class="hll"><span class="n">example_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
-</span><span class="hll">    <span class="n">data</span><span class="o">=</span><span class="p">[</span>
-</span><span class="hll">        <span class="p">[</span><span class="s2">&quot;2011-01-01&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
-</span><span class="hll">        <span class="p">[</span><span class="s2">&quot;2011-01-02&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span>
-</span>        <span class="p">[</span><span class="s2">&quot;2011-01-03&quot;</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
+    <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">prefect</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">example_pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">pipeline</span><span class="o">.</span><span class="n">target</span><span class="p">),</span> <span class="n">prefect</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+
+<span class="n">example_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-01&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-02&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-03&quot;</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
         <span class="p">[</span><span class="s2">&quot;2011-01-04&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
         <span class="p">[</span><span class="s2">&quot;2011-01-05&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span>
     <span class="p">],</span>

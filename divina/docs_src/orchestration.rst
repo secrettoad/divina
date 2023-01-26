@@ -12,7 +12,6 @@ Below is an example of fitting and predicting with a Divina pipeline using the b
 
 .. literalinclude:: _static/examples/prefect_example.py
    :language: python
-   :emphasize-lines: 10-19
 
 **Artifact Persistence**
 
@@ -22,10 +21,8 @@ Below is an example of artifact persistence to a local path:
 
 .. literalinclude:: _static/examples/local_artifact.py
    :language: python
-   :emphasize-lines: 10-19
 
 Below is an example of artifact persistence to S3 (be sure to set the appropriate credentials via environment variable):
 
 .. literalinclude:: _static/examples/s3_artifact.py
    :language: python
-   :emphasize-lines: 10-19
