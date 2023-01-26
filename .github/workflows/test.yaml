@@ -26,6 +26,11 @@ jobs:
     environment: test
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
+    services:
+      minio:
+        image: jhurdle/divina-storage
+      prefect:
+        image: jhurdle/divina-pipeline
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
