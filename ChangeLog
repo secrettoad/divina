@@ -1,24 +1,95 @@
 CHANGES
 =======
 
+* tests pass
+* pull
+* Build docs
+* WIP: get github actions to work
+* WIP: get github actions to work
+* WIP: get github actions to work
+* Build docs
+* WIP: get github actions to work
+* WIP: get github actions to work
+* WIP: get github actions to work
+* WIP: get github actions to work
+* WIP: get github actions to work
+* WIP: get github actions to work
+* WIP: get github actions to work
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* Build docs
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* tests pass
+* WIP: fixtures
+* beta release
+* time features added and retail dataset filtered. need to move hyperparameter tuning to prefect
+* docs
+* WIP charts
+* time features added and retail dataset filtered. need to move hyperparameter tuning to prefect
+* quickstart tests WIP: need to add time features to preprocess and filter retail dataset
+* unit tests aside from quickstart passing
+* tests almost passing
+* synthesis wip implemented
+* gridcv implemented
+* unit tests passing - just need to reset fixtures for prefect test
+* preprocess moved to prefect
+* target dimensions working
+* license updated in readme
+* fix issue 172
+* fix issue 172
+* fix issue\_159
+* fixes #149
+* merge: polymorphism
+* all tests passing
+* WIP: polymorphism compute bottleneck
+* WIP: polymorphism - divina module not found on workers
+* WIP: polymorphism
+* WIP: polymorphism
+* spelling
+* spelling
+* spelling
+* before svelt
+* gitattributes
+* gitattributes
+* alpha
 * remove local docs
-* gitattributes
-* gitattributes
-* alpha
-
-2021.11.23
-----------
-
-* merge main
 * Build docs
 * alpha
+* Build docs
 * alpha
 * Build docs
 * alpha
 * alpha
 * alpha
 * Build docs
-* merge test
 * quickstart charts ready
 * quickstart charts ready
 * quickstart charts ready
@@ -27,7 +98,6 @@ CHANGES
 * Revert "Build docs"
 * tests passing - random seed passed to dask model
 * add time dataset
-* Build docs
 * add time dataset
 * Build docs
 * add time dataset
@@ -67,7 +137,6 @@ CHANGES
 * WIP: fixed forecast definition validation test
 * WIP: performance bug resolved. basic plotting added to predict unit test
 * WIP: various improvements - retail tests ready to lock
-* Build docs
 * all tests working with interaction features
 * unit tests working with interaction features
 * unit tests working with scaling and regularlization
@@ -103,6 +172,11 @@ CHANGES
 * WIP: add codecov
 * WIP: add codecov
 * Build docs
+* Build docs
+* Build docs
+* Build docs
+* Build docs
+* update prod github action yaml
 * WIP: add codecov
 * WIP: add codecov
 * WIP: add codecov
@@ -115,27 +189,13 @@ CHANGES
 * WIP: add codecov
 * param set and get added to cli
 * parameters persisted as json and overridable
-* Build docs
 * WIP: add simulation and aggregation
-* Build docs
 * WIP: add simulation and aggregation
-* Build docs
-* cleanup docs directory
-* Build docs
-* cleanup docs directory
-
-2021.9.5
---------
-
-* Build docs
 * cleanup docs directory
 * cleanup docs directory
 * cleanup docs directory
 * cleanup docs directory
 * cleanup docs directory
-* -f
-* Build docs
-* update prod github action yaml
 * update prod github action yaml
 * update prod github action yaml
 * update prod github action yaml
@@ -149,120 +209,29 @@ CHANGES
 * update prod github action yaml
 * add tag
 * update prod github action yaml
-* update prod github action yaml
-* update prod github action yaml
-* update prod github action yaml
-* update prod github action yaml
-* update prod github action yaml
-* update prod github action yaml
-* update prod github action yaml
-* update prod github action yaml
+* Set theme jekyll-theme-minimal
 * Build docs
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
-* add sphinx build github action
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
+* update prod github action yaml
 * add sphinx build github action
 * dataset and vision id's merged with paths, dataset profiles removed, documentation formatting
 * add docs
-* Set theme jekyll-theme-minimal
 * add docs
-* add docs
-* WIP: docker test image
 * WIP: docker test image
 * add pbr
-* WIP: docker test image
-* WIP: docker test image
-* WIP: docker test image
 * WIP: docker test image
 * WIP: point to test docker container
 * add pbr
 * WIP: add repo secrets
-
-2021.8.1
---------
-
 * WIP: add repo secrets
 * WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-
-0.1
----
-
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* rebase on main
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: cleanup
-* WIP: add repo secrets
-* WIP: add repo secrets
-* WIP: add repo secrets
-* WIP: cleanup
+* parent 8bba6f0f3b568240ea59508b41df935ee46bba46 author John Hurdle <johnhurdle23@gmail.com> 1630010025 -0700 committer John Hurdle <johnhurdle23@gmail.com> 1674520338 -0800
 * WIP: cleanup
 * move models to seperate repo
 * formatting
