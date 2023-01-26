@@ -150,6 +150,8 @@ def assert_pipeline_fit_result_equal(pr1: PipelineFitResult, pr2: PipelineFitRes
         for bs1, bs2 in zip_longest(s1.causal_validation.bootstrap_validations, s2.causal_validation.bootstrap_validations):
             assert bs1.model == bs2.model
             assert_series_equal(bs1.predictions.compute(), bs2.predictions.compute())
+            print(bs1.metrics)
+            print(bs2.metrics)
             assert bs1.metrics == bs2.metrics
         assert_frame_equal(s1.truth.compute(), s2.truth.compute())
         assert_series_equal(s1.causal_validation.predictions.compute(), s2.causal_validation.predictions.compute())
