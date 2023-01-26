@@ -19,4 +19,4 @@ html_js_files = [
     "js/docs.js",
 ]
 
-html_theme = 'furo'
+html_theme = "furo"
