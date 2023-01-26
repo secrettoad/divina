@@ -29,13 +29,9 @@ jobs:
     services:
       minio:
         image: jhurdle/divina-storage
-        ports:
-          - 9000:9000
         options: --name=minio --health-cmd "curl http://localhost:9000/minio/health/live"
       prefect:
         image: jhurdle/divina-pipeline
-        ports:
-          - 4200:4200
     env:
       PYTHONHASHSEED: 11
       AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
