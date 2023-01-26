@@ -27,9 +27,6 @@ jobs:
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
     services:
-      minio:
-        image: jhurdle/divina-storage
-        options: --name=minio --health-cmd "curl http://localhost:9000/minio/health/live"
       prefect:
         image: jhurdle/divina-pipeline
     env:
@@ -40,6 +37,20 @@ jobs:
       ACCOUNT_NUMBER: '${{ secrets.ACCOUNT_NUMBER }}'
     steps:
       - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15
+      - name: Setup minio
+        run: |
+          docker run -d -p 9000:9000 --name minio \
+                           -e "MINIO_ACCESS_KEY=minioadmin" \
+                           -e "MINIO_SECRET_KEY=minioadmin" \
+                           -v /tmp/data:/data \
+                           -v /tmp/config:/root/.minio \
+                           minio/minio server /data
+                
+          export AWS_EC2_METADATA_DISABLED=true
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
