@@ -4,4 +4,4 @@
 build/*
 dist/*
 WIP/*
-docs/*
+docs_src/_static/plots/*
