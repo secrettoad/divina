@@ -12,6 +12,7 @@ def test_pipeline_fit_prefect(
     test_boost_model_params,
     test_bucket,
     test_pipeline_root,
+    test_pipeline_name,
 ):
     test_pipeline_2.storage_options = {
         "client_kwargs": {"endpoint_url": "http://{}:{}".format(os.environ['S3_HOST'], 9000)}
@@ -32,7 +33,7 @@ def test_pipeline_fit_prefect(
     )
     from prefect import flow
 
-    @flow(name='test-prefect-predict', persist_result=True)
+    @flow(name=test_pipeline_name, persist_result=True)
     def run_pipeline(df: str):
         return test_pipeline_2.fit(df=df, prefect=True)
 
