@@ -72,7 +72,7 @@ def test_pipeline_predict_prefect(
     @flow(name=test_pipeline_name, persist_result=True)
     def run_pipeline():
         return test_pipeline_2.predict(
-            x=test_data_1,
+            x=test_data_1[test_data_1["a"] >= "1970-01-01 00:00:05"],
             boost_y=test_pipeline_2.target,
             horizons=test_horizons,
         )
