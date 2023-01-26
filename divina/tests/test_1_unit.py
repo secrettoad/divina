@@ -44,7 +44,7 @@ def test_forecast(
     result = test_pipeline_1.forecast(
         model=test_model_1, x=test_df_1.set_index('a').drop(columns='c')
     )
-    np.testing.assert_allcose(
+    np.testing.assert_allclose(
         result.compute().values,
         test_forecast_1.compute().values
     )
