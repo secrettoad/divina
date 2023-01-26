@@ -336,7 +336,7 @@ def test_truth():
 
 @pytest.fixture
 def test_bootstrap_metrics():
-    return [{'mse': 643.9186200767692}, {'mse': 643.9186200767692}, {'mse': 643.9186200767671}, {'mse': 407.75609758701285}, {'mse': 833.1063483669718}]
+    return [{'mse': pytest.approx(643.9186200767692)}, {'mse': pytest.approx(643.9186200767692)}, {'mse': 643.9186200767671}, {'mse': pytest.approx(407.75609758701285)}, {'mse': pytest.approx(833.1063483669718)}]
 
 
 @pytest.fixture
@@ -356,7 +356,7 @@ def test_boosted_models():
 
 @pytest.fixture
 def test_boosted_metrics():
-    return [{'mse': 526.3151700698562}, {'mse': 617.8586415734015}]
+    return [{'mse': pytest.approx(526.3151700698562)}, {'mse': pytest.approx(617.8586415734015)}]
 
 
 @pytest.fixture
@@ -428,7 +428,7 @@ def test_pipeline_fit_result(test_causal_predictions, test_boosted_predictions, 
     return PipelineFitResult(
         split_validations=[ValidationSplit(split='1970-01-01 00:00:05', boosted_validations=test_boosted_validations,
                                            causal_validation=CausalValidation(
-                                               metrics={'mse': 624.6711566239716},
+                                               metrics={'mse': pytest.approx(624.6711566239716)},
                                                predictions=test_causal_predictions,
                                                bootstrap_validations=test_bootstrap_validations), truth=test_truth)])
 
