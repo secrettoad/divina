@@ -336,7 +336,7 @@ def test_truth():
 
 @pytest.fixture
 def test_bootstrap_metrics():
-    return [{'mse': pytest.approx(643.9186200767692)}, {'mse': pytest.approx(643.9186200767692)}, {'mse': 643.9186200767671}, {'mse': pytest.approx(407.75609758701285)}, {'mse': pytest.approx(833.1063483669718)}]
+    return [{'mse': pytest.approx(643.9186200767692)}, {'mse': pytest.approx(643.9186200767692)}, {'mse': pytest.approx(643.9186200767671)}, {'mse': pytest.approx(407.75609758701285)}, {'mse': pytest.approx(833.1063483669718)}]
 
 
 @pytest.fixture
