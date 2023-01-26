@@ -56,7 +56,7 @@ def test_pipeline_predict_prefect(
     test_horizon_predictions,
 ):
     test_pipeline_2.storage_options = {
-        "client_kwargs": {"endpoint_url": "http://127.0.0.1:{}".format(9000)}
+        "client_kwargs": {"endpoint_url": "http://localhost:{}".format(9000)}
     }
     test_pipeline_2.is_fit = True
     test_pipeline_2.bootstrap_models = test_bootstrap_models
