@@ -40,7 +40,6 @@ Below we use the target_dimensions option to tell divina to individually aggrega
 
 .. literalinclude:: _static/pipeline_definitions/quickstart2.py
    :language: python
-   :emphasize-lines: 5-7
 
 .. raw:: html
     :file: _static/plots/quickstart/2_s_1_2d.html
@@ -56,7 +55,6 @@ An important part of forecasting and feature of divina is the ability to derive 
 
 .. literalinclude:: _static/pipeline_definitions/quickstart3.py
    :language: python
-   :emphasize-lines: 10-19
 
 We can see through the interpretablity interface that the new time information is now informing the forecasts.
 
@@ -69,7 +67,6 @@ Information encoding, binning and interaction terms are all powerful features of
 
 .. literalinclude:: _static/pipeline_definitions/quickstart4.py
    :language: python
-   :emphasize-lines: 20-49
 
 .. raw:: html
     :file: _static/plots/quickstart/4_test_forecast_retail_s_1_factors.html
@@ -80,7 +77,6 @@ While visual inspection is a powerful tool for validating a model, programmatic 
 
 .. literalinclude:: _static/pipeline_definitions/quickstart5.py
    :language: python
-   :emphasize-lines: 51-53
 
 The resulting validation split metrics can be accessed through the `PipelineFitResult` object that is returned from `pipeline.fit()`.
 
@@ -90,7 +86,6 @@ Confidence intervals provide important insight into how sure divina is of its pr
 
 .. literalinclude:: _static/pipeline_definitions/quickstart7.py
    :language: python
-   :emphasize-lines: 71-75
 
 .. raw:: html
     :file: _static/plots/quickstart/7_s_1_2d.html
@@ -102,7 +97,6 @@ Divina provides the important capability of boosting the residuals of the causal
 
 .. literalinclude:: _static/pipeline_definitions/quickstart8.py
    :language: python
-   :emphasize-lines: 71-75
 
 .. raw:: html
     :file: _static/plots/quickstart/8_s_1_2d.html
