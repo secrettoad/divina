@@ -255,7 +255,7 @@ def test_quickstart(test_pipelines_quickstart, random_state):
                 )
             path = pathlib.Path(
                 pathlib.Path(__file__).parent.parent,
-                "docs_src/_static/plots/"
+                "docs_heavy_assets/_static/plots/"
                 "quickstart/{}_s_{}_2d.html".format(i, s),
             )
             fig.update_layout(
@@ -311,7 +311,7 @@ def test_quickstart(test_pipelines_quickstart, random_state):
             factor_fig.update_xaxes(side="top")
             path = pathlib.Path(
                 pathlib.Path(__file__).parent.parent,
-                "docs_src/_static/plots/quickstart/"
+                "docs_heavy_assets/plots/quickstart/"
                 "{}_test_forecast_retail_s_{}_factors.html".format(i, s),
             )
             path.parent.mkdir(parents=True, exist_ok=True)
