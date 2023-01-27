@@ -16,7 +16,7 @@ At a minimum, a :mod:`divina` pipeline must know which column represents the tim
    :language: python
 
 .. raw:: html
-    :file: _static/plots/quickstart/0_s_2_2d.html
+    :file: ../docs_heavy_assets/plots/quickstart/0_s_2_2d.html
 
 As you can see, Divina automatically uses the non-target columns that we don't tell it to drop in the file to make in-sample predictions that are reasonably accurate.
 
@@ -28,7 +28,7 @@ Divina supports hyper-parameter optimization through grid search. In order to op
    :language: python
 
 .. raw:: html
-    :file: _static/plots/quickstart/1_s_2_2d.html
+    :file: ../docs_heavy_assets/plots/quickstart/1_s_2_2d.html
 
 It seems clear that the log link function improves the performance of the default, linear, causal model on this sales dataset.
 
@@ -42,12 +42,12 @@ Below we use the target_dimensions option to tell divina to individually aggrega
    :language: python
 
 .. raw:: html
-    :file: _static/plots/quickstart/2_s_1_2d.html
+    :file: ../docs_heavy_assets/plots/quickstart/2_s_1_2d.html
 
 We can see above that the forecast for an individual store is even more accurate and through the interpretability interface below what information is influencing the forecasts and how.
 
 .. raw:: html
-    :file: _static/plots/quickstart/2_test_forecast_retail_s_1_factors.html
+    :file: ../docs_heavy_assets/plots/quickstart/2_test_forecast_retail_s_1_factors.html
 
 **Time Features**
 
@@ -59,7 +59,7 @@ An important part of forecasting and feature of divina is the ability to derive 
 We can see through the interpretablity interface that the new time information is now informing the forecasts.
 
 .. raw:: html
-    :file: _static/plots/quickstart/3_test_forecast_retail_s_1_factors.html
+    :file: ../docs_heavy_assets/plots/quickstart/3_test_forecast_retail_s_1_factors.html
 
 **Feature Engineering**
 
@@ -69,7 +69,7 @@ Information encoding, binning and interaction terms are all powerful features of
    :language: python
 
 .. raw:: html
-    :file: _static/plots/quickstart/4_test_forecast_retail_s_1_factors.html
+    :file: ../docs_heavy_assets/plots/quickstart/4_test_forecast_retail_s_1_factors.html
 
 **Cross Validation**
 
@@ -88,7 +88,7 @@ Confidence intervals provide important insight into how sure divina is of its pr
    :language: python
 
 .. raw:: html
-    :file: _static/plots/quickstart/7_s_1_2d.html
+    :file: ../docs_heavy_assets/plots/quickstart/7_s_1_2d.html
 
 
 **Endogenous Boosting**
@@ -99,4 +99,4 @@ Divina provides the important capability of boosting the residuals of the causal
    :language: python
 
 .. raw:: html
-    :file: _static/plots/quickstart/8_s_1_2d.html
+    :file: ../docs_heavy_assets/plots/quickstart/8_s_1_2d.html
