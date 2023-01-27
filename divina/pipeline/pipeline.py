@@ -4,18 +4,15 @@ from functools import partial
 from itertools import zip_longest
 from typing import Union
 
-import dask.array as da
 import dask.dataframe as dd
-import numpy as np
 import pandas as pd
 from dask_ml.preprocessing import Categorizer, DummyEncoder
 from pandas.api.types import is_numeric_dtype
 from pandas.testing import assert_frame_equal, assert_series_equal
 from pandas.tseries.holiday import USFederalHolidayCalendar as calendar
-from sklearn.base import BaseEstimator
 from sklearn.pipeline import make_pipeline
 
-from divina.divina.pipeline.utils import (Output, _divina_component,
+from divina.divina.pipeline.utils import (Output, _divina_component, get_dask_client,
                                           cull_empty_partitions)
 
 from .model import *  # noqa: F403, F401
@@ -1022,7 +1019,8 @@ class Pipeline:
                 model=bootstrap_model,
             )
 
-        def _fit(train_df, test_df, prefect):
+        @get_dask_client
+        def _fit(train_df, test_df, prefect, dask_configuration):
             bootstrap_validations = []
             x_train, y_train = self.x_y_split(df=train_df, prefect=prefect)
             x_test, y_test = self.x_y_split(df=test_df, prefect=prefect)
@@ -1164,12 +1162,14 @@ class Pipeline:
         self.is_fit = True
         return PipelineFitResult(split_validations=validation_splits)
 
+    @get_dask_client
     def predict(
         self,
         x: dd.DataFrame,
         horizons: [int] = None,
         boost_y: str = None,
         prefect=False,
+        dask_configuration=None
     ):
         if not self.is_fit:
             raise ValueError("Pipeline must be fit before you can predict.")

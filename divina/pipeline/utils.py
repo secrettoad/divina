@@ -220,33 +220,41 @@ def create_dask_aws_cluster(aws_workers, ec2_key, keep_alive):
     cluster.scale(aws_workers)
     return cluster
 
+class DaskConfiguration():
+    def __init__(self, scheduler_ip=None, destination=None, num_workers=None, ssh_key=None, debug=False):
+        if not scheduler_ip and not destination:
+            self.destination = "local"
+        elif scheduler_ip and destination:
+            raise ValueError("Either scheduler_ip or destination can be set, not both")
+        else:
+            self.scheduler_ip = scheduler_ip
+            self.destination = destination
+        self.num_workers = num_workers
+        self.ssh_key = ssh_key
+        self.debug = debug
+
 
 def get_dask_client(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if not kwargs["dask_scheduler_ip"]:
-            if not kwargs["create_cluster_destination"]:
-                with LocalCluster() as cluster:
-                    with Client(cluster) as client:
-                        value = func(*args, **kwargs)
-                        cluster.close()
-                        cluster.shutdown()
-                        return value
-            elif kwargs["create_cluster_destination"] == "aws":
-                with create_dask_aws_cluster(
-                    kwargs["num_workers"],
-                    kwargs["ssh_key"],
-                    keep_alive=kwargs["debug"],
-                ) as cluster:
-                    with Client(cluster) as client:   # noqa: F841
-                        value = func(*args, **kwargs)
-                        cluster.close()
-                        cluster.shutdown()
-                        return value
-            # todo add gcp, azure
-
+        if not "dask_configuration" in kwargs:
+            return func(*args, **kwargs)
         else:
-            with Client(kwargs["dask_scheduler_ip"]):
+            config = kwargs["dask_configuration"]
+        if hasattr(config, "dask_scheduler_ip"):
+            with Client(config.dask_scheduler_ip):
                 return func(*args, **kwargs)
+        elif config.destination == "aws":
+            with create_dask_aws_cluster(
+                    config.num_workers,
+                    config.ssh_key,
+                    keep_alive=config.debug,
+            ) as cluster:
+                with Client(cluster) as client:   # noqa: F841
+                    value = func(*args, **kwargs)
+                    cluster.close()
+                    cluster.shutdown()
+                    return value
+            # todo add gcp, azure
 
     return wrapper
