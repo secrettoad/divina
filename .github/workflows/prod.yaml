@@ -28,10 +28,22 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       - name: Test with pytest
         run: |
-          python3 -m pytest
+          python3 -m pytest -k test_1_unit.py
+        env:
+          AWS_ACCESS_KEY_ID: 'minioadmin'
+          AWS_SECRET_ACCESS_KEY: 'minioadmin'
+          S3_HOST: minio
+      - name: Test with pytest
+        run: |
+          python3 -m pytest -k test_2_orchestration.py
+        env:
+          AWS_ACCESS_KEY_ID: 'minioadmin'
+          AWS_SECRET_ACCESS_KEY: 'minioadmin'
+          S3_HOST: minio
+      - name: Test with pytest
+        run: |
+          python3 -m pytest -k test_3_integration.py
         env:
           AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
           AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
-          AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
           S3_HOST: minio
-          ACCOUNT_NUMBER: '${{ secrets.ACCOUNT_NUMBER }}'

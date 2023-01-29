@@ -977,7 +977,8 @@ class Pipeline:
 
         return boosted_intervals
 
-    def fit(self, df, start=None, end=None, prefect=False):
+    @get_dask_client
+    def fit(self, df, start=None, end=None, prefect=False, dask_configuration=None):
         def _causal_fit(
             x_train,
             y_train,
@@ -1019,8 +1020,7 @@ class Pipeline:
                 model=bootstrap_model,
             )
 
-        @get_dask_client
-        def _fit(train_df, test_df, prefect, dask_configuration):
+        def _fit(train_df, test_df, prefect):
             bootstrap_validations = []
             x_train, y_train = self.x_y_split(df=train_df, prefect=prefect)
             x_test, y_test = self.x_y_split(df=test_df, prefect=prefect)

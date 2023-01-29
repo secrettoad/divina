@@ -21,16 +21,10 @@ def test_pipeline_fit_prefect(
     fs = s3fs.S3FileSystem(**test_pipeline_2.storage_options)
     if fs.exists(test_bucket):
         fs.rm(test_bucket, True)
+        fs.mkdir(test_bucket)
     else:
         fs.mkdir(test_bucket)
-    test_data_1.to_parquet(
-        test_data_path,
-        storage_options={
-            "client_kwargs": {
-                "endpoint_url": "http://{}:{}".format(os.environ['S3_HOST'], 9000)
-            }
-        },
-    )
+    test_data_1.to_parquet(test_data_path, storage_options=test_pipeline_2.storage_options)
     from prefect import flow
 
     @flow(name=test_pipeline_name, persist_result=True)

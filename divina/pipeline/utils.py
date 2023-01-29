@@ -206,6 +206,7 @@ def _divina_component(func):
 
 
 def create_dask_aws_cluster(aws_workers, ec2_key, keep_alive):
+    region = 'us-east-1' if not "AWS_DEFAULT_REGION" in os.environ else os.environ["AWS_DEFAULT_REGION"]
     cluster = EC2Cluster(
         key_name=ec2_key,
         security=False,
@@ -214,9 +215,10 @@ def create_dask_aws_cluster(aws_workers, ec2_key, keep_alive):
         env_vars={
             "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
             "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-            "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
+            "AWS_DEFAULT_REGION": region,
         },
         auto_shutdown=not keep_alive,
+        region=region
     )
     cluster.scale(aws_workers)
     return cluster
@@ -254,7 +256,7 @@ def get_dask_client(func):
                 with Client(cluster) as client:   # noqa: F841
                     value = func(*args, **kwargs)
                     cluster.close()
-                    cluster.shutdown()
+                    client.shutdown()
                     return value
             # todo add gcp, azure
 
