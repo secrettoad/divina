@@ -209,6 +209,7 @@ def create_dask_aws_cluster(aws_workers, ec2_key, keep_alive):
     cluster = EC2Cluster(
         key_name=ec2_key,
         security=False,
+        # TODO - START HERE - add bokeh to docker image then check to see if versions match and error is resolved
         docker_image="jhurdle/divina:latest",
         env_vars={
             "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
