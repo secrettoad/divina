@@ -23,7 +23,6 @@ jobs:
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
   test:
-    environment: test
     runs-on: ubuntu-latest
     container: jhurdle/divina:test
     services:
@@ -32,11 +31,9 @@ jobs:
         options: --name=minio --health-cmd "curl http://localhost:9000/minio/health/live"
     env:
       PYTHONHASHSEED: 11
-      AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
-      AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
-      AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
+      AWS_ACCESS_KEY_ID: 'minioadmin'
+      AWS_SECRET_ACCESS_KEY: 'minioadmin'
       S3_HOST: minio
-      ACCOUNT_NUMBER: '${{ secrets.ACCOUNT_NUMBER }}'
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
@@ -45,7 +42,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Test with pytest
         run: |
-          python3 -m pytest
+          python3 -m pytest -k test_1_unit.py
+      - name: Test with pytest
+        run: |
+          python3 -m pytest -k test_2_orchestration.py
+        env:
+          AWS_ACCESS_KEY_ID: 'minioadmin'
+          AWS_SECRET_ACCESS_KEY: 'minioadmin'
+          S3_HOST: minio
 
   pypi:
     runs-on: ubuntu-latest
