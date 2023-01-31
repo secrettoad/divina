@@ -39,10 +39,6 @@ jobs:
       - name: Test with pytest
         run: |
           python3 -m pytest -k test_1_unit.py
-        env:
-          AWS_ACCESS_KEY_ID: 'minioadmin'
-          AWS_SECRET_ACCESS_KEY: 'minioadmin'
-          S3_HOST: minio
       - name: Test with pytest
         run: |
           python3 -m pytest -k test_2_orchestration.py
