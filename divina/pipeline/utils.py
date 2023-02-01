@@ -37,12 +37,8 @@ def create_write_directory(func):
         else:
             path = pathlib.Path(write_path)
             path.mkdir(exist_ok=True, parents=True)
-            pathlib.Path(path, "models/bootstrap").mkdir(
-                exist_ok=True, parents=True
-            )
-            pathlib.Path(path, "models/validation").mkdir(
-                exist_ok=True, parents=True
-            )
+            pathlib.Path(path, "models/bootstrap").mkdir(exist_ok=True, parents=True)
+            pathlib.Path(path, "models/validation").mkdir(exist_ok=True, parents=True)
         return func(*args, **kwargs)
 
     return wrapper
@@ -74,15 +70,11 @@ def _component_helper(func):
         _args = dict(sig.parameters)
         new_args = []
         for a, v in zip(_args, args):
-            if (_args[a].annotation == Union[str, dd.DataFrame]) and type(
-                v
-            ) == str:
+            if (_args[a].annotation == Union[str, dd.DataFrame]) and type(v) == str:
                 new_args.append(
                     dd.read_parquet(v, storage_options=self.storage_options)
                 )
-            elif (_args[a].annotation == Union[str, dd.Series]) and type(
-                v
-            ) == str:
+            elif (_args[a].annotation == Union[str, dd.Series]) and type(v) == str:
                 s = dd.read_parquet(v, storage_options=self.storage_options)
                 if len(s.columns) > 1:
                     raise ValueError(
@@ -91,21 +83,16 @@ def _component_helper(func):
                     )
                 s = s[s.columns[0]]
                 new_args.append(s)
-            elif _args[a].annotation == Union[
-                List[str], List[dd.DataFrame]
-            ] and type(v) == [str]:
+            elif _args[a].annotation == Union[List[str], List[dd.DataFrame]] and type(
+                v
+            ) == [str]:
                 new_args.append(
                     [
-                        dd.read_parquet(
-                            _df, storage_options=self.storage_options
-                        )
+                        dd.read_parquet(_df, storage_options=self.storage_options)
                         for _df in v
                     ]
                 )
-            elif (
-                _args[a].annotation == Union[str, BaseEstimator]
-                and type(v) == str
-            ):
+            elif _args[a].annotation == Union[str, BaseEstimator] and type(v) == str:
                 fs = s3fs.S3FileSystem(**self.storage_options)
                 with fs.open(v, "rb") as f:
                     new_args.append(dill.load(f))
@@ -117,9 +104,7 @@ def _component_helper(func):
         from itertools import zip_longest
 
         outputs = [
-            v
-            for v, a in zip_longest(args, _args)
-            if _args[a].annotation == Output
+            v for v, a in zip_longest(args, _args) if _args[a].annotation == Output
         ]
         reduce_result = False
         if not type(result) == tuple:
@@ -138,9 +123,7 @@ def _component_helper(func):
                 if type(r) == dd.DataFrame:
                     r.to_parquet(o, storage_options=self.storage_options)
                 elif type(r) == dd.Series:
-                    r.to_frame().to_parquet(
-                        o, storage_options=self.storage_options
-                    )
+                    r.to_frame().to_parquet(o, storage_options=self.storage_options)
             if type(r) == dict and o:
                 fs = s3fs.S3FileSystem(**self.storage_options)
                 with fs.open(o + ".json", "w") as f:
@@ -168,8 +151,7 @@ def generate_random_key(length):
     import string
 
     return "".join(
-        random.choice(string.ascii_lowercase + string.digits)
-        for _ in range(length)
+        random.choice(string.ascii_lowercase + string.digits) for _ in range(length)
     )
 
 
@@ -205,26 +187,41 @@ def _divina_component(func):
     return wrapper
 
 
-def create_dask_aws_cluster(aws_workers, ec2_key, keep_alive):
-    region = 'us-east-1' if not "AWS_DEFAULT_REGION" in os.environ else os.environ["AWS_DEFAULT_REGION"]
+def create_dask_aws_cluster(
+    num_workers, ec2_key=None, keep_alive=False, docker_image=None
+):
+    region = (
+        "us-east-1"
+        if "AWS_DEFAULT_REGION" not in os.environ
+        else os.environ["AWS_DEFAULT_REGION"]
+    )
     cluster = EC2Cluster(
         key_name=ec2_key,
         security=False,
         # TODO - START HERE - add bokeh to docker image then check to see if versions match and error is resolved
-        docker_image="jhurdle/divina:latest",
+        docker_image=docker_image or "jhurdle/divina:latest",
         env_vars={
             "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
             "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
             "AWS_DEFAULT_REGION": region,
         },
         auto_shutdown=not keep_alive,
-        region=region
+        region=region,
     )
-    cluster.scale(aws_workers)
+    cluster.scale(num_workers)
     return cluster
 
-class DaskConfiguration():
-    def __init__(self, scheduler_ip=None, destination=None, num_workers=None, ssh_key=None, debug=False):
+
+class DaskConfiguration:
+    def __init__(
+        self,
+        scheduler_ip=None,
+        destination=None,
+        num_workers=None,
+        ssh_key=None,
+        debug=False,
+        docker_image=None,
+    ):
         if not scheduler_ip and not destination:
             self.destination = "local"
         elif scheduler_ip and destination:
@@ -235,12 +232,14 @@ class DaskConfiguration():
         self.num_workers = num_workers
         self.ssh_key = ssh_key
         self.debug = debug
+        self.docker_image = docker_image
 
 
 def get_dask_client(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if not "dask_configuration" in kwargs:
+        if "dask_configuration" not in kwargs:
+            kwargs["dask_configuration"] = None
             return func(*args, **kwargs)
         else:
             config = kwargs["dask_configuration"]
@@ -249,11 +248,12 @@ def get_dask_client(func):
                 return func(*args, **kwargs)
         elif config.destination == "aws":
             with create_dask_aws_cluster(
-                    config.num_workers,
-                    config.ssh_key,
-                    keep_alive=config.debug,
+                num_workers=config.num_workers,
+                ec2_key=config.ssh_key,
+                keep_alive=config.debug,
+                docker_image=config.docker_image,
             ) as cluster:
-                with Client(cluster) as client:   # noqa: F841
+                with Client(cluster) as client:  # noqa: F841
                     value = func(*args, **kwargs)
                     cluster.close()
                     client.shutdown()

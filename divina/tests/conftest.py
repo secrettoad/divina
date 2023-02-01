@@ -4,15 +4,19 @@ import pandas as pd
 import pytest
 from pandas import Timestamp
 
-from divina.docs_src._static.pipeline_definitions import \
-    quickstart_pipelines
+from divina.docs_src._static.pipeline_definitions import quickstart_pipelines
 from divina.divina.pipeline.model import EWMA, GLM
-from divina.divina.pipeline.pipeline import (BoostPrediction, BoostValidation,
-                                             CausalPrediction,
-                                             CausalValidation, Pipeline,
-                                             PipelineFitResult,
-                                             PipelinePredictResult, Validation,
-                                             ValidationSplit)
+from divina.divina.pipeline.pipeline import (
+    BoostPrediction,
+    BoostValidation,
+    CausalPrediction,
+    CausalValidation,
+    Pipeline,
+    PipelineFitResult,
+    PipelinePredictResult,
+    Validation,
+    ValidationSplit,
+)
 
 
 @pytest.fixture()
@@ -39,9 +43,9 @@ def test_model_1(test_df_1, random_state, test_pipeline_1):
             pd.DataFrame([np.array(params) + c for c in range(0, 2)]),
             npartitions=1,
         ).to_dask_array(lengths=True),
-        ddf.from_pandas(
-            pd.Series([intercept, intercept]), npartitions=1
-        ).to_dask_array(lengths=True),
+        ddf.from_pandas(pd.Series([intercept, intercept]), npartitions=1).to_dask_array(
+            lengths=True
+        ),
     )
     model.linear_model.coef_ = np.array(params)
     model.linear_model.intercept_ = intercept
@@ -89,14 +93,12 @@ def test_bootstrap_models(random_state, test_pipeline_1):
         model = GLM(link_function="log")
         model.linear_model.fit(
             ddf.from_pandas(
-                pd.DataFrame(
-                    [np.array(params[j]) + c for c in range(0, len(states))]
-                ),
+                pd.DataFrame([np.array(params[j]) + c for c in range(0, len(states))]),
                 npartitions=1,
             ).to_dask_array(lengths=True),
-            ddf.from_pandas(
-                pd.Series(intercepts), npartitions=1
-            ).to_dask_array(lengths=True),
+            ddf.from_pandas(pd.Series(intercepts), npartitions=1).to_dask_array(
+                lengths=True
+            ),
         )
         model.linear_model.coef_ = np.array(p)
         model.linear_model.intercept_ = i
@@ -382,9 +384,9 @@ def test_df_2():
 
 @pytest.fixture()
 def test_df_3():
-    df = pd.DataFrame(
-        [[1, 2, 3], [4, "a", 6], [7, 8, "b"], ["c", 11, 12]]
-    ).astype("str")
+    df = pd.DataFrame([[1, 2, 3], [4, "a", 6], [7, 8, "b"], ["c", 11, 12]]).astype(
+        "str"
+    )
     df.columns = ["a", "b", "c"]
     return df
 
@@ -453,15 +455,13 @@ def test_boosted_predictions():
         ],
     ]
     dfs = [
-        pd.DataFrame(
-            columns=["__target_dimension_index__", "y_hat_boosted"], data=df
-        )
+        pd.DataFrame(columns=["__target_dimension_index__", "y_hat_boosted"], data=df)
         for df in dfs
     ]
     return [
-        ddf.from_pandas(
-            df.set_index("__target_dimension_index__"), npartitions=2
-        )["y_hat_boosted"]
+        ddf.from_pandas(df.set_index("__target_dimension_index__"), npartitions=2)[
+            "y_hat_boosted"
+        ]
         for df in dfs
     ]
 
@@ -479,9 +479,9 @@ def test_causal_predictions():
         ]
     )
     df.columns = ["__target_dimension_index__", "y_hat"]
-    return ddf.from_pandas(
-        df.set_index("__target_dimension_index__"), npartitions=2
-    )["y_hat"]
+    return ddf.from_pandas(df.set_index("__target_dimension_index__"), npartitions=2)[
+        "y_hat"
+    ]
 
 
 @pytest.fixture
@@ -521,9 +521,7 @@ def test_truth():
         "b_(10, 15]",
         "b_(15, inf]",
     ]
-    return ddf.from_pandas(
-        df.set_index("__target_dimension_index__"), npartitions=2
-    )
+    return ddf.from_pandas(df.set_index("__target_dimension_index__"), npartitions=2)
 
 
 @pytest.fixture
@@ -586,9 +584,9 @@ def test_bootstrap_predictions():
         for df in dfs
     ]
     return [
-        ddf.from_pandas(
-            df.set_index("__target_dimension_index__"), npartitions=2
-        )["y_hat"]
+        ddf.from_pandas(df.set_index("__target_dimension_index__"), npartitions=2)[
+            "y_hat"
+        ]
         for df in dfs
     ]
 
@@ -693,9 +691,7 @@ def test_causal_factors():
         "factor_b_(-inf, 5]",
         "factor_b_(5, 10]",
     ]
-    return ddf.from_pandas(df, npartitions=2).set_index(
-        "__target_dimension_index__"
-    )
+    return ddf.from_pandas(df, npartitions=2).set_index("__target_dimension_index__")
 
 
 @pytest.fixture
@@ -711,9 +707,7 @@ def test_causal_confidence_intervals():
         ]
     )
     df.columns = ["__target_dimension_index__", "c_pred_c_90"]
-    return ddf.from_pandas(df, npartitions=2).set_index(
-        "__target_dimension_index__"
-    )
+    return ddf.from_pandas(df, npartitions=2).set_index("__target_dimension_index__")
 
 
 @pytest.fixture
@@ -902,9 +896,7 @@ def test_lag_features():
     ]
     return [
         ddf.from_pandas(
-            pd.DataFrame(data=df, columns=c).set_index(
-                "__target_dimension_index__"
-            ),
+            pd.DataFrame(data=df, columns=c).set_index("__target_dimension_index__"),
             npartitions=2,
         )
         for df, c in zip(dfs, columns)

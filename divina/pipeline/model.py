@@ -24,9 +24,7 @@ class EWMA(BaseEstimator):
                 "the same number of columns as the "
                 "data used to train"
             )
-        y_hat = (
-            da.dot(da.nan_to_num(X), da.from_array(self.weights)) / self.window
-        )
+        y_hat = da.dot(da.nan_to_num(X), da.from_array(self.weights)) / self.window
         return y_hat
 
     @property
@@ -36,9 +34,7 @@ class EWMA(BaseEstimator):
     @window.setter
     def window(self, value):
         self._window = value
-        self.weights = list(
-            [(1 - self.alpha) ** n for n in range(self._window)]
-        )
+        self.weights = list([(1 - self.alpha) ** n for n in range(self._window)])
         return
 
     def __eq__(self, other):
@@ -82,16 +78,12 @@ class GLM(BaseEstimator):
         if drop_constants:
             da_std = X.std()
             constant_indices = [i for i, v in enumerate(da_std) if v == 0]
-            usable_indices = list(
-                set(range(len(X.columns))) - set(constant_indices)
-            )
+            usable_indices = list(set(range(len(X.columns))) - set(constant_indices))
             if usable_indices == []:
                 X = X + np.random.normal(0, 1, X.shape)
             self.fit_indices = usable_indices
         if self.fit_indices:
-            X = X[
-                [c for i, c in enumerate(X.columns) if i in self.fit_indices]
-            ]
+            X = X[[c for i, c in enumerate(X.columns) if i in self.fit_indices]]
         if self.link_function == "log":
             self.y_min = y.min().compute()
             y = np.log(y + self.y_min + 1)

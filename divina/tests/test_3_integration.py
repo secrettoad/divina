@@ -1,18 +1,31 @@
 from divina.divina.pipeline.utils import get_dask_client, DaskConfiguration
-import dask.dataframe as dd
-import pandas as pd
-from dask_cloudprovider.aws import EC2Cluster
-from pandas.testing import assert_frame_equal
-
-from distributed import Client
+from divina.divina.pipeline.pipeline import assert_pipeline_fit_result_equal
 
 
-def test_dask_client_aws():
-    @get_dask_client
-    def test(dask_configuration):
-        assert type(Client.current().cluster) == EC2Cluster
-        df = pd.DataFrame([['1', '2', '3'], ['1', '2', '3']])
-        ddf = dd.from_pandas(df, npartitions=2)
-        assert_frame_equal(ddf.compute(), df)
+def test_dask_client_aws(
+    test_data_1,
+    test_pipeline_2,
+    test_pipeline_fit_result,
+    test_boost_model_params,
+    test_bucket,
+    test_pipeline_root,
+    test_pipeline_name,
+):
+    from prefect import flow
 
-    test(dask_configuration=DaskConfiguration(destination='aws', num_workers=2))
+    @flow(name=test_pipeline_name, persist_result=True)
+    def test_flow():
+        @get_dask_client
+        def run_pipeline(dask_configuration: DaskConfiguration):
+            return test_pipeline_2.fit(df=test_data_1, prefect=True)
+
+        return run_pipeline(
+            dask_configuration=DaskConfiguration(
+                destination="aws", num_workers=2, docker_image="jhurdle/divina:test"
+            )
+        )
+
+    test_pipeline_2.pipeline_root = None
+    result = test_flow()
+    assert_pipeline_fit_result_equal(result, test_pipeline_fit_result)
+
