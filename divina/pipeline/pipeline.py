@@ -12,8 +12,12 @@ from pandas.testing import assert_frame_equal, assert_series_equal
 from pandas.tseries.holiday import USFederalHolidayCalendar as calendar
 from sklearn.pipeline import make_pipeline
 
-from divina.divina.pipeline.utils import (Output, _divina_component, get_dask_client,
-                                          cull_empty_partitions)
+from divina.divina.pipeline.utils import (
+    Output,
+    _divina_component,
+    get_dask_client,
+    cull_empty_partitions,
+)
 
 from .model import *  # noqa: F403, F401
 
@@ -35,8 +39,7 @@ class CausalPrediction:
         return (
             self.factors == other.factors
             and (
-                self.predictions.compute().values
-                == other.predictions.compute().values
+                self.predictions.compute().values == other.predictions.compute().values
             ).all()
             and self.confidence_intervals == other.confidence_intervals
         )
@@ -70,8 +73,7 @@ class BoostPrediction:
             and self.horizon == other.horizon
             and self.model == other.model
             and (
-                self.predictions.compute().values
-                == other.predictions.compute().values
+                self.predictions.compute().values == other.predictions.compute().values
             ).all()
             and (
                 self.lag_features.compute().values
@@ -135,8 +137,7 @@ class Validation:
         return (
             self.metrics == other.metrics
             and (
-                self.predictions.compute().values
-                == other.predictions.compute().values
+                self.predictions.compute().values == other.predictions.compute().values
             ).all()
             and self.model == other.model
         )
@@ -151,9 +152,7 @@ class CausalValidation(Validation):
         factors: dd.DataFrame = None,
     ):
         self.bootstrap_validations = bootstrap_validations
-        super().__init__(
-            metrics=metrics, predictions=predictions, factors=factors
-        )
+        super().__init__(metrics=metrics, predictions=predictions, factors=factors)
 
     def __eq__(self, other):
         return (
@@ -202,9 +201,7 @@ class ValidationSplit:
         return (
             self.causal_validation == other.causal_validation
             and self.split == other.split
-            and (
-                self.truth.compute().values == other.truth.compute().values
-            ).all()
+            and (self.truth.compute().values == other.truth.compute().values).all()
             and self.boosted_validations == other.boosted_validations
         )
 
@@ -232,9 +229,7 @@ class PipelineFitResult:
         return repr(self.tpl)
 
 
-def assert_pipeline_fit_result_equal(
-    pr1: PipelineFitResult, pr2: PipelineFitResult
-):
+def assert_pipeline_fit_result_equal(pr1: PipelineFitResult, pr2: PipelineFitResult):
     for s1, s2 in zip_longest(pr1, pr2):
         assert s1.split == s2.split
         for bs1, bs2 in zip_longest(
@@ -242,9 +237,7 @@ def assert_pipeline_fit_result_equal(
             s2.causal_validation.bootstrap_validations,
         ):
             assert bs1.model == bs2.model
-            assert_series_equal(
-                bs1.predictions.compute(), bs2.predictions.compute()
-            )
+            assert_series_equal(bs1.predictions.compute(), bs2.predictions.compute())
             print(bs1.metrics)
             print(bs2.metrics)
             assert bs1.metrics == bs2.metrics
@@ -254,14 +247,10 @@ def assert_pipeline_fit_result_equal(
             s2.causal_validation.predictions.compute(),
         )
         assert s1.causal_validation.metrics == s2.causal_validation.metrics
-        for b1, b2 in zip_longest(
-            s1.boosted_validations, s2.boosted_validations
-        ):
+        for b1, b2 in zip_longest(s1.boosted_validations, s2.boosted_validations):
             assert b1.horizon == b2.horizon
             assert b1.model == b2.model
-            assert_series_equal(
-                b1.predictions.compute(), b2.predictions.compute()
-            )
+            assert_series_equal(b1.predictions.compute(), b2.predictions.compute())
             assert b1.metrics == b2.metrics
 
 
@@ -272,9 +261,7 @@ def assert_pipeline_predict_result_equal(
     for s1, s2 in zip_longest(pr1, pr2):
         if type(s1) == CausalPrediction:
             assert type(s2) == CausalPrediction
-            assert_series_equal(
-                s1.predictions.compute(), s2.predictions.compute()
-            )
+            assert_series_equal(s1.predictions.compute(), s2.predictions.compute())
             assert_frame_equal(s1.factors.compute(), s2.factors.compute())
             assert_frame_equal(
                 s1.confidence_intervals.compute(),
@@ -284,16 +271,12 @@ def assert_pipeline_predict_result_equal(
             assert type(s2) == BoostPrediction
             assert s1.model == s2.model
             assert s1.horizon == s1.horizon
-            assert_series_equal(
-                s1.predictions.compute(), s2.predictions.compute()
-            )
+            assert_series_equal(s1.predictions.compute(), s2.predictions.compute())
             assert_frame_equal(
                 s1.confidence_intervals.compute(),
                 s2.confidence_intervals.compute(),
             )
-            assert_frame_equal(
-                s1.lag_features.compute(), s2.lag_features.compute()
-            )
+            assert_frame_equal(s1.lag_features.compute(), s2.lag_features.compute())
             assert_series_equal(
                 s1.residual_predictions.compute(),
                 s2.residual_predictions.compute(),
@@ -337,9 +320,7 @@ class Pipeline:
         if len(horizon_ranges) > 0:
             self.time_horizons = [x for x in time_horizons if type(x) == int]
             for x in horizon_ranges:
-                self.time_horizons = set(
-                    self.time_horizons + list(range(x[0], x[1]))
-                )
+                self.time_horizons = set(self.time_horizons + list(range(x[0], x[1])))
         else:
             self.time_horizons = time_horizons
         if not confidence_intervals:
@@ -391,9 +372,7 @@ class Pipeline:
                 x for x in range(self.random_seed, self.random_seed + value)
             ]
         else:
-            self.bootstrap_seeds = [
-                x for x in np.random.randint(0, 10000, size=value)
-            ]
+            self.bootstrap_seeds = [x for x in np.random.randint(0, 10000, size=value)]
         return
 
     @property
@@ -423,18 +402,14 @@ class Pipeline:
         for _c in expanded_df:
             df[_c] = expanded_df[_c]
         df[self.time_index] = dd.to_datetime(df[self.time_index])
-        for _c, d in zip(
-            self.target_dimensions, self._target_dimension_dtypes
-        ):
+        for _c, d in zip(self.target_dimensions, self._target_dimension_dtypes):
             df[_c] = df[_c].astype(d)
         return df
 
     def set_dask_multiindex(self, df):
         df["__target_dimension_index__"] = df[self.time_index].astype(str)
         for i, col in enumerate(self.target_dimensions):
-            df["__target_dimension_index__"] += "__index__" + df[
-                col
-            ].astype(str)
+            df["__target_dimension_index__"] += "__index__" + df[col].astype(str)
         df = df.drop(columns=[self.time_index] + self.target_dimensions)
         df = df.set_index("__target_dimension_index__")
         return df
@@ -513,15 +488,11 @@ class Pipeline:
             df["Weekday"] = df[self.time_index].dt.weekday
             df["T"] = (
                 df[self.time_index]
-                - pd.to_datetime(
-                    datetime.fromtimestamp(time.mktime(time.gmtime(0)))
-                )
+                - pd.to_datetime(datetime.fromtimestamp(time.mktime(time.gmtime(0))))
             ) / pd.to_timedelta("1{}".format(self.frequency))
 
             cal = calendar()
-            holidays = cal.holidays(
-                start=time_min, end=time_max, return_name=True
-            )
+            holidays = cal.holidays(start=time_min, end=time_max, return_name=True)
 
             df["Holiday"] = (
                 df[self.time_index]
@@ -529,13 +500,10 @@ class Pipeline:
                 .astype(bool)
                 .astype(int)
             )
-            df["HolidayType"] = df[self.time_index].apply(
-                lambda x: holidays.get(x)
-            )
+            df["HolidayType"] = df[self.time_index].apply(lambda x: holidays.get(x))
 
             df["LastDayOfMonth"] = (
-                df[self.time_index].dt.daysinmonth
-                == df[self.time_index].dt.day
+                df[self.time_index].dt.daysinmonth == df[self.time_index].dt.day
             ).astype(int)
 
             df["DayOfMonth"] = df[self.time_index].dt.day
@@ -590,9 +558,7 @@ class Pipeline:
 
             for c in self.encode_features:
                 df[c] = df["{}_dummy".format(c)]
-            df = df.drop(
-                columns=["{}_dummy".format(c) for c in self.encode_features]
-            )
+            df = df.drop(columns=["{}_dummy".format(c) for c in self.encode_features])
 
         if self.interaction_features:
             _columns = []
@@ -603,13 +569,7 @@ class Pipeline:
                     else:
                         column_name = "{}-x-{}".format(t, m)
                     df[column_name] = (
-                        t
-                        + "-"
-                        + df[t].astype(str)
-                        + "-"
-                        + m
-                        + "-"
-                        + df[m].astype(str)
+                        t + "-" + df[t].astype(str) + "-" + m + "-" + df[m].astype(str)
                     )
                     _columns.append(column_name)
             pipe = make_pipeline(
@@ -624,9 +584,7 @@ class Pipeline:
 
         df[self.time_index] = dd.to_datetime(df[self.time_index])
         if self.target_dimensions:
-            self._target_dimension_dtypes = list(
-                df[self.target_dimensions].dtypes
-            )
+            self._target_dimension_dtypes = list(df[self.target_dimensions].dtypes)
             # TODO - issue stems from setting multiindex
             df = self.set_dask_multiindex(df)
         else:
@@ -656,21 +614,17 @@ class Pipeline:
                 columns=[self.time_index] + self.target_dimensions
             )
         else:
-            df_train = df[
-                (dd.to_datetime(df[self.time_index]) < split)
-            ].set_index(self.time_index)
-            df_test = df[
-                (dd.to_datetime(df[self.time_index]) >= split)
-            ].set_index(self.time_index)
+            df_train = df[(dd.to_datetime(df[self.time_index]) < split)].set_index(
+                self.time_index
+            )
+            df_test = df[(dd.to_datetime(df[self.time_index]) >= split)].set_index(
+                self.time_index
+            )
         df_test = (
-            cull_empty_partitions(df_test)
-            .reset_index()
-            .set_index(df_test.index.name)
+            cull_empty_partitions(df_test).reset_index().set_index(df_test.index.name)
         )
         df_train = (
-            cull_empty_partitions(df_train)
-            .reset_index()
-            .set_index(df_train.index.name)
+            cull_empty_partitions(df_train).reset_index().set_index(df_train.index.name)
         )
         return df_train, df_test
 
@@ -776,15 +730,10 @@ class Pipeline:
     ):
 
         df_forecasts = dd.concat(
-            [
-                dd.from_dask_array(s.to_dask_array(lengths=True))
-                for s in forecasts
-            ],
+            [dd.from_dask_array(s.to_dask_array(lengths=True)) for s in forecasts],
             axis=1,
         )
-        df_forecasts.columns = [
-            "bootstrap_{}".format(c) for c in range(len(forecasts))
-        ]
+        df_forecasts.columns = ["bootstrap_{}".format(c) for c in range(len(forecasts))]
         if self.confidence_intervals:
             df_interval = dd.from_dask_array(
                 dd.from_dask_array(df_forecasts.to_dask_array(lengths=True).T)
@@ -794,12 +743,9 @@ class Pipeline:
             )
 
             df_interval.columns = [
-                "{}_pred_c_{}".format(self.target, c)
-                for c in self.confidence_intervals
+                "{}_pred_c_{}".format(self.target, c) for c in self.confidence_intervals
             ]
-            df_interval = df_interval.repartition(
-                divisions=df_forecasts.divisions
-            )
+            df_interval = df_interval.repartition(divisions=df_forecasts.divisions)
 
             df_interval.index = forecasts[0].index
         else:
@@ -823,9 +769,7 @@ class Pipeline:
         return df_interval, df_point_estimate
 
     @_divina_component
-    def aggregate_factors(
-        self, factors: list, aggregated_factors: Output = None
-    ):
+    def aggregate_factors(self, factors: list, aggregated_factors: Output = None):
         aggregated_factors = factors[0]
         for df in factors[1:]:
             aggregated_factors += df
@@ -916,9 +860,7 @@ class Pipeline:
                 n=len(series.head(1).index[0].split("__index__")) - 1,
             )
             target_dimensions_df.index = series.index
-            target_dimensions_df.columns = [
-                self.time_index
-            ] + self.target_dimensions
+            target_dimensions_df.columns = [self.time_index] + self.target_dimensions
             df = series.to_frame()
             for c in target_dimensions_df.columns:
                 df[c] = target_dimensions_df[c]
@@ -942,9 +884,9 @@ class Pipeline:
         else:
             df = series.to_frame()
             for lag in lags:
-                df["lag_{}".format(lag)] = resample_shift(
-                    lag, df, series_name
-                )[series_name]
+                df["lag_{}".format(lag)] = resample_shift(lag, df, series_name)[
+                    series_name
+                ]
 
         return df
 
@@ -1045,10 +987,7 @@ class Pipeline:
                     )
                     bootstrap_validations.append(best_cv_validation)
                     self.bootstrap_models.append(best_cv_validation.model)
-                (
-                    confidence_intervals,
-                    point_estimates,
-                ) = self.aggregate_forecasts(
+                (confidence_intervals, point_estimates,) = self.aggregate_forecasts(
                     [v.predictions for v in bootstrap_validations],
                     prefect=prefect,
                 )
@@ -1151,9 +1090,7 @@ class Pipeline:
         validation_splits = []
         if self.validation_splits:
             for s in self.validation_splits:
-                train_df, test_df = self.split_dataset(
-                    df=df, split=s, prefect=prefect
-                )
+                train_df, test_df = self.split_dataset(df=df, split=s, prefect=prefect)
                 validation_split = _fit(train_df, test_df, prefect)
                 validation_split.split = s
                 validation_splits.append(validation_split)
@@ -1169,7 +1106,7 @@ class Pipeline:
         horizons: [int] = None,
         boost_y: str = None,
         prefect=False,
-        dask_configuration=None
+        dask_configuration=None,
     ):
         if not self.is_fit:
             raise ValueError("Pipeline must be fit before you can predict.")
@@ -1214,18 +1151,14 @@ class Pipeline:
                 truth_series=y,
                 prefect=prefect,
             )
-            for h, m in zip(
-                horizons, [self.boost_models[h] for h in horizons]
-            ):
+            for h, m in zip(horizons, [self.boost_models[h] for h in horizons]):
                 wide_residuals = self.long_to_wide(
                     series=residuals, horizon=h, prefect=prefect
                 )
                 x_wide, y = self.x_y_split(
                     df=wide_residuals, target="y_hat", prefect=prefect
                 )
-                residual_predictions = self.forecast(
-                    x=x_wide, model=m, prefect=prefect
-                )
+                residual_predictions = self.forecast(x=x_wide, model=m, prefect=prefect)
                 boosted_predictions = self.boost_forecast(
                     forecast_series=point_estimates,
                     adjustment_series=residual_predictions,
@@ -1258,6 +1191,4 @@ class Pipeline:
                 boost_predictions=boosted_prediction_results,
             )
         else:
-            return PipelinePredictResult(
-                causal_predictions=causal_prediction, truth=x
-            )
+            return PipelinePredictResult(causal_predictions=causal_prediction, truth=x)

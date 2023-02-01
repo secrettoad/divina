@@ -7,7 +7,9 @@ import plotly.graph_objects as go
 
 from divina.divina.datasets.load import _load
 from divina.divina.pipeline.pipeline import (
-    assert_pipeline_fit_result_equal, assert_pipeline_predict_result_equal)
+    assert_pipeline_fit_result_equal,
+    assert_pipeline_predict_result_equal,
+)
 
 
 def test_preprocess(
@@ -123,29 +125,20 @@ def test_quickstart(test_pipelines_quickstart, random_state):
             predict_result_df = predict_result.truth
             x["Store"] = x["Store"].astype(float)
             y = pipeline.set_dask_multiindex(
-                x[
-                    [pipeline.target, pipeline.time_index]
-                    + pipeline.target_dimensions
-                ]
+                x[[pipeline.target, pipeline.time_index] + pipeline.target_dimensions]
             )
             predict_result_df[pipeline.target] = y[pipeline.target]
-            predict_result_df[
-                "y_hat"
-            ] = predict_result.causal_predictions.predictions
+            predict_result_df["y_hat"] = predict_result.causal_predictions.predictions
             if i == 8:
                 for h in pipeline.time_horizons:
                     predict_result_df["y_hat_h_{}".format(h)] = predict_result[
                         h
                     ].predictions
-                    confidence_intervals = predict_result[
-                        h
-                    ].confidence_intervals
+                    confidence_intervals = predict_result[h].confidence_intervals
                     if confidence_intervals is not None:
                         for _c in confidence_intervals:
                             predict_result_df[
-                                _c.replace(
-                                    "Sales_pred", "y_hat_h_{}".format(h)
-                                )
+                                _c.replace("Sales_pred", "y_hat_h_{}".format(h))
                             ] = confidence_intervals[_c]
             confidence_intervals = (
                 predict_result.causal_predictions.confidence_intervals
@@ -177,13 +170,10 @@ def test_quickstart(test_pipelines_quickstart, random_state):
             if i in [0, 1, 2, 3]:
                 store_df = result_df[result_df["Store"] == s]
             else:
-                store_df = result_df[
-                    result_df["Store_{}".format(float(s))] == 1
-                ]
+                store_df = result_df[result_df["Store_{}".format(float(s))] == 1]
             if pipeline.scenarios:
                 store_df = store_df[
-                    (store_df["Date"] < "2015-08-01")
-                    | (result_df["Promo"] == 1)
+                    (store_df["Date"] < "2015-08-01") | (result_df["Promo"] == 1)
                 ]
                 fig.add_vrect(
                     x0=pd.to_datetime("07-31-2015").timestamp() * 1000,
@@ -241,9 +231,7 @@ def test_quickstart(test_pipelines_quickstart, random_state):
                     name="Forecast",
                 )
             )
-            for h, t in zip(
-                pipeline.time_horizons, ["red", "green", "purple"]
-            ):
+            for h, t in zip(pipeline.time_horizons, ["red", "green", "purple"]):
                 fig.add_trace(
                     go.Scatter(
                         marker=dict(color=t),
@@ -274,8 +262,7 @@ def test_quickstart(test_pipelines_quickstart, random_state):
             _factors = [c for c in store_df if c.split("_")[0] == "factor"]
             if pipeline.scenarios:
                 store_df = store_df[
-                    (store_df["Date"] > "2015-08-01")
-                    | (result_df["Promo"] == 1)
+                    (store_df["Date"] > "2015-08-01") | (result_df["Promo"] == 1)
                 ]
             store_df = store_df[_factors + [pipeline.time_index]]
             for f in _factors:

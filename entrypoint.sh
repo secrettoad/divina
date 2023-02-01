@@ -6,9 +6,6 @@ then
     touch /var/log/auth.log
 fi
 
-# start ssh service
-service ssh start
-
 # sleep forever
 #sleep infinity
 
