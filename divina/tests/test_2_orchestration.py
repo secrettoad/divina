@@ -2,7 +2,9 @@ import s3fs
 import os
 
 from divina.divina.pipeline.pipeline import (
-    assert_pipeline_fit_result_equal, assert_pipeline_predict_result_equal)
+    assert_pipeline_fit_result_equal,
+    assert_pipeline_predict_result_equal,
+)
 
 
 def test_pipeline_fit_prefect(
@@ -15,7 +17,9 @@ def test_pipeline_fit_prefect(
     test_pipeline_name,
 ):
     test_pipeline_2.storage_options = {
-        "client_kwargs": {"endpoint_url": "http://{}:{}".format(os.environ['S3_HOST'], 9000)}
+        "client_kwargs": {
+            "endpoint_url": "http://{}:{}".format(os.environ["S3_HOST"], 9000)
+        }
     }
     test_data_path = "{}/test-data".format(test_pipeline_root)
     fs = s3fs.S3FileSystem(**test_pipeline_2.storage_options)
@@ -24,7 +28,9 @@ def test_pipeline_fit_prefect(
         fs.mkdir(test_bucket)
     else:
         fs.mkdir(test_bucket)
-    test_data_1.to_parquet(test_data_path, storage_options=test_pipeline_2.storage_options)
+    test_data_1.to_parquet(
+        test_data_path, storage_options=test_pipeline_2.storage_options
+    )
     from prefect import flow
 
     @flow(name=test_pipeline_name, persist_result=True)
@@ -51,7 +57,9 @@ def test_pipeline_predict_prefect(
     test_horizon_predictions,
 ):
     test_pipeline_2.storage_options = {
-        "client_kwargs": {"endpoint_url": "http://{}:{}".format(os.environ['S3_HOST'], 9000)}
+        "client_kwargs": {
+            "endpoint_url": "http://{}:{}".format(os.environ["S3_HOST"], 9000)
+        }
     }
     test_pipeline_2.is_fit = True
     test_pipeline_2.bootstrap_models = test_bootstrap_models
