@@ -1,5 +1,5 @@
-from divina.divina.pipeline.utils import get_dask_client, DaskConfiguration
-from divina.divina.pipeline.pipeline import assert_pipeline_fit_result_equal
+from ..pipeline.utils import get_dask_client, DaskConfiguration
+from ..pipeline.pipeline import assert_pipeline_fit_result_equal
 
 
 def test_dask_client_aws(

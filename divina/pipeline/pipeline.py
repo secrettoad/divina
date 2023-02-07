@@ -12,7 +12,7 @@ from pandas.testing import assert_frame_equal, assert_series_equal
 from pandas.tseries.holiday import USFederalHolidayCalendar as calendar
 from sklearn.pipeline import make_pipeline
 
-from divina.divina.pipeline.utils import (
+from .utils import (
     Output,
     _divina_component,
     get_dask_client,
