@@ -19,7 +19,7 @@ In order to persist pipeline artifacts (datasets, models and metrics), one must 
 
 Below is an example of artifact persistence to a local path:
 
-.. literalinclude:: _statics/examples/local_artifact.py
+.. literalinclude:: _static/examples/local_artifact.py
    :language: python
 
 Below is an example of artifact persistence to S3 (be sure to set the appropriate credentials via environment variable):

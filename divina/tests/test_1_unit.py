@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from divina.divina.datasets.load import _load
-from divina.divina.pipeline.pipeline import (
+from ..datasets.load import _load
+from ..pipeline.pipeline import (
     assert_pipeline_fit_result_equal,
     assert_pipeline_predict_result_equal,
 )

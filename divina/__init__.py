@@ -1,1 +1,1 @@
-from .pipeline.pipeline import Pipeline as Divina   # noqa: F401
+from divina.pipeline.pipeline import Pipeline as Divina   # noqa: F401
