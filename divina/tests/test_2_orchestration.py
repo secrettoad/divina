@@ -1,7 +1,7 @@
 import s3fs
 import os
 
-from divina.divina.pipeline.pipeline import (
+from ..pipeline.pipeline import (
     assert_pipeline_fit_result_equal,
     assert_pipeline_predict_result_equal,
 )
