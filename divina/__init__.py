@@ -1,1 +1,1 @@
-from pipeline.pipeline import Pipeline as Divina
+from .pipeline.pipeline import Pipeline as Divina
