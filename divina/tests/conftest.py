@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from pandas import Timestamp
 
-from ...docs_src._static.pipeline_definitions import quickstart_pipelines
+from ..docs_src._static.pipeline_definitions import quickstart_pipelines
 from ..pipeline.model import EWMA, GLM
 from ..pipeline.pipeline import (
     BoostPrediction,

@@ -10,7 +10,7 @@ Divina pipelines have built-in orchestration via Prefect, meaning that by only s
 
 Below is an example of fitting and predicting with a Divina pipeline using the built-in Prefect orchestration (Please be sure to use the appropriate environment variables to point and authenticate to your Prefect service).
 
-.. literalinclude:: ../docs_heavy_assets/examples/prefect_example.py
+.. literalinclude:: _static/examples/prefect_example.py
    :language: python
 
 **Artifact Persistence**
@@ -19,10 +19,10 @@ In order to persist pipeline artifacts (datasets, models and metrics), one must 
 
 Below is an example of artifact persistence to a local path:
 
-.. literalinclude:: ../docs_heavy_assets/examples/local_artifact.py
+.. literalinclude:: _static/examples/local_artifact.py
    :language: python
 
 Below is an example of artifact persistence to S3 (be sure to set the appropriate credentials via environment variable):
 
-.. literalinclude:: ../docs_heavy_assets/examples/s3_artifact.py
+.. literalinclude:: _static/examples/s3_artifact.py
    :language: python

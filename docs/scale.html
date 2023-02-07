@@ -196,7 +196,46 @@
           <section id="scale">
 <h1>scale<a class="headerlink" href="#scale" title="Permalink to this heading">#</a></h1>
 <p><strong>Forecasting at Scale</strong></p>
-<p>Inversion of control of the Dask client that connects to, authenticates with and uses for all Divina pipeline computations remote Dask clusters on AWS, GCP, Azure and more via Dask Cloud provider is in the works and will be released ASAP.</p>
+<p>Inversion of control of the Dask client that connects to, authenticates with and uses for all Divina pipeline computations remote Dask clusters on AWS, GCP, Azure and more via Dask Cloud provider is enabled through the provision of the <cite>dask_configuration</cite> argument to a Divina pipeline’s <cite>fit</cite> and <cite>predict</cite> methods.</p>
+<p>Below is an example of a pipeline running on AWS.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
+
+<span class="kn">import</span> <span class="nn">dask.dataframe</span> <span class="k">as</span> <span class="nn">dd</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="kn">from</span> <span class="nn">divina</span> <span class="kn">import</span> <span class="n">Divina</span>
+<span class="kn">from</span> <span class="nn">divina.divina.pipeline.utils</span> <span class="kn">import</span> <span class="n">DaskConfiguration</span>
+
+<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;AWS_ACCESS_KEY_ID&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;your access key&#39;</span>
+<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;AWS_SECRET_ACCESS_KEY&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;your secret key&#39;</span>
+
+<span class="n">dask_configuration</span> <span class="o">=</span> <span class="n">DaskConfiguration</span><span class="p">(</span><span class="n">destination</span><span class="o">=</span><span class="s1">&#39;aws&#39;</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+
+<span class="n">example_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-01&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-02&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-03&quot;</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-04&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+        <span class="p">[</span><span class="s2">&quot;2011-01-05&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span>
+    <span class="p">],</span>
+    <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;a&quot;</span><span class="p">,</span> <span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="s2">&quot;c&quot;</span><span class="p">],</span>
+<span class="p">)</span>
+
+<span class="n">example_data_dask</span> <span class="o">=</span> <span class="n">dd</span><span class="o">.</span><span class="n">from_pandas</span><span class="p">(</span><span class="n">example_data</span><span class="p">,</span> <span class="n">npartitions</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="n">example_pipeline</span> <span class="o">=</span> <span class="n">Divina</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="s2">&quot;c&quot;</span><span class="p">,</span> <span class="n">time_index</span><span class="o">=</span><span class="s2">&quot;a&quot;</span><span class="p">,</span> <span class="n">frequency</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">)</span>
+
+<span class="n">y_hat_insample</span> <span class="o">=</span> <span class="n">example_pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">example_data_dask</span><span class="p">,</span>
+    <span class="n">dask_configuration</span><span class="o">=</span><span class="n">dask_configuration</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">causal_validation</span><span class="o">.</span><span class="n">predictions</span>
+
+<span class="n">y_hat_out_of_sample</span> <span class="o">=</span> <span class="n">example_pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+    <span class="n">example_data_dask</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="s2">&quot;c&quot;</span><span class="p">),</span>
+    <span class="n">dask_configuration</span><span class="o">=</span><span class="n">dask_configuration</span>
+<span class="p">)</span><span class="o">.</span><span class="n">causal_predictions</span><span class="o">.</span><span class="n">predictions</span>
+</pre></div>
+</div>
 </section>
 
         </article>
