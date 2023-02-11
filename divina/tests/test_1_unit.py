@@ -91,10 +91,9 @@ def test_pipeline_predict(
 def test_quickstart(test_pipelines_quickstart, random_state):
     for i, pipeline in enumerate(test_pipelines_quickstart):
         print("testing quickstart {}".format(i))
+        data = _load("divina://retail_sales")
         result = pipeline.fit(
-            _load("divina://retail_sales"),
-            start="2013-01-01 00:00:00",
-            end="2015-03-31 00:00:00",
+            data[(data['Date'] > "2013-01-01 00:00:00") & (data['Date'] < "2015-03-31 00:00:00")]
         )
         result_df = result[0].truth
         factors = result[0].causal_validation.factors

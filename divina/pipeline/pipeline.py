@@ -423,7 +423,6 @@ class Pipeline:
         end=None,
         dataset: Output = None,
     ):
-
         df[self.time_index] = dd.to_datetime(df[self.time_index])
 
         if self.time_features:
@@ -807,6 +806,7 @@ class Pipeline:
             df = series.to_frame()
             df = df.merge(target_dimensions_df)
             df[self.time_index] = dd.to_datetime(df[self.time_index])
+            #TODO - use tests to remove this apply for performance purposes
             for lag in lags:
                 df["lag_{}".format(lag)] = (
                     df.groupby(self.target_dimensions)
