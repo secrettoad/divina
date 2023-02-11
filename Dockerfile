@@ -2,6 +2,8 @@ FROM python:3.10
 
 COPY . /divina
 
+RUN pip install -r divina/requirements.txt
+
 RUN python3 -m pip install -e divina
 
 COPY entrypoint.sh entrypoint.sh

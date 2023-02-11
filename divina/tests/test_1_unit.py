@@ -13,14 +13,14 @@ from ..pipeline.pipeline import (
 
 
 def test_preprocess(
-    test_data_1,
+    test_data_agg_date,
     test_df_1,
     test_pipeline_1,
 ):
-    df = test_pipeline_1.preprocess(test_data_1)
+    df = test_pipeline_1.preprocess(test_data_agg_date)
     pd.testing.assert_frame_equal(
         df.compute(),
-        test_df_1.compute(),
+        test_df_1.compute()
     )
 
 
@@ -61,13 +61,13 @@ def test_validate(test_pipeline_1, test_df_1, test_forecast_1, test_metrics_1):
     assert metrics == test_metrics_1
 
 
-def test_pipeline_fit(test_data_1, test_pipeline_2, test_pipeline_fit_result):
-    result = test_pipeline_2.fit(test_data_1)
+def test_pipeline_fit(test_data_agg_multi, test_pipeline_2, test_pipeline_fit_result):
+    result = test_pipeline_2.fit(test_data_agg_multi)
     assert_pipeline_fit_result_equal(result, test_pipeline_fit_result)
 
 
 def test_pipeline_predict(
-    test_data_1,
+    test_data_agg_multi,
     test_pipeline_2,
     test_horizons,
     test_scenarios,
@@ -81,7 +81,7 @@ def test_pipeline_predict(
     test_pipeline_2.bootstrap_models = test_bootstrap_models
     test_pipeline_2.boost_models = test_boost_models
     result = test_pipeline_2.predict(
-        x=test_data_1[test_data_1["a"] >= "1970-01-01 00:00:05"],
+        x=test_data_agg_multi[test_data_agg_multi["a"] >= "1970-01-01 00:00:05"],
         boost_y=test_pipeline_2.target,
         horizons=test_horizons,
     )

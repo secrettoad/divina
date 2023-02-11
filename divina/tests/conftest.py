@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 from pandas import Timestamp
 
+# todo - start here and undo all relative imports - run all tests locally and see if pass, then push and merge
 from ..docs_src._static.pipeline_definitions import quickstart_pipelines
 from ..pipeline.model import EWMA, GLM
 from ..pipeline.pipeline import (
@@ -88,7 +89,7 @@ def test_bootstrap_models(random_state, test_pipeline_1):
     bootstrap_models = []
 
     for j, i, p, f, state in zip(
-        range(0, len(states)), intercepts, params, indices, states
+            range(0, len(states)), intercepts, params, indices, states
     ):
         model = GLM(link_function="log")
         model.linear_model.fit(
@@ -258,7 +259,7 @@ def test_composite_dataset_1():
 
 
 @pytest.fixture()
-def test_data_1():
+def test_data():
     df = pd.DataFrame(
         [
             [Timestamp("1970-01-01 00:00:04"), 5.0, 6.0, 2, 2],
@@ -291,6 +292,14 @@ def test_data_1():
     df.columns = ["a", "b", "c", "e", "d"]
     return ddf.from_pandas(df, npartitions=2)
 
+
+@pytest.fixture()
+def test_data_agg_date(test_data):
+    return test_data.groupby('a').agg({'b': 'mean', 'e': 'mean', 'd': 'mean', 'c': 'sum'}).reset_index()
+
+@pytest.fixture()
+def test_data_agg_multi(test_data):
+    return test_data.groupby(['a', 'e', 'd']).agg({'b': 'mean', 'c': 'sum'}).reset_index()
 
 @pytest.fixture()
 def test_df_1():
@@ -329,7 +338,16 @@ def test_df_1():
                 0,
                 0,
             ],
-            [Timestamp("1970-01-01 00:00:06"), 5.0, 1.0, 1.0, 6.0, 0, 1, 0, 0],
+            [
+                Timestamp("1970-01-01 00:00:06"),
+                5.0,
+                1.0,
+                1.0,
+                6.0,
+                0,
+                1,
+                0,
+                0],
             [
                 Timestamp("1970-01-01 00:00:07"),
                 8.0,
@@ -365,7 +383,7 @@ def test_df_1():
         "b_(10, 15]",
         "b_(15, inf]",
     ]
-    return ddf.from_pandas(df, npartitions=2).set_index("a")
+    return ddf.from_pandas(df, npartitions=2).set_index("a").astype(float)
 
 
 @pytest.fixture()
@@ -488,27 +506,27 @@ def test_causal_predictions():
 def test_truth():
     df = pd.DataFrame(
         [
-            ["1970-01-01 00:00:05__index__1__index__1", 5.0, 18.0, 0, 1, 0, 0],
-            ["1970-01-01 00:00:06__index__1__index__1", 5.0, 6.0, 0, 1, 0, 0],
-            ["1970-01-01 00:00:07__index__1__index__1", 8.0, 18.0, 0, 1, 0, 0],
-            ["1970-01-01 00:00:07__index__2__index__2", 8.0, 36.0, 0, 1, 0, 0],
+            ["1970-01-01 00:00:05__index__1__index__1", 5.0, 18.0, 0.0, 1.0, 0.0, 0.0],
+            ["1970-01-01 00:00:06__index__1__index__1", 5.0, 6.0, 0.0, 1.0, 0.0, 0.0],
+            ["1970-01-01 00:00:07__index__1__index__1", 8.0, 18.0, 0.0, 1.0, 0.0, 0.0],
+            ["1970-01-01 00:00:07__index__2__index__2", 8.0, 36.0, 0.0, 1.0, 0.0, 0.0],
             [
                 "1970-01-01 00:00:10__index__1__index__1",
                 11.0,
                 36.0,
-                0,
-                0,
-                1,
-                0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
             ],
             [
                 "1970-01-01 00:00:10__index__2__index__2",
                 11.0,
                 48.0,
-                0,
-                0,
-                1,
-                0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
             ],
         ]
     )
@@ -609,7 +627,7 @@ def test_boosted_metrics():
 
 @pytest.fixture
 def test_bootstrap_validations(
-    test_bootstrap_models, test_bootstrap_metrics, test_bootstrap_predictions
+        test_bootstrap_models, test_bootstrap_metrics, test_bootstrap_predictions
 ):
     validations = [
         Validation(metrics=_metric, predictions=_series, model=_model)
@@ -624,7 +642,7 @@ def test_bootstrap_validations(
 
 @pytest.fixture
 def test_boosted_validations(
-    test_boosted_models, test_boosted_metrics, test_boosted_predictions
+        test_boosted_models, test_boosted_metrics, test_boosted_predictions
 ):
     validations = [
         BoostValidation(
@@ -905,11 +923,11 @@ def test_lag_features():
 
 @pytest.fixture
 def test_pipeline_fit_result(
-    test_causal_predictions,
-    test_boosted_predictions,
-    test_truth,
-    test_bootstrap_validations,
-    test_boosted_validations,
+        test_causal_predictions,
+        test_boosted_predictions,
+        test_truth,
+        test_bootstrap_validations,
+        test_boosted_validations,
 ):
     return PipelineFitResult(
         split_validations=[
@@ -929,17 +947,17 @@ def test_pipeline_fit_result(
 
 @pytest.fixture
 def test_pipeline_predict_result(
-    test_horizons,
-    test_causal_predictions,
-    test_causal_factors,
-    test_causal_confidence_intervals,
-    test_boosted_predictions,
-    test_truth,
-    test_bootstrap_validations,
-    test_boosted_residual_predictions,
-    test_boosted_confidence_intervals,
-    test_lag_features,
-    test_boosted_validations,
+        test_horizons,
+        test_causal_predictions,
+        test_causal_factors,
+        test_causal_confidence_intervals,
+        test_boosted_predictions,
+        test_truth,
+        test_bootstrap_validations,
+        test_boosted_residual_predictions,
+        test_boosted_confidence_intervals,
+        test_lag_features,
+        test_boosted_validations,
 ):
     causal_prediction = CausalPrediction(
         predictions=test_causal_predictions,

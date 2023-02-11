@@ -4,7 +4,7 @@ import dask.dataframe as dd
 import pandas as pd
 
 from divina import Divina
-from divina.divina.pipeline.utils import DaskConfiguration
+from divina.pipeline.utils import DaskConfiguration
 
 os.environ['AWS_ACCESS_KEY_ID'] = 'your access key'
 os.environ['AWS_SECRET_ACCESS_KEY'] = 'your secret key'
