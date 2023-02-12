@@ -8,7 +8,7 @@ from ..pipeline.pipeline import (
 
 
 def test_pipeline_fit_prefect(
-    test_data_1,
+    test_data_agg_multi,
     test_pipeline_2,
     test_pipeline_fit_result,
     test_boost_model_params,
@@ -28,7 +28,7 @@ def test_pipeline_fit_prefect(
         fs.mkdir(test_bucket)
     else:
         fs.mkdir(test_bucket)
-    test_data_1.to_parquet(
+    test_data_agg_multi.to_parquet(
         test_data_path, storage_options=test_pipeline_2.storage_options
     )
     from prefect import flow
@@ -42,7 +42,7 @@ def test_pipeline_fit_prefect(
 
 
 def test_pipeline_predict_prefect(
-    test_data_1,
+    test_data_agg_multi,
     test_pipeline_2,
     test_pipeline_predict_result,
     test_boost_model_params,
@@ -74,7 +74,7 @@ def test_pipeline_predict_prefect(
     @flow(name=test_pipeline_name, persist_result=True)
     def run_pipeline():
         return test_pipeline_2.predict(
-            x=test_data_1[test_data_1["a"] >= "1970-01-01 00:00:05"],
+            x=test_data_agg_multi[test_data_agg_multi["a"] >= "1970-01-01 00:00:05"],
             boost_y=test_pipeline_2.target,
             horizons=test_horizons,
         )

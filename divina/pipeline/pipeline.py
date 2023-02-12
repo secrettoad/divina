@@ -11,6 +11,7 @@ from pandas.api.types import is_numeric_dtype
 from pandas.testing import assert_frame_equal, assert_series_equal
 from pandas.tseries.holiday import USFederalHolidayCalendar as calendar
 from sklearn.pipeline import make_pipeline
+from distributed import Client
 
 from .utils import (
     Output,
@@ -422,62 +423,7 @@ class Pipeline:
         end=None,
         dataset: Output = None,
     ):
-
         df[self.time_index] = dd.to_datetime(df[self.time_index])
-
-        time_min, time_max = (
-            df[self.time_index].min().compute(),
-            df[self.time_index].max().compute(),
-        )
-
-        if start:
-            if pd.to_datetime(start) < time_min:
-                raise Exception(
-                    "Bad Start: {} < {} Check Dataset Time Range".format(
-                        start, time_min
-                    )
-                )
-            else:
-                df = df[dd.to_datetime(df[self.time_index]) >= start]
-
-        if end:
-            if pd.to_datetime(end) > time_max:
-                if not self.scenarios:
-                    raise Exception(
-                        "Bad End: {} | {} Check Dataset Time Range".format(
-                            end, time_max
-                        )
-                    )
-            else:
-                df = df[dd.to_datetime(df[self.time_index]) <= end]
-
-        agg_map = {
-            **{
-                c: "mean"
-                for c in df.columns
-                if df[c].dtype in [int, float]
-                and c not in [self.time_index, self.target]
-            },
-            **{
-                c: "last"
-                for c in df.columns
-                if df[c].dtype not in [int, float]
-                and c not in [self.time_index, self.target]
-            },
-        }
-        if self.target in df.columns:
-            agg_map.update({self.target: self.frequency_target_aggregation})
-
-        # TODO - ADD WARNING ON DUPLICATES BEFORE AGG
-        if self.target_dimensions:
-            df = (
-                df.groupby([self.time_index] + self.target_dimensions)
-                .agg(agg_map)
-                .drop(columns=self.target_dimensions)
-                .reset_index()
-            )
-        else:
-            df = df.groupby([self.time_index]).aggregate(agg_map).reset_index()
 
         if self.time_features:
             df[self.time_index] = dd.to_datetime(df[self.time_index])
@@ -491,24 +437,22 @@ class Pipeline:
                 - pd.to_datetime(datetime.fromtimestamp(time.mktime(time.gmtime(0))))
             ) / pd.to_timedelta("1{}".format(self.frequency))
 
-            cal = calendar()
-            holidays = cal.holidays(start=time_min, end=time_max, return_name=True)
-
-            df["Holiday"] = (
-                df[self.time_index]
-                .apply(lambda x: holidays.get(x))
-                .astype(bool)
-                .astype(int)
-            )
-            df["HolidayType"] = df[self.time_index].apply(lambda x: holidays.get(x))
-
             df["LastDayOfMonth"] = (
                 df[self.time_index].dt.daysinmonth == df[self.time_index].dt.day
             ).astype(int)
 
             df["DayOfMonth"] = df[self.time_index].dt.day
 
-            df["WeekOfYear"] = df[self.time_index].dt.week
+            df["WeekOfYear"] = df[self.time_index].dt.isocalendar().week
+
+            cal = calendar()
+            holidays = cal.holidays(return_name=True).to_frame()
+            holidays.columns = ['HolidayType']
+            holidays['Holiday'] = holidays['HolidayType'].astype(bool).astype(int)
+            df['__day_date__'] = df[self.time_index].dt.round('D')
+            df = df.merge(holidays, left_on='__day_date__', right_index=True, how='left').drop(columns='__day_date__')
+            df['HolidayType'] = df['HolidayType'].fillna('None')
+            df['Holiday'] = df['Holiday'].fillna(0.0)
 
             if not self.encode_features:
                 self.encode_features = ["HolidayType"]
@@ -585,7 +529,6 @@ class Pipeline:
         df[self.time_index] = dd.to_datetime(df[self.time_index])
         if self.target_dimensions:
             self._target_dimension_dtypes = list(df[self.target_dimensions].dtypes)
-            # TODO - issue stems from setting multiindex
             df = self.set_dask_multiindex(df)
         else:
             df = df.set_index(self.time_index)
@@ -595,6 +538,7 @@ class Pipeline:
             for c in self.fit_features:
                 if c not in df.columns:
                     df[c] = 0
+        df = df.astype(float)
         return df
 
     @_divina_component
@@ -641,8 +585,6 @@ class Pipeline:
         model: Output = None,
     ):
 
-        if y.isna().sum().compute() > 0:
-            raise ValueError("Null values in target not permitted.")
         if bootstrap_percentage:
             x = x.sample(
                 replace=False,
@@ -862,9 +804,9 @@ class Pipeline:
             target_dimensions_df.index = series.index
             target_dimensions_df.columns = [self.time_index] + self.target_dimensions
             df = series.to_frame()
-            for c in target_dimensions_df.columns:
-                df[c] = target_dimensions_df[c]
+            df = df.merge(target_dimensions_df)
             df[self.time_index] = dd.to_datetime(df[self.time_index])
+            #TODO - use tests to remove this apply for performance purposes
             for lag in lags:
                 df["lag_{}".format(lag)] = (
                     df.groupby(self.target_dimensions)
@@ -1086,6 +1028,8 @@ class Pipeline:
             return validation_split
 
         df = self.preprocess(df, prefect=prefect, start=start, end=end)
+        if type(df) == dd.DataFrame:
+            df.persist()
         self.fit_features = df.columns
         validation_splits = []
         if self.validation_splits:

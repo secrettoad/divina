@@ -13,14 +13,14 @@ from ..pipeline.pipeline import (
 
 
 def test_preprocess(
-    test_data_1,
+    test_data_agg_date,
     test_df_1,
     test_pipeline_1,
 ):
-    df = test_pipeline_1.preprocess(test_data_1)
+    df = test_pipeline_1.preprocess(test_data_agg_date)
     pd.testing.assert_frame_equal(
         df.compute(),
-        test_df_1.compute(),
+        test_df_1.compute()
     )
 
 
@@ -61,13 +61,13 @@ def test_validate(test_pipeline_1, test_df_1, test_forecast_1, test_metrics_1):
     assert metrics == test_metrics_1
 
 
-def test_pipeline_fit(test_data_1, test_pipeline_2, test_pipeline_fit_result):
-    result = test_pipeline_2.fit(test_data_1)
+def test_pipeline_fit(test_data_agg_multi, test_pipeline_2, test_pipeline_fit_result):
+    result = test_pipeline_2.fit(test_data_agg_multi)
     assert_pipeline_fit_result_equal(result, test_pipeline_fit_result)
 
 
 def test_pipeline_predict(
-    test_data_1,
+    test_data_agg_multi,
     test_pipeline_2,
     test_horizons,
     test_scenarios,
@@ -81,7 +81,7 @@ def test_pipeline_predict(
     test_pipeline_2.bootstrap_models = test_bootstrap_models
     test_pipeline_2.boost_models = test_boost_models
     result = test_pipeline_2.predict(
-        x=test_data_1[test_data_1["a"] >= "1970-01-01 00:00:05"],
+        x=test_data_agg_multi[test_data_agg_multi["a"] >= "1970-01-01 00:00:05"],
         boost_y=test_pipeline_2.target,
         horizons=test_horizons,
     )
@@ -91,10 +91,9 @@ def test_pipeline_predict(
 def test_quickstart(test_pipelines_quickstart, random_state):
     for i, pipeline in enumerate(test_pipelines_quickstart):
         print("testing quickstart {}".format(i))
+        data = _load("divina://retail_sales")
         result = pipeline.fit(
-            _load("divina://retail_sales"),
-            start="2013-01-01 00:00:00",
-            end="2015-03-31 00:00:00",
+            data[(data['Date'] > "2013-01-01 00:00:00") & (data['Date'] < "2015-03-31 00:00:00")]
         )
         result_df = result[0].truth
         factors = result[0].causal_validation.factors
