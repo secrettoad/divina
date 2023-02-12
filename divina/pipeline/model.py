@@ -93,8 +93,8 @@ class GLM(BaseEstimator):
 
     def predict(self, X):
         if self.fit_indices:
-            X = X[:, self.fit_indices]
-        y_hat = self.linear_model.predict(X)
+            X = X[[X.columns[i] for i in self.fit_indices]]
+        y_hat = self.linear_model.predict(X.to_dask_array(lengths=True))
         if self.link_function == "log":
             y_hat = np.exp(y_hat) - self.y_min - 1
         return y_hat
