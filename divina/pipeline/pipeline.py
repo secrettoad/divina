@@ -1029,7 +1029,7 @@ class Pipeline:
 
         df = self.preprocess(df, prefect=prefect, start=start, end=end)
         if type(df) == dd.DataFrame:
-            df.persist()
+            df = df.persist()
         self.fit_features = df.columns
         validation_splits = []
         if self.validation_splits:
