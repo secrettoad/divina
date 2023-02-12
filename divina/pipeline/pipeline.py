@@ -487,8 +487,6 @@ class Pipeline:
             for c in self.encode_features:
                 if df[c].dtype == int:
                     df[c] = df[c].astype(float)
-                else:
-                    df[c] = df[c]
                 df["{}_dummy".format(c)] = df[c]
 
             pipe = make_pipeline(
@@ -627,7 +625,7 @@ class Pipeline:
                     )
 
         y_hat = dd.from_dask_array(
-            model.predict(x.to_dask_array(lengths=True))
+            model.predict(x)
         ).to_frame()
         y_hat.index = x.index
         y_hat.columns = ["y_hat"]
