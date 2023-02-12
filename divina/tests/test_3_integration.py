@@ -3,7 +3,7 @@ from ..pipeline.pipeline import assert_pipeline_fit_result_equal
 
 
 def test_dask_client_aws(
-    test_data_1,
+    test_data_agg_multi,
     test_pipeline_2,
     test_pipeline_fit_result,
     test_boost_model_params,
@@ -17,7 +17,7 @@ def test_dask_client_aws(
     def test_flow():
         @get_dask_client
         def run_pipeline(dask_configuration: DaskConfiguration):
-            return test_pipeline_2.fit(df=test_data_1, prefect=True)
+            return test_pipeline_2.fit(df=test_data_agg_multi, prefect=True)
 
         return run_pipeline(
             dask_configuration=DaskConfiguration(
