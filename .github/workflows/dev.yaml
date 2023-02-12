@@ -62,5 +62,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Test pypi
         run: |
-          $PBR_VERSION=${{ github.sha }} python3 setup.py sdist bdist_wheel
+          export =${{ github.sha }} 
+          python3 setup.py sdist bdist_wheel
           twine check dist/*
+        env:
+          PBR_VERSION: '0.0.1'
