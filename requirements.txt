@@ -1,7 +1,6 @@
 bokeh==2.4.3
 dask==2022.11.1
 dask-cloudprovider==2022.10.0
-dask-cloudprovider[gcp]==2022.10.0
 dask-ml==2022.5.27
 distributed==2022.11.1
 dill==0.3.6

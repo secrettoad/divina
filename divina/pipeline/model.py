@@ -76,7 +76,7 @@ class GLM(BaseEstimator):
 
     def fit(self, X, y, drop_constants: bool = False):
         if drop_constants:
-            da_std = X.std()
+            da_std = X.astype(float).std()
             constant_indices = [i for i, v in enumerate(da_std) if v == 0]
             usable_indices = list(set(range(len(X.columns))) - set(constant_indices))
             if usable_indices == []:
@@ -93,8 +93,8 @@ class GLM(BaseEstimator):
 
     def predict(self, X):
         if self.fit_indices:
-            X = X[:, self.fit_indices]
-        y_hat = self.linear_model.predict(X)
+            X = X[[X.columns[i] for i in self.fit_indices]]
+        y_hat = self.linear_model.predict(X.to_dask_array(lengths=True))
         if self.link_function == "log":
             y_hat = np.exp(y_hat) - self.y_min - 1
         return y_hat

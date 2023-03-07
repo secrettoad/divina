@@ -188,7 +188,7 @@ def _divina_component(func):
 
 
 def create_dask_aws_cluster(
-    num_workers, ec2_key=None, keep_alive=False, docker_image=None
+    num_workers, ec2_key=None, debug=False, docker_image=None, machine_type=None, env_vars=None
 ):
     region = (
         "us-east-1"
@@ -204,9 +204,14 @@ def create_dask_aws_cluster(
             "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
             "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
             "AWS_DEFAULT_REGION": region,
+            "MALLOC_TRIM_THRESHOLD_": 0
         },
-        auto_shutdown=not keep_alive,
+        instance_tags={'Terminate-After':'2h'},
+        auto_shutdown=not debug,
         region=region,
+        instance_type=machine_type or 't2.micro',
+        debug=debug
+
     )
     cluster.scale(num_workers)
     return cluster
@@ -221,6 +226,7 @@ class DaskConfiguration:
         ssh_key=None,
         debug=False,
         docker_image=None,
+        machine_type=None
     ):
         if not scheduler_ip and not destination:
             self.destination = "local"
@@ -233,6 +239,7 @@ class DaskConfiguration:
         self.ssh_key = ssh_key
         self.debug = debug
         self.docker_image = docker_image
+        self.machine_type = machine_type
 
 
 def get_dask_client(func):
@@ -250,8 +257,9 @@ def get_dask_client(func):
             with create_dask_aws_cluster(
                 num_workers=config.num_workers,
                 ec2_key=config.ssh_key,
-                keep_alive=config.debug,
+                debug=config.debug,
                 docker_image=config.docker_image,
+                machine_type=config.machine_type,
             ) as cluster:
                 with Client(cluster) as client:  # noqa: F841
                     value = func(*args, **kwargs)

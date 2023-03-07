@@ -1,13 +1,42 @@
 CHANGES
 =======
 
+* fixing global import location
+* fixing global import location
+* fixing global import location
+* fixing global import location
+* fixing global import location
+* fixing global import location
+* fixing global import location
+* fixing global import location
+* fixing global import location
+* prefect and dask aws tested together
+* WIP
+* WIP
+* issue 161 - add aws dask configuration'
+* WIP: aws
+* WIP: assert AWS then ad GCP and Azure
+
+2023.01.26.1
+------------
+
+* tests pass
+* tests passing
+* tests passing
+* tests passing
 * tests passing
 * add pbr
 * add pbr
+* Build docs
+* add pbr
+* Build docs
 * add pbr
 * add pbr
 * add pbr
-* add pbr
+
+2022.01.26
+----------
+
 * Build docs
 * add pbr
 * add pbr
