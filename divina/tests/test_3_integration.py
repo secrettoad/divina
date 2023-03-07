@@ -1,5 +1,7 @@
 from ..pipeline.utils import get_dask_client, DaskConfiguration
 from ..pipeline.pipeline import assert_pipeline_fit_result_equal
+from distributed import Client, LocalCluster
+import dask.dataframe as dd
 
 
 def test_dask_client_aws(
@@ -17,7 +19,7 @@ def test_dask_client_aws(
     def test_flow():
         @get_dask_client
         def run_pipeline(dask_configuration: DaskConfiguration):
-            return test_pipeline_2.fit(df=test_data_agg_multi, prefect=True)
+            return test_pipeline_2.fit(df=test_data_agg_multi)
 
         return run_pipeline(
             dask_configuration=DaskConfiguration(

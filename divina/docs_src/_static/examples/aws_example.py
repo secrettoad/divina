@@ -4,12 +4,11 @@ import dask.dataframe as dd
 import pandas as pd
 
 from divina import Divina
-from divina.pipeline.utils import DaskConfiguration
+from dask_cloudprovider.aws import EC2Cluster
+from dask.distributed import Client
 
 os.environ['AWS_ACCESS_KEY_ID'] = 'your access key'
 os.environ['AWS_SECRET_ACCESS_KEY'] = 'your secret key'
-
-dask_configuration = DaskConfiguration(destination='aws', num_workers=3)
 
 example_data = pd.DataFrame(
     data=[
@@ -26,11 +25,12 @@ example_data_dask = dd.from_pandas(example_data, npartitions=1)
 
 example_pipeline = Divina(target="c", time_index="a", frequency="D")
 
-y_hat_insample = example_pipeline.fit(
-    example_data_dask,
-    dask_configuration=dask_configuration)[0].causal_validation.predictions
+with EC2Cluster(instance_type='t2.small') as cluster:
+    cluster.scale(5)
+    with Client(cluster) as client:
+        y_hat_insample = example_pipeline.fit(
+            example_data_dask)[0].causal_validation.predictions
 
-y_hat_out_of_sample = example_pipeline.predict(
-    example_data_dask.drop(columns="c"),
-    dask_configuration=dask_configuration
-).causal_predictions.predictions
+        y_hat_out_of_sample = example_pipeline.predict(
+            example_data_dask.drop(columns="c")
+        ).causal_predictions.predictions
