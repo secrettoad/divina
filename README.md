@@ -14,30 +14,32 @@
 
 ## What is it?
 
-`divina` is essentially a convenience wrapper that facilitates training, prediction, validation and deployment of an ensemble consisting of a causal, interpretable model that is boosted by an endogenous time-series model, allowing for high levels of automation and accuracy while still emphasizing and relying on the causal relationships discovered by the user. This ensemble structure is delivered with swappable model types to be able to suit many different kinds of forecasting problems. `divina` is also fully integrated with both `dask` and `prefect` meaning that distributed compute and pipeline orchestration can be enabled with the flip of a switch. For more information of `divina`'s features, check out the [documentation](https://secrettoad.github.io/divina/#).
+`divina` confronts four main problems for professional forecasters:
+  
+  - Multiple-horizon forecasting often involves repeated programming of the same, complex code across train, predict, validation and visualization
+  - Many forecasting model implementations do not follow the standard scikit-interface or scale well to large datasets
+  - Different forecasting models often benefit from the complex engineering of the same time-sensitive features
+  - Because of the above three, deployment and scaling of multi-horizon forecasting ensembles is considerably more complex than a typical machine learning pipeline
 
 
 ## Main Features
-Here are just a few of the things that divina does well:
+`divina` addresses the aforementioned problems by:
 
-  - Abstraction of all necessary configuration of a pipeline, from feature selection and engineering to target transformations and confidence intervals, is abstracted to a single python Pipeline object that follows the scikit interface for ease of consumption and ease of transparency.
-  - A user-centric, two-way [**interpretation interface**][interpretation] that allows for granular interpretation of models and predictions while also allowing domain experts to override factors. (In progress)
-  - Abstracted and scalable feature engineering. Computation is handled scalably by the Dask back-end with minimal configuration required by the user and on the cloud provider of the user's choice by leveraging [Dask Cloud Provider](https://cloudprovider.dask.org/en/latest/)
-  - Built-in pipeline orchestration tools, such as log collection, task graph synthesis, task parallelization, task automation and artifact tracing leveraging [Prefect](https://www.prefect.io/)
-  - Automatic persistence of all experiment artifacts, including models, predictions and validation metrics, to s3 for posterity, traceability and easy integration.
-  
+  - Providing a single Python object with a simple interface that abstracts away the complexities of multi-horizon train, predict, valiation and visualization
+  - Providing a library of interface-standardized model ensemble candidates that can be mixed and matched depending on the forecasting problem
+  - Providing consistent, efficient implementations of popular time-series engineered features 
+  - Built-in integration with Dask for efficient, cloud-based scaling and Prefect for automation, fault-tolerance, queue management and artifact persistence 
   
   [interpretation]: https://github.com/secrettoad/divina
   
 ## Roadmap
 Current development priorities and improvements slated for next and beta release are:
 
-  - Addition of interpretability and interference application that makes consuming, understanding and interacting with forecasts easy and seamless
-  - Additional boosting options, such as RNNs, LSTMs, ARIMA, SARIMA, etc.
-  - Addition of more realistic test cases, useful error messages and robust documentation
-  - Inversion of control of Dask cluster creation, allowing for customization of location and size of cloud compute clusters
-   
-   
+  - Addition of visualization methods that produce commonly-required charts via Highcharts
+  - Additional machine learning model options, such as XGBoost,
+  - Additional boosting model options, such as RNNs, LSTMs, ARIMA, SARIMA, etc.
+  - Addition of more realistic test cases, useful error messages and robust documentation 
+  - Addition of GPU support via CUDA, CUDF and CUML
 
 ## Where to get it
 The source code is currently hosted on GitHub at:
@@ -66,8 +68,8 @@ For local integration testing, run the following commands in order to create the
 ```sh
 docker pull jhurdle/divina-storage
 docker pull jhurdle/divina-prefect
-docker run jhurdle/divina-storage -p 9000:9000
-docker run jhurdle/divina-prefect -p 4200:4200
+docker run -p 9000:9000 jhurdle/divina-storage 
+docker run -p 4200:4200 jhurdle/divina-prefect 
 pytest divina/divina/tests
 ```
 

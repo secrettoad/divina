@@ -5,13 +5,12 @@ from itertools import zip_longest
 from typing import Union
 
 import dask.dataframe as dd
-import pandas as pd
 from dask_ml.preprocessing import Categorizer, DummyEncoder
 from pandas.api.types import is_numeric_dtype
 from pandas.testing import assert_frame_equal, assert_series_equal
 from pandas.tseries.holiday import USFederalHolidayCalendar as calendar
 from sklearn.pipeline import make_pipeline
-from distributed import Client
+import pandas as pd
 
 from .utils import (
     Output,
@@ -465,7 +464,7 @@ class Pipeline:
 
         for c in df.columns:
             if df[c].dtype == bool:
-                df[c] = df[c].astype(float)
+                df[c] = df[c]
 
         if self.include_features:
             df = (
@@ -1025,9 +1024,8 @@ class Pipeline:
                 validation_split.boosted_validations = boosted_validations
             return validation_split
 
+
         df = self.preprocess(df, prefect=prefect, start=start, end=end)
-        if type(df) == dd.DataFrame:
-            df = df.persist()
         self.fit_features = df.columns
         validation_splits = []
         if self.validation_splits:
@@ -1125,8 +1123,6 @@ class Pipeline:
                         lag_features=x_wide,
                     )
                 )
-
-                # TODO aggregate boosted predictions into single series
             return PipelinePredictResult(
                 causal_predictions=causal_prediction,
                 truth=x,

@@ -1,0 +1,6 @@
+docs_heavy_assets/*
+docs/*
+.github/*
+.pytest_cache/*
+*/.pytest-divina
+.git/*
