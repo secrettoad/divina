@@ -4,7 +4,7 @@
 
 -----------------
 
-# divina: scalable and hyper-interpretable causal forecasting toolkit
+# divina: scalable and automatable multi-horizon causal forecasting toolkit
 [![Continuous Integration](https://github.com/secrettoad/divina/actions/workflows/prod.yaml/badge.svg)](https://github.com/secrettoad/divina/actions/workflows/prod.yaml)
 [![PyPI Latest Release](https://img.shields.io/pypi/v/divina.svg)](https://pypi.org/project/divina/)
 [![Package Status](https://img.shields.io/pypi/status/divina.svg)](https://pypi.org/project/divina/)
