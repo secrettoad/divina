@@ -36,7 +36,7 @@
 Current development priorities and improvements slated for next and beta release are:
 
   - Addition of visualization methods that produce commonly-required charts via Highcharts
-  - Additional machine learning model options, such as XGBoost,
+  - Additional machine learning model options, such as XGBoost and CNNs
   - Additional boosting model options, such as RNNs, LSTMs, ARIMA, SARIMA, etc.
   - Addition of more realistic test cases, useful error messages and robust documentation 
   - Addition of GPU support via CUDA, CUDF and CUML
