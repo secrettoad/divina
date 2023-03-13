@@ -16,6 +16,8 @@ jobs:
         uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install twine and wheel
+        run: pip install twine wheel
       - name: Get latest tag
         id: previoustag
         uses: WyriHaximus/github-action-get-previous-tag@v1
