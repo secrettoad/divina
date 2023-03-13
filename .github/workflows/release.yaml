@@ -10,7 +10,6 @@ jobs:
   release:
     environment: prod
     runs-on: ubuntu-latest
-    container: jhurdle/divina:test
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
